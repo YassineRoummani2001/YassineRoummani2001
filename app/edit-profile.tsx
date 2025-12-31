@@ -1,0 +1,616 @@
+import { COUNTRY_CODES } from '@/constants/CountryCodes';
+import { PROFILE } from '@/constants/MockData';
+import { useThemeContext } from '@/context/ThemeContext';
+import { useUser } from '@/context/UserContext';
+import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
+import { Camera, Check, ChevronDown, Pencil, Search, X } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import { FlatList, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ConfirmationModal from '../components/ConfirmationModal';
+
+export default function EditProfileScreen() {
+    const router = useRouter();
+    const { user, updateProfile } = (useUser() || {}) as any;
+    const { colors, isDark } = useThemeContext();
+    const insets = useSafeAreaInsets();
+    const [saving, setSaving] = useState(false);
+
+    // Initialize with user data or defaults
+    const [name, setName] = useState(user?.name || '');
+    const [handle, setHandle] = useState(user?.handle || '');
+    const [bio, setBio] = useState(user?.bio || '');
+    const [avatar, setAvatar] = useState(user?.avatar || '');
+    const [coverImage, setCoverImage] = useState(user?.coverImage || PROFILE.user.coverImage);
+    const [pronouns, setPronouns] = useState(user?.pronouns || '');
+    const [gender, setGender] = useState(user?.gender || '');
+    const [website, setWebsite] = useState(user?.links && user.links.length > 0 ? user.links[0].url : '');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [successModalVisible, setSuccessModalVisible] = useState(false);
+    const [errorModalVisible, setErrorModalVisible] = useState(false);
+    const [modalMessage, setModalMessage] = useState({ title: '', message: '' });
+
+    const [phone, setPhone] = useState(user?.phone || '');
+    const defaultCountry = COUNTRY_CODES.find(c => c.code === '+212') || COUNTRY_CODES[0];
+    const [selectedCountry, setSelectedCountry] = useState(defaultCountry);
+    const [isCountryPickerVisible, setIsCountryPickerVisible] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    useEffect(() => {
+        if (user?.phone) {
+            const match = COUNTRY_CODES.find(c => user.phone.startsWith(c.code));
+            if (match) {
+                setSelectedCountry(match);
+                setPhone(user.phone.replace(match.code, '').trim());
+            } else {
+                setPhone(user.phone);
+            }
+        }
+    }, [user]);
+
+    // Fallback if no user loaded
+    if (!user) return <View style={[styles.container, { backgroundColor: colors.background }]}><Text style={{ color: colors.text }}>Loading...</Text></View>;
+
+    const pickImage = async (type: string) => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: type === 'avatar' ? [1, 1] : [16, 9],
+            quality: 0.5,
+            base64: true,
+        });
+
+        if (!result.canceled) {
+            const uri = result.assets[0].base64
+                ? `data:${result.assets[0].mimeType || 'image/jpeg'};base64,${result.assets[0].base64}`
+                : result.assets[0].uri;
+
+            if (type === 'avatar') {
+                setAvatar(uri);
+            } else {
+                setCoverImage(uri);
+            }
+        }
+    };
+
+    const handleSave = async () => {
+        setSaving(true);
+        // Prepare data
+        // Only prepend code if phone is not empty
+        let fullPhone = phone;
+        if (phone) {
+            fullPhone = selectedCountry.code + phone.replace(/^0+/, '');
+        }
+
+        const updatedUser: any = {
+            name,
+            handle,
+            bio,
+            pronouns,
+            gender,
+            phone: fullPhone,
+            links: website ? [{ title: 'Website', url: website }] : [],
+            avatar,
+            coverImage
+        };
+
+        if (newPassword) {
+            if (newPassword !== confirmPassword) {
+                setModalMessage({
+                    title: 'Password Mismatch',
+                    message: 'Passwords do not match!'
+                });
+                setErrorModalVisible(true);
+                setSaving(false);
+                return;
+            }
+            if (newPassword.length < 6) {
+                setModalMessage({
+                    title: 'Password Too Short',
+                    message: 'Password must be at least 6 characters'
+                });
+                setErrorModalVisible(true);
+                setSaving(false);
+                return;
+            }
+            updatedUser.password = newPassword;
+        }
+
+        const result = await updateProfile(updatedUser);
+        setSaving(false);
+
+        if (result?.success) {
+            setModalMessage({
+                title: 'Profile Updated',
+                message: 'Your profile has been saved successfully!'
+            });
+            setSuccessModalVisible(true);
+            setTimeout(() => router.back(), 1500);
+        } else {
+            setModalMessage({
+                title: 'Update Failed',
+                message: result?.message || 'Failed to update profile'
+            });
+            setErrorModalVisible(true);
+        }
+    };
+
+    const filteredCountries = COUNTRY_CODES.filter(c =>
+        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.country.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.code.includes(searchQuery)
+    );
+
+    const renderCountryPicker = () => (
+        <Modal
+            visible={isCountryPickerVisible}
+            animationType="slide"
+            presentationStyle="pageSheet"
+            onRequestClose={() => setIsCountryPickerVisible(false)}
+        >
+            <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+                <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+                    <Text style={[styles.modalTitle, { color: colors.text }]}>Select Country</Text>
+                    <TouchableOpacity onPress={() => setIsCountryPickerVisible(false)}>
+                        <X size={24} color={colors.text} />
+                    </TouchableOpacity>
+                </View>
+
+                <View style={[styles.searchContainer, { backgroundColor: isDark ? '#1F1F1F' : '#F2F2F7' }]}>
+                    <Search size={20} color={colors.textSecondary} />
+                    <TextInput
+                        style={[styles.searchInput, { color: colors.text }]}
+                        placeholder="Search country..."
+                        placeholderTextColor={colors.textSecondary}
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                    />
+                </View>
+
+                <FlatList
+                    data={filteredCountries}
+                    keyExtractor={(item) => item.country}
+                    keyboardShouldPersistTaps="handled"
+                    renderItem={({ item }) => (
+                        <TouchableOpacity
+                            style={[styles.countryItem, { borderBottomColor: colors.border }]}
+                            onPress={() => {
+                                setSelectedCountry(item);
+                                setIsCountryPickerVisible(false);
+                            }}
+                        >
+                            <Image
+                                source={{ uri: `https://flagcdn.com/w80/${item.country.toLowerCase()}.png` }}
+                                style={styles.flagIcon}
+                            />
+                            <Text style={[styles.countryName, { color: colors.text }]}>{item.name}</Text>
+                            <Text style={[styles.countryCode, { color: colors.textSecondary }]}>{item.code}</Text>
+                        </TouchableOpacity>
+                    )}
+                />
+            </View>
+        </Modal>
+    );
+
+    return (
+        <View style={[styles.container, { backgroundColor: colors.background, paddingBottom: insets.bottom }]}>
+            {/* Header */}
+            <View style={[styles.header, {
+                borderBottomColor: colors.border,
+                backgroundColor: colors.background,
+                paddingTop: insets.top || 20
+            }]}>
+                <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
+                    <X size={24} color={colors.text} />
+                </TouchableOpacity>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>Edit Profile</Text>
+                <TouchableOpacity onPress={handleSave} style={styles.headerBtn} disabled={saving}>
+                    {saving ? <Text style={{ color: colors.primary }}>...</Text> : <Check size={24} color={colors.primary} />}
+                </TouchableOpacity>
+            </View>
+
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+                <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+                    {/* Visual & Avatar Section */}
+                    <View style={styles.visualSection}>
+                        <View style={styles.coverWrapper}>
+                            <Image source={{ uri: coverImage }} style={styles.coverImage} resizeMode="cover" />
+                            <TouchableOpacity style={styles.changeCoverBtn} onPress={() => pickImage('cover')}>
+                                <Camera size={18} color="white" />
+                                <Text style={styles.changeCoverText}>Edit Cover</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.avatarSection} pointerEvents="box-none">
+                            <View style={[styles.avatarWrapper, { backgroundColor: colors.background }]}>
+                                <Image source={{ uri: avatar }} style={[styles.avatar]} />
+                                <TouchableOpacity
+                                    style={[styles.cameraIcon, { backgroundColor: colors.primary, borderColor: colors.background }]}
+                                    onPress={() => pickImage('avatar')}
+                                >
+                                    <Pencil size={16} color="white" />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+
+                    <View style={styles.content}>
+                        {/* Section: Public Info */}
+                        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Public Info</Text>
+
+                        <View style={[styles.inputGroup, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF', borderColor: colors.border }]}>
+                            <View style={[styles.inputContainer, { borderBottomColor: colors.border }]}>
+                                <Text style={[styles.label, { color: colors.textSecondary }]}>Name</Text>
+                                <TextInput
+                                    style={[styles.input, { color: colors.text }]}
+                                    value={name}
+                                    onChangeText={setName}
+                                    placeholder="Your Name"
+                                    placeholderTextColor={colors.textSecondary}
+                                />
+                            </View>
+
+                            <View style={[styles.inputContainer, { borderBottomColor: colors.border }]}>
+                                <Text style={[styles.label, { color: colors.textSecondary }]}>Username</Text>
+                                <TextInput
+                                    style={[styles.input, { color: colors.text }]}
+                                    value={handle}
+                                    onChangeText={setHandle}
+                                    placeholder="@username"
+                                    placeholderTextColor={colors.textSecondary}
+                                    autoCapitalize="none"
+                                />
+                            </View>
+
+                            <View style={[styles.inputContainer, { borderBottomWidth: 0 }]}>
+                                <Text style={[styles.label, { color: colors.textSecondary }]}>Bio</Text>
+                                <TextInput
+                                    style={[styles.input, styles.textArea, { color: colors.text }]}
+                                    value={bio}
+                                    onChangeText={setBio}
+                                    placeholder="Write a short bio..."
+                                    placeholderTextColor={colors.textSecondary}
+                                    multiline
+                                />
+                            </View>
+                        </View>
+
+                        {/* Section: Details */}
+                        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Details</Text>
+
+                        <View style={[styles.inputGroup, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF', borderColor: colors.border }]}>
+                            <View style={[styles.inputContainer, { borderBottomColor: colors.border }]}>
+                                <Text style={[styles.label, { color: colors.textSecondary }]}>Pronouns</Text>
+                                <TextInput
+                                    style={[styles.input, { color: colors.text }]}
+                                    value={pronouns}
+                                    onChangeText={setPronouns}
+                                    placeholder="he/him, she/her"
+                                    placeholderTextColor={colors.textSecondary}
+                                />
+                            </View>
+
+                            <View style={[styles.inputContainer, { borderBottomColor: colors.border }]}>
+                                <Text style={[styles.label, { color: colors.textSecondary }]}>Website</Text>
+                                <TextInput
+                                    style={[styles.input, { color: colors.text }]}
+                                    value={website}
+                                    onChangeText={setWebsite}
+                                    placeholder="https://your-site.com"
+                                    placeholderTextColor={colors.textSecondary}
+                                    autoCapitalize="none"
+                                />
+                            </View>
+
+                            <View style={[styles.inputContainer, { borderBottomColor: colors.border }]}>
+                                <Text style={[styles.label, { color: colors.textSecondary }]}>Gender</Text>
+                                <View style={styles.genderRow}>
+                                    {['Male', 'Female', 'Other'].map((option) => (
+                                        <TouchableOpacity
+                                            key={option}
+                                            style={[
+                                                styles.genderChip,
+                                                gender === option ? { backgroundColor: colors.primary } : { backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7' }
+                                            ]}
+                                            onPress={() => setGender(option)}
+                                        >
+                                            <Text style={[
+                                                styles.genderText,
+                                                gender === option ? { color: 'white' } : { color: colors.text }
+                                            ]}>
+                                                {option}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            </View>
+
+                            <View style={[styles.inputContainer, { borderBottomWidth: 0 }]}>
+                                <Text style={[styles.label, { color: colors.textSecondary }]}>Phone</Text>
+                                <View style={styles.phoneRow}>
+                                    <TouchableOpacity
+                                        style={[styles.countrySelector, { borderRightColor: colors.border }]}
+                                        onPress={() => setIsCountryPickerVisible(true)}
+                                    >
+                                        <Image
+                                            source={{ uri: `https://flagcdn.com/w80/${selectedCountry.country.toLowerCase()}.png` }}
+                                            style={styles.flagIconSmall}
+                                        />
+                                        <Text style={{ color: colors.text, fontSize: 16, fontWeight: '500', marginHorizontal: 6 }}>{selectedCountry.code}</Text>
+                                        <ChevronDown size={14} color={colors.textSecondary} />
+                                    </TouchableOpacity>
+                                    <TextInput
+                                        style={[styles.input, { flex: 1, paddingVertical: 0, height: '100%' }]}
+                                        value={phone}
+                                        onChangeText={setPhone}
+                                        placeholder="Mobile Number"
+                                        placeholderTextColor={colors.textSecondary}
+                                        keyboardType="phone-pad"
+                                        maxLength={15}
+                                    />
+                                </View>
+                            </View>
+                        </View>
+
+                        {/* Section: Security */}
+                        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Security</Text>
+
+                        <View style={[styles.inputGroup, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF', borderColor: colors.border }]}>
+                            <View style={[styles.inputContainer, { borderBottomColor: colors.border }]}>
+                                <Text style={[styles.label, { color: colors.textSecondary }]}>New Password</Text>
+                                <TextInput
+                                    style={[styles.input, { color: colors.text }]}
+                                    value={newPassword}
+                                    onChangeText={setNewPassword}
+                                    placeholder="Enter new password"
+                                    placeholderTextColor={colors.textSecondary}
+                                    secureTextEntry
+                                />
+                            </View>
+                            <View style={[styles.inputContainer, { borderBottomWidth: 0 }]}>
+                                <Text style={[styles.label, { color: colors.textSecondary }]}>Confirm Password</Text>
+                                <TextInput
+                                    style={[styles.input, { color: colors.text }]}
+                                    value={confirmPassword}
+                                    onChangeText={setConfirmPassword}
+                                    placeholder="Re-enter new password"
+                                    placeholderTextColor={colors.textSecondary}
+                                    secureTextEntry
+                                />
+                            </View>
+                        </View>
+
+                        <TouchableOpacity style={{ alignSelf: 'center', marginTop: 10 }} onPress={() => alert('Reset link sent!')}>
+                            <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '600' }}>Forgot Password?</Text>
+                        </TouchableOpacity>
+
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+
+            {/* Country Picker Modal */}
+            {renderCountryPicker()}
+
+            {/* Success Modal */}
+            <ConfirmationModal
+                visible={successModalVisible}
+                onClose={() => setSuccessModalVisible(false)}
+                title={modalMessage.title}
+                message={modalMessage.message}
+                type="success"
+            />
+
+            {/* Error Modal */}
+            <ConfirmationModal
+                visible={errorModalVisible}
+                onClose={() => setErrorModalVisible(false)}
+                title={modalMessage.title}
+                message={modalMessage.message}
+                type="error"
+            />
+        </View >
+    );
+}
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingTop: Platform.OS === 'android' ? 40 : 20,
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+    },
+    headerBtn: {
+        padding: 8,
+    },
+    headerTitle: {
+        fontSize: 17,
+        fontWeight: '600',
+    },
+    visualSection: {
+        marginBottom: 10,
+    },
+    coverWrapper: {
+        height: 160,
+        width: '100%',
+        position: 'relative',
+    },
+    coverImage: {
+        width: '100%',
+        height: '100%',
+    },
+    changeCoverBtn: {
+        position: 'absolute',
+        bottom: 12,
+        right: 12,
+        zIndex: 10,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 20,
+    },
+    changeCoverText: {
+        color: 'white',
+        fontSize: 12,
+        fontWeight: '600',
+        marginLeft: 6,
+    },
+    avatarSection: {
+        alignItems: 'center',
+        marginTop: -50,
+    },
+    avatarWrapper: {
+        position: 'relative',
+        padding: 4,
+        borderRadius: 60,
+    },
+    avatar: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+    },
+    cameraIcon: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 3,
+    },
+    content: {
+        paddingHorizontal: 16,
+        paddingTop: 10,
+    },
+    sectionTitle: {
+        fontSize: 13,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        marginLeft: 16,
+        marginBottom: 8,
+        marginTop: 24,
+        letterSpacing: 0.5,
+    },
+    inputGroup: {
+        borderRadius: 12,
+        overflow: 'hidden',
+        borderWidth: 1, // subtle border usually
+    },
+    inputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12, // More breathing room
+        borderBottomWidth: 1, // Separator
+    },
+    label: {
+        width: 90, // Fixed width for alignment
+        fontSize: 15,
+        fontWeight: '500',
+    },
+    input: {
+        flex: 1,
+        fontSize: 16,
+        paddingVertical: 0, // Reset default padding
+    },
+    textArea: {
+        minHeight: 60,
+        textAlignVertical: 'center',
+        paddingTop: 0,
+    },
+    genderRow: {
+        flex: 1,
+        flexDirection: 'row',
+        gap: 8,
+    },
+    genderChip: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
+    },
+    genderText: {
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    phoneRow: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        height: 24, // Match text height approx
+    },
+    countrySelector: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingRight: 10,
+        marginRight: 10,
+        borderRightWidth: 1,
+        height: '100%',
+    },
+    flagIconSmall: {
+        width: 21,
+        height: 14,
+        borderRadius: 2,
+    },
+
+    // Modal Styles
+    modalContainer: {
+        flex: 1,
+        paddingTop: 10,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 0.5,
+    },
+    modalTitle: {
+        fontSize: 17,
+        fontWeight: '600',
+    },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        margin: 16,
+        paddingHorizontal: 12,
+        borderRadius: 10,
+        height: 36,
+    },
+    searchInput: {
+        flex: 1,
+        marginLeft: 8,
+        fontSize: 16,
+    },
+    countryItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderBottomWidth: 0.5,
+    },
+    flagIcon: {
+        width: 30,
+        height: 20,
+        marginRight: 12,
+        borderRadius: 3,
+    },
+    countryName: {
+        flex: 1,
+        fontSize: 16,
+    },
+    countryCode: {
+        fontSize: 16,
+        fontWeight: '400',
+    },
+});
