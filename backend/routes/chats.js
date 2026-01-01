@@ -51,29 +51,100 @@ router.post('/', protect, async (req, res) => {
     }
 });
 
-// Get messages for a chat
+// Get messages for a chat (Paginated)
 router.get('/:chatId/messages', protect, async (req, res) => {
     try {
-        const messages = await Message.find({ chatId: req.params.chatId })
+        const limit = parseInt(req.query.limit) || 50;
+        const before = req.query.before;
+
+        const query = { chatId: req.params.chatId };
+        if (before) {
+            query.createdAt = { $lt: new Date(before) };
+        }
+
+        const messages = await Message.find(query)
             .populate('sender', 'name handle avatar')
-            .populate('postId', 'uri videoUri')
-            .populate('marketitemId')
+            .populate({
+                path: 'postId',
+                select: 'uri videoUri user',
+                populate: { path: 'user', select: 'name username avatar' }
+            })
+            .populate({
+                path: 'marketitemId',
+                populate: { path: 'user', select: 'name username avatar' }
+            })
             .populate({
                 path: 'replyTo',
                 select: 'content type sender',
                 populate: { path: 'sender', select: 'name' }
             })
-            .sort({ createdAt: 1 });
+            .sort({ createdAt: -1 }) // Newest first
+            .limit(limit);
+
         res.json(messages);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
 
-// Send message
-router.post('/:chatId/messages', protect, async (req, res) => {
-    const { content, type, duration } = req.body;
+const mult = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Configure upload storage
+const uploadDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = mult.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const upload = mult({ 
+    storage: storage,
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+    fileFilter: (req, file, cb) => {
+        // Accept images, videos, audio
+        if (file.mimetype.startsWith('image/') || 
+            file.mimetype.startsWith('video/') || 
+            file.mimetype.startsWith('audio/') ||
+            // Fallback for some audio types that might not have audio/ prefix on some systems
+            file.originalname.match(/\.(mp3|wav|m4a|aac|ogg)$/i)
+           ) {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid file type'));
+        }
+    }
+});
+
+// Send message (support text and file upload)
+router.post('/:chatId/messages', protect, upload.single('file'), async (req, res) => {
+    // req.body will contain text fields
+    // req.file will contain the file if uploaded
+    let { content, type, duration } = req.body;
+    
     try {
+        if (req.file) {
+            // If file uploaded, content is the filename (or relative path)
+            // The frontend helper 'getCorrectUrl' handles adding the base URL
+            content = req.file.filename;
+            
+            // Auto-detect type if not provided
+            if (!type) {
+                if (req.file.mimetype.startsWith('image/')) type = 'image';
+                else if (req.file.mimetype.startsWith('video/')) type = 'video';
+                else if (req.file.mimetype.startsWith('audio/')) type = 'audio';
+            }
+        }
+
         const chat = await Chat.findById(req.params.chatId);
         let expireAt = null;
         if (chat && chat.disappearingMessages && chat.disappearingMessages > 0) {
@@ -93,7 +164,7 @@ router.post('/:chatId/messages', protect, async (req, res) => {
         });
 
         await Chat.findByIdAndUpdate(req.params.chatId, {
-            lastMessage: content,
+            lastMessage: type === 'text' ? content : `Sent a ${type}`,
             lastMessageSender: req.user._id,
             updatedAt: Date.now()
         });
@@ -108,6 +179,7 @@ router.post('/:chatId/messages', protect, async (req, res) => {
             });
         res.json(fullMessage);
     } catch (err) {
+        console.error("Message Send Error:", err);
         res.status(500).json({ message: err.message });
     }
 });
@@ -285,6 +357,36 @@ router.delete('/:chatId/messages/:messageId', protect, async (req, res) => {
     }
 });
 
+// Edit a message
+router.put('/:chatId/messages/:messageId', protect, async (req, res) => {
+    const { content } = req.body;
+    try {
+        const message = await Message.findById(req.params.messageId);
+
+        if (!message) {
+            return res.status(404).json({ message: 'Message not found' });
+        }
+
+        // Verify ownership
+        if (message.sender.toString() !== req.user._id.toString()) {
+            return res.status(401).json({ message: 'Not authorized to edit this message' });
+        }
+
+        // Only allow editing text messages for now
+        if (message.type !== 'text') {
+             return res.status(400).json({ message: 'Only text messages can be edited' });
+        }
+
+        message.content = content;
+        // message.isEdited = true; 
+        await message.save();
+
+        res.json(message);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 // React to a message
 router.post('/:chatId/messages/:messageId/react', protect, async (req, res) => {
     const { emoji } = req.body;
@@ -294,19 +396,25 @@ router.post('/:chatId/messages/:messageId/react', protect, async (req, res) => {
 
         if (!message.reactions) message.reactions = new Map();
         
-        const userReactions = message.reactions.get(emoji) || [];
-        const userIndex = userReactions.indexOf(req.user._id);
-
-        if (userIndex > -1) {
-            // Remove reaction
-            userReactions.splice(userIndex, 1);
-            if (userReactions.length === 0) {
-                message.reactions.delete(emoji);
-            } else {
-                message.reactions.set(emoji, userReactions);
+        // Remove user from ALL reaction lists (Enforce single reaction per user)
+        let removedFrom = null;
+        for (const [key, users] of message.reactions.entries()) {
+            const index = users.indexOf(req.user._id);
+            if (index > -1) {
+                users.splice(index, 1);
+                if (users.length === 0) {
+                    message.reactions.delete(key);
+                } else {
+                    message.reactions.set(key, users);
+                }
+                removedFrom = key;
             }
-        } else {
-            // Add reaction
+        }
+
+        // If the user didn't just remove the SAME emoji, add the new one
+        // (Toggle behavior: click same -> remove. click different -> switch)
+        if (removedFrom !== emoji) {
+            const userReactions = message.reactions.get(emoji) || [];
             userReactions.push(req.user._id);
             message.reactions.set(emoji, userReactions);
         }

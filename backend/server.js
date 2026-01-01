@@ -38,6 +38,7 @@ require('./models/Message');
 require('./models/MarketItem');
 require('./models/Announcement');
 require('./models/Report');
+require('./models/Note');
 
 
 // Routes definitions
@@ -50,6 +51,7 @@ app.use('/api/chats', require('./routes/chats'));
 app.use('/api/upload', require('./routes/upload'));
 app.use('/api/marketplace', require('./routes/marketplace'));
 app.use('/api/announcements', require('./routes/announcements'));
+app.use('/api/notes', require('./routes/notes'));
 
 
 app.get('/', (req, res) => {

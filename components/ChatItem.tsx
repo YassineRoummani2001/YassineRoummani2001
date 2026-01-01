@@ -11,6 +11,7 @@ interface ChatItemProps {
     online?: boolean;
     onPress: () => void;
     isDark: boolean;
+    lastMessageSender?: string;
 }
 
 const ChatItem = memo(({
@@ -21,7 +22,8 @@ const ChatItem = memo(({
     unread = 0,
     online = false,
     onPress,
-    isDark
+    isDark,
+    lastMessageSender
 }: ChatItemProps) => {
 
     // Fallback initials
@@ -50,6 +52,8 @@ const ChatItem = memo(({
         >
             {/* Avatar */}
             <View style={styles.avatarContainer}>
+                {/* Note Bubble Removed */}
+
                 {avatar ? (
                     <Image
                         source={{ uri: avatar }}
@@ -105,6 +109,36 @@ const styles = StyleSheet.create({
     avatarContainer: {
         marginRight: 14,
         position: 'relative',
+    },
+    noteBubble: {
+        position: 'absolute',
+        top: -50,
+        left: -10,
+        minWidth: 80,
+        maxWidth: 150,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 16,
+        zIndex: 10,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
+    },
+    noteText: {
+        fontSize: 12,
+        fontWeight: '500',
+        lineHeight: 16,
+        textAlign: 'center',
+    },
+    noteTail: {
+        position: 'absolute',
+        bottom: -4,
+        left: 20,
+        width: 8,
+        height: 8,
+        transform: [{ rotate: '45deg' }],
     },
     avatar: {
         width: 56,

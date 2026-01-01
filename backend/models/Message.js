@@ -56,4 +56,7 @@ const messageSchema = new mongoose.Schema({
   }
 });
 
+// Index for fetching messages in a chat efficiently
+messageSchema.index({ chatId: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Message', messageSchema);
