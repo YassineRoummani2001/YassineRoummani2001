@@ -1,7 +1,7 @@
 import { API_BASE_URL } from '@/constants/Config';
 import { useThemeContext } from '@/context/ThemeContext';
 import { useUser } from '@/context/UserContext';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -13,7 +13,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CreateStoryView from '@/components/CreateStoryView';
 
 export default function CreateScreen() {
-    const { user } = useUser() || {};
+    const context = useUser();
+    const user = (context as any)?.user;
     const router = useRouter();
     const navigation = useNavigation();
     const { colors, isDark } = useThemeContext();
@@ -73,22 +74,20 @@ export default function CreateScreen() {
                             style={[styles.tabItem]}
                             onPress={() => setActiveTab('post')}
                         >
-                            <Text style={[styles.tabText, { color: 'rgba(255,255,255,0.6)' }, activeTab === 'post' && styles.activeTabText]}>POST</Text>
-                            {activeTab === 'post' && <View style={[styles.activeIndicator, { backgroundColor: '#fff' }]} />}
+                            <Text style={[styles.tabText, { color: 'rgba(255,255,255,0.6)' }]}>POST</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={[styles.tabItem]}
                             onPress={() => setActiveTab('reel')}
                         >
-                            <Text style={[styles.tabText, { color: 'rgba(255,255,255,0.6)' }, activeTab === 'reel' && styles.activeTabText]}>REEL</Text>
-                            {activeTab === 'reel' && <View style={[styles.activeIndicator, { backgroundColor: '#fff' }]} />}
+                            <Text style={[styles.tabText, { color: 'rgba(255,255,255,0.6)' }]}>REEL</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={[styles.tabItem]}
                             onPress={() => setActiveTab('story')}
                         >
                             <Text style={[styles.tabText, { color: '#fff', fontWeight: '900', textShadowColor: 'black', textShadowRadius: 2 }]}>STORY</Text>
-                            {activeTab === 'story' && <View style={[styles.activeIndicator, { backgroundColor: '#fff' }]} />}
+                            <View style={[styles.activeIndicator, { backgroundColor: '#fff' }]} />
                         </TouchableOpacity>
                     </View>
                 )}
@@ -136,7 +135,7 @@ export default function CreateScreen() {
             }
         } else {
             try {
-                const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+                const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
                 // Simple guess based on common image types since we only use this for Post images
                 return `data:image/jpeg;base64,${base64}`;
             } catch (error) {
@@ -184,7 +183,7 @@ export default function CreateScreen() {
                 });
 
                 if (response.ok) {
-                    router.replace('/(tabs)/');
+                    router.replace('/(tabs)/' as any);
                     setTimeout(() => alert('Reel created successfully! 🎉'), 300);
                 } else {
                     const errorText = await response.text();
@@ -222,7 +221,7 @@ export default function CreateScreen() {
                 });
 
                 if (response.ok) {
-                    router.replace('/(tabs)/');
+                    router.replace('/(tabs)/' as any);
                     setTimeout(() => alert('Post created successfully! 🎉'), 300);
                 } else {
                     const errorText = await response.text();
@@ -357,8 +356,7 @@ export default function CreateScreen() {
                     style={styles.tabItem}
                     onPress={() => setActiveTab('story')}
                 >
-                    <Text style={[styles.tabText, activeTab === 'story' && styles.activeTabText]}>STORY</Text>
-                    {activeTab === 'story' && <View style={styles.activeIndicator} />}
+                    <Text style={[styles.tabText]}>STORY</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -417,13 +415,11 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
         paddingBottom: 140, // Extra padding for safe scrolling on all devices
     },
     mediaPlaceholder: {
-        height: 400, // Reduced further to ensure inputs are higher up (tl3ha chwi)
-        backgroundColor: isDark ? '#111' : colors.gray,
+        height: 400,
+        backgroundColor: isDark ? '#1C1C1E' : colors.gray,
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
-        // borderBottomWidth: 1, // Removed to match screenshot clean look
-        // borderBottomColor: colors.border,
     },
     mediaIcons: {
         alignItems: 'center',
@@ -433,7 +429,7 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
         width: 80,
         height: 80,
         borderRadius: 40,
-        backgroundColor: isDark ? '#222' : '#e0e0e0',
+        backgroundColor: isDark ? '#2C2C2E' : '#e0e0e0',
         alignItems: 'center',
         justifyContent: 'center',
     },

@@ -33,7 +33,7 @@ interface NewChatModalProps {
 
 export default function NewChatModal({ visible, onClose }: NewChatModalProps) {
     const router = useRouter();
-    const { user } = useUser() || { user: null };
+    const { user } = (useUser() || {}) as any;
     const { theme, colors: activeColors, isDark } = useThemeContext();
     const colorScheme = theme;
 
@@ -99,15 +99,17 @@ export default function NewChatModal({ visible, onClose }: NewChatModalProps) {
                 </View>
 
                 {/* Search Bar */}
-                <View style={[styles.searchContainer, { backgroundColor: isDark ? '#1A1A1A' : '#F0F0F0' }]}>
-                    <Search size={20} color={activeColors.textSecondary} />
-                    <TextInput
-                        style={[styles.searchInput, { color: activeColors.text }]}
-                        placeholder="Search..."
-                        placeholderTextColor={activeColors.textSecondary}
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                    />
+                <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+                    <View style={[styles.searchContainer, { backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7', margin: 0 }]}>
+                        <Search size={18} color={activeColors.textSecondary} />
+                        <TextInput
+                            style={[styles.searchInput, { color: activeColors.text }]}
+                            placeholder="To: "
+                            placeholderTextColor={activeColors.textSecondary}
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                        />
+                    </View>
                 </View>
 
                 {/* Users List */}
@@ -180,11 +182,10 @@ const styles = StyleSheet.create({
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        margin: 16,
         paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderRadius: 12,
-        gap: 12,
+        paddingVertical: 10,
+        borderRadius: 24, // Pill shape
+        gap: 8,
     },
     searchInput: {
         flex: 1,

@@ -1,6 +1,7 @@
 import { Colors } from '@/constants/Colors';
-import { API_BASE_URL } from '@/constants/Config';
 import { useThemeContext } from '@/context/ThemeContext';
+import { ApiClient } from '@/utils/api';
+import ErrorHandler from '@/utils/ErrorHandler';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -111,21 +112,14 @@ export default function SignupScreen() {
 
         setLoading(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: name.trim(),
-                    email: email.toLowerCase().trim(),
-                    password
-                }),
+            const response = await ApiClient.post('/api/auth/register', {
+                name: name.trim(),
+                email: email.toLowerCase().trim(),
+                password
             });
 
-            const data = await response.json();
-
-            if (response.ok) {
-                // Success! In a real app, save token to AsyncStorage here
-                console.log('User registered:', data);
+            if (response.success) {
+                console.log('User registered:', response.data);
                 Toast.show({
                     type: 'success',
                     text1: 'Account Created! 🎉',
@@ -133,48 +127,25 @@ export default function SignupScreen() {
                 });
                 router.replace('/auth/login');
             } else {
-                // Handle specific error cases
-                if (response.status === 409) {
-                    // Duplicate email (Conflict)
-                    if (data.field === 'email') {
-                        setEmailError('This email is already in use');
-                        Toast.show({
-                            type: 'error',
-                            text1: 'Email Already Registered',
-                            text2: 'This email is already in use. Try logging in instead.',
-                        });
-                    }
-                } else if (response.status === 400) {
-                    // Validation error
-                    if (data.field === 'email') {
-                        setEmailError(data.message);
-                    } else if (data.field === 'password') {
-                        setPasswordError(data.message);
-                    } else if (data.field === 'name') {
-                        setNameError(data.message);
-                    }
-
-                    Toast.show({
-                        type: 'error',
-                        text1: 'Validation Error',
-                        text2: data.message || 'Please check your input',
-                    });
-                } else {
-                    // Generic error
-                    Toast.show({
-                        type: 'error',
-                        text1: 'Signup Failed',
-                        text2: data.message || 'Could not create account',
-                    });
+                // Specific field mapping for errors
+                const msg = response.message || '';
+                if (msg.toLowerCase().includes('email')) {
+                    setEmailError(msg);
+                } else if (msg.toLowerCase().includes('password')) {
+                    setPasswordError(msg);
+                } else if (msg.toLowerCase().includes('name')) {
+                    setNameError(msg);
                 }
+
+                Toast.show({
+                    type: 'error',
+                    text1: 'Signup Failed',
+                    text2: msg || 'Could not create account',
+                });
             }
         } catch (error) {
             console.error('Signup error:', error);
-            Toast.show({
-                type: 'error',
-                text1: 'Network Error',
-                text2: 'Please check your connection and try again.',
-            });
+            ErrorHandler.show('Please check your connection and try again.', 'toast');
         } finally {
             setLoading(false);
         }

@@ -29,7 +29,7 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({ child
         // Configure reachability check to avoid errors on localhost:8081
         // On web, we point to our own API which has CORS enabled to avoid CORS blocks
         NetInfo.configure({
-            reachabilityUrl: Platform.OS === 'web' ? `${API_BASE_URL}/` : 'https://clients3.google.com/generate_204',
+            reachabilityUrl: Platform.OS === 'web' ? API_BASE_URL : 'https://clients3.google.com/generate_204',
             reachabilityTest: async (response) => response.status === 204 || response.status === 200,
             reachabilityLongTimeout: 60 * 1000, // 60s
             reachabilityShortTimeout: 5 * 1000, // 5s

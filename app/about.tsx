@@ -2,7 +2,7 @@ import { useThemeContext } from '@/context/ThemeContext';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, ChevronRight } from 'lucide-react-native';
 import React, { useMemo } from 'react';
-import { Linking, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, Linking, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function AboutScreen() {
@@ -34,7 +34,7 @@ export default function AboutScreen() {
             <ScrollView contentContainerStyle={styles.content}>
                 <View style={styles.logoSection}>
                     <View style={styles.logoBox}>
-                        <Text style={styles.logoText}>V</Text>
+                        <Image source={require('@/assets/images/vibe-logo.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
                     </View>
                     <Text style={styles.appName}>Vibe</Text>
                     <Text style={styles.version}>Version 1.0.0 (Build 42)</Text>
@@ -106,7 +106,6 @@ const createStyles = (colors: any) => StyleSheet.create({
         width: 80,
         height: 80,
         borderRadius: 20,
-        backgroundColor: colors.primary,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 16,

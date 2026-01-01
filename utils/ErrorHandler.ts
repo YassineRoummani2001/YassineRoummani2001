@@ -1,10 +1,9 @@
 // utils/ErrorHandler.ts
 import { ErrorMessages } from '@/constants/ErrorMessages';
+import * as Updates from 'expo-updates';
 import Toast from 'react-native-toast-message';
+import { captureException, initSentry } from './sentry';
 
-/**
- * Standardized error structure
- */
 interface AppError {
     message: string;
     originalError?: any;
@@ -12,86 +11,142 @@ interface AppError {
 }
 
 class ErrorHandler {
+    static isInitialized = false;
+
+    /**
+     * Initialize Global Error Handlers
+     * Should be called in _layout.tsx
+     */
+    static init() {
+        if (this.isInitialized) return;
+
+        // Initialize Logging
+        initSentry();
+
+        // 1. Global JS Error Handler (Prevents RedBox Crash in Prod)
+        const defaultHandler = ErrorUtils.getGlobalHandler();
+        ErrorUtils.setGlobalHandler(async (error: any, isFatal?: boolean) => {
+            if (isFatal) {
+                // In production, silent recovery for fatal errors
+                if (!__DEV__) {
+                    // Log to Sentry/Service first
+                    captureException(error, { isFatal: true });
+
+                    // Attempt silent reload to recover
+                    try {
+                        await Updates.reloadAsync();
+                    } catch (e) {
+                        // Last resort (native crash prevention if reload fails)
+                    }
+                } else {
+                    // DEV: Show RedBox
+                    if (defaultHandler) defaultHandler(error, isFatal);
+                }
+            } else {
+                // Non-fatal: Log safely
+                this.log('Non-fatal Error', error);
+                captureException(error);
+            }
+        });
+
+        // 2. Promise Rejection Handler (Uncommon in RN but good practice)
+        // @ts-ignore - tracking unhandled promises
+        if (global.Promise) {
+            // @ts-ignore
+            const originalHandler = global.onunhandledrejection;
+            // @ts-ignore
+            global.onunhandledrejection = (event) => {
+                this.log('Unhandled Promise Rejection', event);
+                captureException(event);
+            };
+        }
+
+        // 3. Silence Console in Production
+        if (!__DEV__) {
+            console.log = () => { };
+            console.info = () => { };
+            console.warn = () => { };
+            console.error = (message, ...args) => {
+                // Capture real errors but don't spam STDOUT
+                captureException(new Error(message), { args });
+            };
+        }
+
+        this.isInitialized = true;
+        console.log('✅ Global Error Handling Initialized');
+    }
+
     /**
      * Log error to console only in development
      */
     static log(message: string, error?: any) {
         if (__DEV__) {
-            console.log(`[ErrorHandler] ${message}`, error || '');
+            console.log(`[Vibe API] ${message}`, error || '');
         } else {
-            // In production, you would send this to Sentry/Crashlytics
-            // Sentry.captureException(error);
+            // Production: Send to Sentry
+            if (error) captureException(error, { message });
         }
     }
 
     /**
      * Parse various error types into a user-friendly message
-     * STRICT: Never return technical jargon.
      */
     static parse(error: any): string {
         if (!error) return ErrorMessages.DEFAULT;
 
+        // Extract message from object validity
+        const rawMessage = error.message || error.error || (typeof error === 'string' ? error : '');
+
         // 1. Network / Connection
         if (
-            error.message === 'Network request failed' ||
+            rawMessage === 'Network request failed' ||
+            rawMessage.includes('Network') ||
+            rawMessage.includes('timeout') ||
             error.name === 'TypeError' ||
-            error.name === 'AbortError' ||
-            error.message?.includes('timeout')
+            error.name === 'AbortError'
         ) {
             return "Connection issue. Retrying...";
         }
 
-        // 2. HTTP Status based (if verified safe)
-        if (error.status === 401) return "Please sign in again.";
+        // 2. HTTP Status based
+        if (error.status === 401) return "Session expired. Please login.";
         if (error.status === 403) return "Access denied.";
-        if (error.status === 404) return "Content not found.";
+        if (error.status === 404) return "Resource not found.";
+        if (error.status >= 500) return "Server is temporarily unavailable.";
 
-        // 3. Backend standardized errors - ONLY if they are user friendly
-        // We assume 'message' from backend is decently sanitized, but if we want Absolute Zero usage of backend text:
-        // return "Something went wrong. Please try again."; 
-        // However, usually validations like "Username taken" are needed. 
-        // We will allow backend messages but fallback to generic if it looks technical.
+        // 3. Backend standardized errors
         if (error.response?.data?.message) {
             const serverMsg = error.response.data.message;
-            // Simple basic heuristic to filter out SQL/Code dumps
-            if (serverMsg.includes('SQL') || serverMsg.includes('Error') || serverMsg.length > 50) {
+            if (serverMsg.includes('SQL') || serverMsg.includes('Error:') || serverMsg.length > 100) {
                 return "Something went wrong. Please try again.";
             }
             return serverMsg;
         }
 
         // 4. Default Safe Message
-        return "Something went wrong. Please try again.";
+        return ErrorMessages.DEFAULT || "Something went wrong.";
     }
 
     /**
      * Display error to user based on severity
-     * STRICT: NEVER USE ALERT.ALERT
+     * STRICT: NEVER USE ALERT.ALERT directly for non-fatal errors
      */
-    static show(error: any, type: 'toast' | 'alert' | 'silent' = 'toast') {
+    static show(error: any, type: 'toast' | 'silent' = 'toast') {
         const message = this.parse(error);
-        this.log('Showing error:', { message, original: error });
 
-        if (type === 'silent') return;
+        if (type === 'silent') {
+            this.log('Silent Error:', error);
+            return;
+        }
 
-        // Force 'alert' to be a 'toast' to avoid blocking UI
-        // We use 'error' type for Toast which usually is red, but we can make it softer if needed.
         Toast.show({
             type: 'error',
-            text1: 'Note', // Neutral title
+            text1: 'Note',
             text2: message,
             position: 'top',
             visibilityTime: 4000,
+            topOffset: 50
         });
-    }
-
-    /**
-     * Handle critical failures (e.g. crash boundaries)
-     */
-    static handleCritical(error: Error) {
-        this.log('CRITICAL ERROR:', error);
-        // Using Toast even for critical errors to strictly follow "No blocking" rule if possible.
-        // But ErrorBoundary usually handles critical crashes with a fallback UI.
     }
 }
 

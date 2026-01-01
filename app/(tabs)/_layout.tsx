@@ -1,12 +1,15 @@
-import { useUser } from '@/context/UserContext';
+import { useUser } from '@/context/AuthContext';
 import { useTheme } from '@/hooks/useTheme';
 import { Tabs } from 'expo-router';
 import { Clapperboard, Home, PlusSquare, Search, User } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { Image, Platform, StyleSheet, View } from 'react-native';
 
 export default function TabLayout() {
   const { user } = (useUser() || {}) as any;
   const colors = useTheme();
+  const { t } = useTranslation();
+
 
   return (
     <Tabs

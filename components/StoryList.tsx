@@ -5,13 +5,28 @@ import { useUser } from '@/context/AuthContext';
 import { useThemeContext } from '@/context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { Plus } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function StoryList() {
     const router = useRouter();
     const { colors: themeColors, isDark } = useThemeContext();
+
+    const getCorrectUrl = (url: string) => {
+        if (!url || typeof url !== 'string') return 'https://ui-avatars.com/api/?name=User&background=random';
+        if (url.startsWith('blob:')) return 'https://ui-avatars.com/api/?name=User&background=random';
+
+        // Force use of current API_BASE_URL for any internal uploads
+        if (url.includes('/uploads/')) {
+            const uploadIndex = url.indexOf('/uploads/');
+            return `${API_BASE_URL}${url.substring(uploadIndex)}`;
+        }
+
+        if (url.startsWith('data:')) return url;
+        if (url.startsWith('http')) return url;
+        return `${API_BASE_URL}/uploads/${url}`;
+    };
+
     const { user, refreshUser } = (useUser() || {}) as any;
     const [fetchedUsers, setFetchedUsers] = useState([]);
     const [hasRefreshed, setHasRefreshed] = useState(false);
@@ -62,8 +77,8 @@ export default function StoryList() {
                 contentContainerStyle={styles.contentContainer}
                 style={styles.container}
                 keyExtractor={(item: any) => item._id || item.id}
-                ListHeaderComponent={() => (
-                    <View style={{ flexDirection: 'row', gap: 16 }}>
+                ListHeaderComponent={
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         {/* Current User Story */}
                         {user && (() => {
                             const hasActiveStory = user.stories?.length > 0 && user.stories.some((s: any) => {
@@ -72,44 +87,54 @@ export default function StoryList() {
                             });
 
                             return (
-                                <View style={styles.storyContainer}>
-                                    <TouchableOpacity onPress={() => {
-                                        if (hasActiveStory) {
-                                            router.push({ pathname: '/story-view', params: { userId: user._id || user.id } });
-                                        } else {
-                                            router.push('/story-create');
-                                        }
-                                    }}>
-                                        <View style={styles.avatarWrapper}>
+                                <View style={[styles.storyContainer, { marginRight: 16 }]}>
+                                    <View style={styles.avatarWrapper}>
+                                        <TouchableOpacity onPress={() => {
+                                            if (hasActiveStory) {
+                                                router.push({ pathname: '/story-view', params: { userId: user._id || user.id } });
+                                            } else {
+                                                router.push('/story-create');
+                                            }
+                                        }}>
                                             {hasActiveStory ? (
                                                 <LinearGradient
                                                     colors={[themeColors.primary, '#AACC00']}
                                                     style={styles.gradientBorder}
                                                 >
                                                     <View style={[styles.whiteBorder, { backgroundColor: themeColors.background }]}>
-                                                        <Image source={{ uri: user.avatar }} style={styles.avatar} />
+                                                        <Image source={{ uri: getCorrectUrl(user.avatar) }} style={styles.avatar} />
                                                     </View>
                                                 </LinearGradient>
                                             ) : (
-                                                <View style={[styles.avatarBorder, { borderColor: 'transparent', backgroundColor: themeColors.gray }]}>
-                                                    <Image source={{ uri: user.avatar }} style={styles.avatar} />
-                                                    <View style={[styles.addStoryBadge, { borderColor: themeColors.background, backgroundColor: themeColors.primary }]}>
-                                                        <Plus size={14} color="#FFF" strokeWidth={3} />
-                                                    </View>
+                                                <View style={[styles.whiteBorder, { backgroundColor: themeColors.background, width: 68, height: 68, borderRadius: 34, borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
+                                                    <Image source={{ uri: getCorrectUrl(user.avatar) }} style={[styles.avatar, { width: 64, height: 64, borderRadius: 32 }]} />
                                                 </View>
                                             )}
-                                        </View>
-                                    </TouchableOpacity>
+                                        </TouchableOpacity>
+
+                                        {!hasActiveStory && (
+                                            <TouchableOpacity
+                                                style={styles.addStoryBadge}
+                                                onPress={() => router.push('/story-create')}
+                                            >
+                                                <Text style={{ color: 'white', fontSize: 14, fontWeight: 'bold' }}>+</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
                                     <Text style={[styles.name, { color: themeColors.text }]} numberOfLines={1}>My Story</Text>
                                 </View>
                             );
                         })()}
 
-                        {isLoading && Array.from({ length: 5 }).map((_, i) => (
-                            <SkeletonStory key={`skeleton-${i}`} />
-                        ))}
+                        {isLoading && (
+                            <View style={{ flexDirection: 'row', gap: 16 }}>
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                    <SkeletonStory key={`skeleton-${i}`} />
+                                ))}
+                            </View>
+                        )}
                     </View>
-                )}
+                }
                 renderItem={({ item }: { item: any }) => (
                     <View style={styles.storyContainer}>
                         <TouchableOpacity onPress={() => router.push({
@@ -124,7 +149,7 @@ export default function StoryList() {
                                     style={styles.gradientBorder}
                                 >
                                     <View style={[styles.whiteBorder, { backgroundColor: themeColors.background }]}>
-                                        <Image source={{ uri: item.avatar }} style={styles.avatar} />
+                                        <Image source={{ uri: getCorrectUrl(item.avatar) }} style={styles.avatar} />
                                     </View>
                                 </LinearGradient>
                             </View>

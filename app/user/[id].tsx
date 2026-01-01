@@ -1,6 +1,7 @@
 import { SkeletonProfile } from '@/components/Skeletons';
 import { Colors } from '@/constants/Colors';
 import { API_BASE_URL } from '@/constants/Config';
+import { useThemeContext } from '@/context/ThemeContext';
 import { useUser } from '@/context/UserContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -12,14 +13,23 @@ const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = width / 3;
 
 // Helper to normalize URIs
-const getValidUri = (uri: string) => {
-    if (!uri) return '';
-    if (uri.startsWith('http') || uri.startsWith('data:')) return uri;
-    return `${API_BASE_URL}${uri.startsWith('/') ? '' : '/'}${uri}`;
+const getCorrectUrl = (url: string) => {
+    if (!url || typeof url !== 'string') return '';
+    if (url.startsWith('blob:')) return '';
+
+    // Force use of current API_BASE_URL for any internal uploads
+    if (url.includes('/uploads/')) {
+        const uploadIndex = url.indexOf('/uploads/');
+        return `${API_BASE_URL}${url.substring(uploadIndex)}`;
+    }
+
+    if (url.startsWith('data:')) return url;
+    if (url.startsWith('http')) return url;
+    return `${API_BASE_URL}/uploads/${url}`;
 };
 
 const GridVideoItem = ({ uri }: { uri: string }) => {
-    const player = useVideoPlayer(getValidUri(uri), player => {
+    const player = useVideoPlayer(getCorrectUrl(uri), player => {
         player.muted = true;
     });
 
@@ -110,7 +120,9 @@ export default function UserProfileScreen() {
     // Check if current user is following this profile
     useEffect(() => {
         if (currentUser && currentUser.following) {
-            const following = currentUser.following.includes(id);
+            const following = currentUser.following.some((f: any) =>
+                (typeof f === 'string' ? f : f._id) === id
+            );
             setIsFollowing(following);
         }
     }, [currentUser, id]);
@@ -129,6 +141,24 @@ export default function UserProfileScreen() {
         }
 
         setFollowLoading(false);
+    };
+
+    const handleBlockUser = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/auth/block/${id}`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${currentUser?.token}` }
+            });
+
+            if (response.ok) {
+                alert('User blocked successfully');
+                router.replace('/'); // Go back to feed after blocking
+            } else {
+                alert('Failed to block user');
+            }
+        } catch (error) {
+            console.error('Error blocking user:', error);
+        }
     };
 
     const renderContent = () => {
@@ -168,7 +198,7 @@ export default function UserProfileScreen() {
                                 {isVideo ? (
                                     <GridVideoItem uri={post.uri || post.videoUri} />
                                 ) : (
-                                    <Image source={{ uri: getValidUri(post.uri || post.image) }} style={styles.gridImage} />
+                                    <Image source={{ uri: getCorrectUrl(post.uri || post.image) }} style={styles.gridImage} />
                                 )}
                             </TouchableOpacity>
                         );
@@ -214,9 +244,11 @@ export default function UserProfileScreen() {
         return <View style={styles.emptyState}><Text>No content</Text></View>;
     };
 
+    const { colors, isDark } = useThemeContext();
+
     if (userLoading) {
         return (
-            <SafeAreaView style={styles.container}>
+            <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                         <ChevronLeft size={28} color={Colors.light.white} />
@@ -228,7 +260,7 @@ export default function UserProfileScreen() {
     }
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <ChevronLeft size={28} color={Colors.light.white} />
@@ -239,76 +271,76 @@ export default function UserProfileScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-                <Image source={{ uri: getValidUri(user.coverImage) }} style={styles.coverImage} resizeMode="cover" />
+                <Image source={{ uri: getCorrectUrl(user.coverImage) }} style={styles.coverImage} resizeMode="cover" />
 
                 <View style={styles.profileHeader}>
-                    <View style={styles.avatarBorder}>
-                        <Image source={{ uri: getValidUri(user.avatar) }} style={styles.avatar} />
+                    <View style={[styles.avatarBorder, { backgroundColor: colors.background }]}>
+                        <Image source={{ uri: getCorrectUrl(user.avatar) }} style={styles.avatar} />
                     </View>
 
                     <View style={styles.userInfo}>
-                        <Text style={styles.name}>{user.name}</Text>
-                        <Text style={styles.handle}>{user.handle}</Text>
+                        <Text style={[styles.name, { color: colors.text }]}>{user.name}</Text>
+                        <Text style={[styles.handle, { color: colors.textSecondary }]}>{user.handle}</Text>
                     </View>
 
-                    <Text style={styles.bio}>{user.bio}</Text>
+                    <Text style={[styles.bio, { color: colors.text }]}>{user.bio}</Text>
 
                     <View style={styles.actionsRow}>
                         <TouchableOpacity
                             style={[
                                 styles.followButton,
-                                isFollowing && styles.followingButton,
+                                isFollowing && [styles.followingButton, { backgroundColor: colors.background, borderColor: colors.border }],
                                 followLoading && { opacity: 0.6 }
                             ]}
                             onPress={handleFollow}
                             disabled={followLoading}
                         >
                             {followLoading ? (
-                                <ActivityIndicator size="small" color={isFollowing ? Colors.light.black : Colors.light.white} />
+                                <ActivityIndicator size="small" color={isFollowing ? colors.text : Colors.light.white} />
                             ) : (
                                 <Text style={[
                                     styles.followButtonText,
-                                    isFollowing && styles.followingButtonText
+                                    isFollowing && [styles.followingButtonText, { color: colors.text }]
                                 ]}>
                                     {isFollowing ? 'Following' : 'Follow'}
                                 </Text>
                             )}
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.messageButton} onPress={() => router.push('/chat')}>
-                            <Text style={styles.messageButtonText}>Message</Text>
+                        <TouchableOpacity style={[styles.messageButton, { backgroundColor: isDark ? '#333' : '#F0F0F0' }]} onPress={() => router.push('/chat')}>
+                            <Text style={[styles.messageButtonText, { color: colors.text }]}>Message</Text>
                         </TouchableOpacity>
                     </View>
 
                     <View style={styles.statsRow}>
                         <View style={styles.statItem}>
-                            <Text style={styles.statNumber}>{user.posts}</Text>
-                            <Text style={styles.statLabel}>Posts</Text>
+                            <Text style={[styles.statNumber, { color: colors.text }]}>{user.posts}</Text>
+                            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Posts</Text>
                         </View>
                         <TouchableOpacity style={styles.statItem} onPress={() => router.push({ pathname: '/users-list', params: { type: 'followers', title: 'Followers', userId: id } })}>
-                            <Text style={styles.statNumber}>{user.followers}</Text>
-                            <Text style={styles.statLabel}>Followers</Text>
+                            <Text style={[styles.statNumber, { color: colors.text }]}>{user.followers}</Text>
+                            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Followers</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.statItem} onPress={() => router.push({ pathname: '/users-list', params: { type: 'following', title: 'Following', userId: id } })}>
-                            <Text style={styles.statNumber}>{user.following}</Text>
-                            <Text style={styles.statLabel}>Following</Text>
+                            <Text style={[styles.statNumber, { color: colors.text }]}>{user.following}</Text>
+                            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Following</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
 
                 {/* Tabs */}
                 <View style={styles.tabSection}>
-                    <View style={[styles.tabIndicator, { left: (width / 3) * activeTab }]} />
-                    <View style={styles.tabHeader}>
+                    <View style={[styles.tabHeader, { borderBottomColor: colors.border }]}>
                         <TouchableOpacity style={styles.tabIcon} onPress={() => setActiveTab(0)}>
-                            <Grid3X3 color={activeTab === 0 ? Colors.light.black : "#999"} size={24} />
+                            <Grid3X3 color={activeTab === 0 ? colors.text : colors.textSecondary} size={24} />
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.tabIcon} onPress={() => setActiveTab(1)}>
-                            <Clapperboard color={activeTab === 1 ? Colors.light.black : "#999"} size={24} />
+                            <Clapperboard color={activeTab === 1 ? colors.text : colors.textSecondary} size={24} />
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.tabIcon} onPress={() => setActiveTab(2)}>
-                            <MonitorPlay color={activeTab === 2 ? Colors.light.black : "#999"} size={24} />
+                            <MonitorPlay color={activeTab === 2 ? colors.text : colors.textSecondary} size={24} />
                         </TouchableOpacity>
                     </View>
+                    <View style={[styles.tabIndicator, { left: (width / 3) * activeTab, backgroundColor: colors.text }]} />
                     {renderContent()}
                 </View>
             </ScrollView>
@@ -324,20 +356,21 @@ export default function UserProfileScreen() {
                     activeOpacity={1}
                     onPress={() => setOptionsVisible(false)}
                 >
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Options</Text>
+                            <Text style={[styles.modalTitle, { color: colors.text }]}>Options</Text>
                             <TouchableOpacity onPress={() => setOptionsVisible(false)}>
-                                <X size={24} color="#000" />
+                                <X size={24} color={colors.text} />
                             </TouchableOpacity>
                         </View>
 
-                        <TouchableOpacity style={styles.modalOption} onPress={() => { setOptionsVisible(false); /* Handle Report */ }}>
-                            <Flag size={20} color="#000" />
-                            <Text style={styles.modalOptionText}>Report User</Text>
+                        <TouchableOpacity style={[styles.modalOption, { borderBottomColor: colors.border }]} onPress={() => { setOptionsVisible(false); /* Handle Report */ }}>
+                            <Flag size={20} color={colors.text} />
+                            <Text style={[styles.modalOptionText, { color: colors.text }]}>Report User</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.modalOption} onPress={() => { setOptionsVisible(false); /* Handle Block */ }}>
+
+                        <TouchableOpacity style={styles.modalOption} onPress={() => { setOptionsVisible(false); handleBlockUser(); }}>
                             <Ban size={20} color="#FF3B30" />
                             <Text style={[styles.modalOptionText, { color: '#FF3B30' }]}>Block User</Text>
                         </TouchableOpacity>

@@ -1,9 +1,13 @@
+// Root Layout
 import { CustomThemeProvider, useThemeContext } from '@/context/ThemeContext';
+import '@/i18n';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
+
 
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { NetworkBanner } from '@/components/NetworkBanner';
@@ -13,8 +17,12 @@ import { NetworkProvider } from '@/context/NetworkContext';
 import { NotificationProvider } from '@/context/NotificationContext';
 import { ReelProvider } from '@/context/ReelContext';
 import { SettingsProvider } from '@/context/SettingsContext';
+import ErrorHandler from '@/utils/ErrorHandler';
 import { LogBox } from 'react-native';
 import Toast from 'react-native-toast-message';
+
+// Initialize Global Error Handling immediately
+ErrorHandler.init();
 
 // Ignore specific warnings
 LogBox.ignoreLogs([
@@ -119,10 +127,12 @@ function InnerLayout() {
 export default function RootLayout() {
   console.log('🌳 RootLayout rendering');
   return (
-    <CustomThemeProvider>
-      <ErrorBoundary>
-        <InnerLayout />
-      </ErrorBoundary>
-    </CustomThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <CustomThemeProvider>
+        <ErrorBoundary>
+          <InnerLayout />
+        </ErrorBoundary>
+      </CustomThemeProvider>
+    </GestureHandlerRootView>
   );
 }

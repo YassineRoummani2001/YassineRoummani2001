@@ -1,5 +1,5 @@
 import { useUser } from '@/context/UserContext';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -35,7 +35,7 @@ const FONTS = ['System', 'Cochin', 'Helvetica', 'Georgia', 'Courier', 'Verdana']
 
 export default function StoryCreateScreen() {
     const router = useRouter();
-    const { addStory } = useUser() || {};
+    const { addStory } = (useUser() || {}) as any;
     const [mode, setMode] = useState<Mode>('select');
     const [media, setMedia] = useState<any>(null);
     const [text, setText] = useState('');
@@ -98,16 +98,18 @@ export default function StoryCreateScreen() {
                 } else {
                     // Native: Use FileSystem to read as base64
                     try {
-                        const base64 = await FileSystem.readAsStringAsync(mediaUri, { encoding: FileSystem.EncodingType.Base64 });
-                        // Determine mime type
-                        const mimeType = mode === 'video' ? 'video/mp4' : 'image/jpeg'; // Fallback; usually ImagePicker gives us type/ext
-                        // Construct data URI
-                        // ImagePicker assets usually have 'uri' ending in extension.
+                        const base64 = await FileSystem.readAsStringAsync(mediaUri, { encoding: 'base64' });
                         const extension = mediaUri.split('.').pop();
                         const type = mode === 'video' ? `video/${extension}` : `image/${extension === 'jpg' ? 'jpeg' : extension}`;
                         mediaUri = `data:${type};base64,${base64}`;
                     } catch (e) {
                         console.error("Failed to convert media to base64 on native", e);
+                        Toast.show({
+                            type: 'error',
+                            text1: 'Failed to process media file',
+                            text2: 'Please try a different image or video.'
+                        });
+                        return; // STOP execution
                     }
                 }
             }

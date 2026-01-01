@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Post = require('../models/Post');
 const User = require('../models/User'); // Import User model to verify user exists
+const Report = require('../models/Report'); // Import Report model
 const { protect } = require('../middleware/auth');
 const sendPushNotification = require('../utils/sendPushNotification');
 
@@ -364,6 +365,31 @@ router.post('/:id/comment', protect, async (req, res) => {
             .populate('comments.user', 'name handle avatar');
 
         res.json(populatedPost.comments);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// @desc    Report a post
+// @route   POST /api/posts/:id/report
+// @access  Private
+router.post('/:id/report', protect, async (req, res) => {
+    try {
+        const { reason } = req.body;
+        const post = await Post.findById(req.params.id);
+
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+
+        const report = await Report.create({
+            reporter: req.user._id,
+            target: post._id,
+            targetModel: 'Post',
+            reason: reason || 'Inappropriate content'
+        });
+
+        res.status(201).json({ message: 'Report submitted', reportId: report._id });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

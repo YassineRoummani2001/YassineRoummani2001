@@ -5,7 +5,8 @@ import { useRouter } from 'expo-router';
 
 import { CornerUpRight, Heart, MessageCircle, MoreVertical, Play, Volume2, VolumeX } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Dimensions, Image, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { State, TapGestureHandler } from 'react-native-gesture-handler';
 import CommentsModal from './CommentsModal';
 import ConfirmationModal from './ConfirmationModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
@@ -29,7 +30,7 @@ const getValidUri = (uri: string) => {
 // --- STABLE FEED VIDEO COMPONENT (expo-video) ---
 import { useVideoPlayer, VideoView } from 'expo-video';
 
-const FeedVideo = ({ videoSource, posterSource, isMuted, setIsMuted, active, styles }: { videoSource: string, posterSource?: string, isMuted: boolean, setIsMuted: (muted: boolean) => void, active: boolean, styles: any }) => {
+const FeedVideo = ({ videoSource, posterSource, isMuted, setIsMuted, active, styles, doubleTapRef }: { videoSource: string, posterSource?: string, isMuted: boolean, setIsMuted: (muted: boolean) => void, active: boolean, styles: any, doubleTapRef: any }) => {
     const validUri = getValidUri(videoSource);
 
     // Don't initialize player if no valid video source
@@ -52,7 +53,16 @@ const FeedVideo = ({ videoSource, posterSource, isMuted, setIsMuted, active, sty
         if (active) {
             // Small delay to prevent scroll jank
             const timeout = setTimeout(() => {
-                player.play();
+                if (Platform.OS === 'web') {
+                    // Start playback and catch any abort errors (common when scrolling quickly)
+                    const playPromise = player.play();
+                    // @ts-ignore - expo-video types might not reflect web promise return
+                    if (playPromise && typeof playPromise.catch === 'function') {
+                        playPromise.catch(() => { /* mute abort errors */ });
+                    }
+                } else {
+                    player.play();
+                }
             }, 50);
             return () => clearTimeout(timeout);
         } else {
@@ -85,26 +95,29 @@ const FeedVideo = ({ videoSource, posterSource, isMuted, setIsMuted, active, sty
 
     return (
         <View style={styles.media}>
-            <TouchableOpacity
-                activeOpacity={1}
-                onPress={togglePlay}
-                style={styles.media}
+            <TapGestureHandler
+                waitFor={doubleTapRef}
+                onHandlerStateChange={({ nativeEvent }) => {
+                    if (nativeEvent.state === State.ACTIVE) togglePlay();
+                }}
             >
-                <VideoView
-                    player={player}
-                    style={styles.media}
-                    contentFit="cover"
-                    nativeControls={false}
-                />
+                <Animated.View style={styles.media}>
+                    <VideoView
+                        player={player}
+                        style={styles.media}
+                        contentFit="cover"
+                        nativeControls={false}
+                    />
 
-                {!isPlaying && (
-                    <View style={styles.playOverlay}>
-                        <View style={styles.playButton}>
-                            <Play size={32} color="white" fill="white" />
+                    {!isPlaying && (
+                        <View style={styles.playOverlay}>
+                            <View style={styles.playButton}>
+                                <Play size={32} color="white" fill="white" />
+                            </View>
                         </View>
-                    </View>
-                )}
-            </TouchableOpacity>
+                    )}
+                </Animated.View>
+            </TapGestureHandler>
 
             <TouchableOpacity
                 style={styles.soundButton}
@@ -372,6 +385,32 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
 
     const [isEditing, setIsEditing] = useState(false);
     const [editedCaption, setEditedCaption] = useState(post.caption || '');
+
+    // Double Tap Animation State
+    const likeScale = React.useRef(new Animated.Value(0)).current;
+    const doubleTapRef = React.useRef(null);
+
+    const onDoubleTap = (event: any) => {
+        if (event.nativeEvent.state === State.ACTIVE) {
+            if (!isLiked) {
+                handleLike();
+            }
+            likeScale.setValue(0);
+            Animated.sequence([
+                Animated.spring(likeScale, {
+                    toValue: 1,
+                    friction: 4,
+                    useNativeDriver: true,
+                }),
+                Animated.delay(200),
+                Animated.timing(likeScale, {
+                    toValue: 0,
+                    duration: 150,
+                    useNativeDriver: true,
+                }),
+            ]).start();
+        }
+    };
 
     // Precise video detection
     const isVideoType = post.type === 'video' || post.type === 'reel';
@@ -876,25 +915,46 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
                 )}
             </View>
 
-            <View style={styles.mediaContainer}>
-                {hasVideo ? (
-                    <FeedVideo
-                        videoSource={videoSource}
-                        posterSource={post.image}
-                        isMuted={isMuted}
-                        setIsMuted={setIsMuted}
-                        active={active}
-                        styles={styles}
-                    />
-                ) : (
-                    <Image
-                        source={{ uri: getValidUri(post.image || post.uri) }}
-                        style={styles.media}
-                        resizeMode="cover"
-                        onError={(e) => console.log('❌ Image Load Error:', e.nativeEvent.error, 'URI:', getValidUri(post.image || post.uri))}
-                    />
-                )}
-            </View>
+            <TapGestureHandler
+                ref={doubleTapRef}
+                numberOfTaps={2}
+                onHandlerStateChange={onDoubleTap}
+            >
+                <View style={styles.mediaContainer}>
+                    {hasVideo ? (
+                        <FeedVideo
+                            videoSource={videoSource}
+                            posterSource={post.image}
+                            isMuted={isMuted}
+                            setIsMuted={setIsMuted}
+                            active={active}
+                            styles={styles}
+                            doubleTapRef={doubleTapRef}
+                        />
+                    ) : (
+                        <Image
+                            source={{ uri: getValidUri(post.image || post.uri) }}
+                            style={styles.media}
+                            resizeMode="cover"
+                            onError={(e) => {
+                                if (__DEV__) {
+                                    console.log('❌ Image Load Error:', e.nativeEvent.error, 'URI:', getValidUri(post.image || post.uri));
+                                }
+                                // In Prod: Fail silently (Image component might show blank or grey, which is better than crash or alert)
+                            }}
+                        />
+                    )}
+
+                    {/* Animated Heart Overlay */}
+                    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+                        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                            <Animated.View style={{ transform: [{ scale: likeScale }], shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { height: 5, width: 0 }, shadowColor: '#000' }}>
+                                <Heart size={100} color="white" fill="white" />
+                            </Animated.View>
+                        </View>
+                    </View>
+                </View>
+            </TapGestureHandler>
 
             <View style={styles.footer}>
                 <View style={styles.actions}>

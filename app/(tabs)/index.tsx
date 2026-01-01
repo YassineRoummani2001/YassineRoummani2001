@@ -4,7 +4,7 @@ import { useNotifications } from '@/context/NotificationContext';
 import { useThemeContext } from '@/context/ThemeContext';
 import { lazyLoad, MinimalLoader } from '@/utils/lazyLoad';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Bell, MessageCircle, Search } from 'lucide-react-native';
+import { Bell, MessageCircle, ShoppingBag, Zap } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -145,16 +145,18 @@ export default function HomeScreen() {
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderBottomWidth: 1 }]}>
         <View style={styles.logoContainer}>
+          <View style={[styles.logoIcon, { backgroundColor: colors.primary }]}>
+            <Zap size={20} color="white" fill="white" />
+          </View>
           <Text style={[styles.logoText, { color: colors.primary }]}>Vibe</Text>
-          <View style={[styles.logoDot, { backgroundColor: colors.primary }]} />
         </View>
 
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={[styles.iconButton, { backgroundColor: isDark ? '#2C2C2E' : '#F3F4F6' }]}
-            onPress={() => router.push('/search')}
+            onPress={() => router.push('/marketplace')}
           >
-            <Search size={22} color={colors.text} />
+            <ShoppingBag size={22} color={colors.text} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -246,19 +248,21 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 4,
+    alignItems: 'center',
+    gap: 8,
+  },
+  logoIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   logoText: {
     fontFamily: Platform.select({ ios: 'Avenir Next', android: 'sans-serif-black' }),
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '800',
-    letterSpacing: -1,
-  },
-  logoDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    letterSpacing: -0.5,
   },
   headerActions: {
     flexDirection: 'row',

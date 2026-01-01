@@ -30,6 +30,7 @@ const userSchema = new mongoose.Schema({
         content: { type: String }, // text caption or text story content
         color: { type: String }, // background color for text stories
         views: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+        likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
         createdAt: { type: Date, default: Date.now }
     }],
     savedPosts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Post' }],

@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 const getBaseUrl = () => {
     // For development, use your computer's local IP address
     // This allows physical devices and emulators to connect
-    const DEV_IP = '192.168.100.96'; // Your computer's IP on local network
+    const DEV_IP = '192.168.0.184'; // Your computer's IP on local network
 
     // If running in Expo Go or Build, hostUri contains the machine IP
     const hostUri = Constants.expoConfig?.hostUri;
@@ -32,8 +32,8 @@ const getBaseUrl = () => {
         return `http://${DEV_IP}:5000`;
     }
 
-    // Web - use localhost
-    return 'http://localhost:5000';
+    // Web - during development, use the same IP so it works on local network
+    return `http://${DEV_IP}:5000`;
 };
 
 export const API_BASE_URL = getBaseUrl();

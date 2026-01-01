@@ -1,0 +1,55 @@
+{
+    "common": {
+        "loading": "جار التحميل...",
+        "save": "حفظ",
+        "cancel": "إلغاء",
+        "delete": "حذف",
+        "edit": "تعديل",
+        "error": "خطأ",
+        "success": "نجاح",
+        "ok": "موافق",
+        "search": "بحث",
+        "back": "رجوع",
+        "next": "التالي",
+        "done": "تم",
+        "close": "إغلاق"
+    },
+    "auth": {
+        "login_title": "مرحبًا بعودتك",
+        "login_subtitle": "سجل الدخول للمتابعة",
+        "signup_title": "إنشاء حساب",
+        "signup_subtitle": "انضم إلى مجتمع Vibe",
+        "email_placeholder": "البريد الإلكتروني",
+        "password_placeholder": "كلمة المرور",
+        "username_placeholder": "اسم المستخدم",
+        "login_button": "تسجيل الدخول",
+        "signup_button": "إنشاء حساب",
+        "forgot_password": "نسيت كلمة المرور؟",
+        "no_account": "ليس لديك حساب؟",
+        "have_account": "لديك حساب بالفعل؟"
+    },
+    "navigation": {
+        "home": "الرئيسية",
+        "explore": "اكتشف",
+        "create": "ينشئ",
+        "chat": "محادثة",
+        "profile": "الملف الشخصي",
+        "settings": "الإعدادات",
+        "marketplace": "المتجر",
+        "notifications": "الإشعارات"
+    },
+    "settings": {
+        "title": "الإعدادات",
+        "account": "الحساب",
+        "appearance": "المظهر",
+        "language": "اللغة",
+        "notifications": "الإشعارات",
+        "privacy": "الخصوصية",
+        "security": "الأمان",
+        "help": "المساعدة",
+        "about": "حول التطبيق",
+        "logout": "تسجيل الخروج",
+        "dark_mode": "الوضع الداكن",
+        "theme": "السمة"
+    }
+}

@@ -13,7 +13,7 @@ export default function UsersListScreen() {
     const { user: currentUser, followUser } = useUser();
     const { colors, isDark } = useThemeContext();
 
-    const [users, setUsers] = useState([]);
+    const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -46,7 +46,7 @@ export default function UsersListScreen() {
                     .map(u => ({
                         ...u,
                         id: u._id,
-                        isFollowing: currentUser?.following?.includes(u._id) || false,
+                        isFollowing: (currentUser?.following || []).some((f: any) => (typeof f === 'string' ? f : f._id) === u._id),
                         isMe: currentUser?._id === u._id
                     }));
                 setUsers(usersWithFollowStatus);
@@ -81,7 +81,14 @@ export default function UsersListScreen() {
 
     const renderItem = ({ item }) => (
         <TouchableOpacity
-            style={[styles.userItem, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }]}
+            style={[
+                styles.userItem,
+                {
+                    backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF',
+                    borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'transparent',
+                    borderWidth: isDark ? 1 : 0
+                }
+            ]}
             onPress={() => router.push({ pathname: '/user/[id]', params: { id: item.id } })}
             activeOpacity={0.7}
         >
@@ -106,8 +113,8 @@ export default function UsersListScreen() {
                         styles.followButton,
                         item.isFollowing && styles.followingButton,
                         {
-                            backgroundColor: item.isFollowing ? (isDark ? '#2C2C2E' : '#F2F2F7') : colors.tint,
-                            borderColor: item.isFollowing ? (isDark ? '#3A3A3C' : '#E5E5EA') : colors.tint
+                            backgroundColor: item.isFollowing ? (isDark ? 'rgba(255,255,255,0.1)' : '#F2F2F7') : colors.primary,
+                            borderColor: item.isFollowing ? (isDark ? 'rgba(255,255,255,0.1)' : '#E5E5EA') : colors.primary
                         }
                     ]}
                     onPress={() => toggleFollow(item.id || item._id)}
@@ -138,7 +145,7 @@ export default function UsersListScreen() {
 
             {loading ? (
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={colors.tint} />
+                    <ActivityIndicator size="large" color={colors.primary} />
                 </View>
             ) : (
                 <FlatList

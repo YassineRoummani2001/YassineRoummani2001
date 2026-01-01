@@ -7,6 +7,7 @@ const storySchema = new mongoose.Schema({
     content: { type: String }, // Content for 'text' type
     color: { type: String }, // Background color for 'text' type
     viewers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     createdAt: { type: Date, default: Date.now },
     expiresAt: { type: Date, default: () => Date.now() + 24*60*60*1000 } // 24 hours from now
 }, { timestamps: true });

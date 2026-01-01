@@ -6,7 +6,8 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ArrowRight, Eye, EyeOff, Lock, Mail } from 'lucide-react-native';
 import { useState } from 'react';
-import { Dimensions, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { Dimensions, I18nManager, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
@@ -17,6 +18,7 @@ const { width } = Dimensions.get('window');
 
 export default function LoginScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
     const userContext = useUser();
 
     // Safety check for context
@@ -36,8 +38,8 @@ export default function LoginScreen() {
         if (!email || !password) {
             Toast.show({
                 type: 'error',
-                text1: 'Missing Fields',
-                text2: 'Please fill in all fields',
+                text1: t('common.error'),
+                text2: t('common.error'), // Or add specific missing fields key
             });
             return;
         }
@@ -55,8 +57,8 @@ export default function LoginScreen() {
 
                 Toast.show({
                     type: 'success',
-                    text1: 'Welcome back!',
-                    text2: 'Login successful',
+                    text1: t('auth.login_title'),
+                    text2: t('common.success'),
                 });
                 // Navigate to home
                 router.replace('/(tabs)');
@@ -93,15 +95,15 @@ export default function LoginScreen() {
                             />
                         </View>
                         <Text style={[styles.appName, { color: isDark ? '#fff' : '#333' }]}>Vibe</Text>
-                        <Text style={[styles.tagline, { color: isDark ? '#ccc' : '#666' }]}>Welcome back! You've been missed.</Text>
+                        <Text style={[styles.tagline, { color: isDark ? '#ccc' : '#666' }]}>{t('auth.login_subtitle')}</Text>
                     </View>
 
                     <View style={styles.formContainer}>
                         <View style={[styles.inputContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
                             <Mail size={20} color={isDark ? "#ccc" : "#666"} style={styles.inputIcon} />
                             <TextInput
-                                style={[styles.input, { color: isDark ? '#fff' : '#333' }]}
-                                placeholder="Email"
+                                style={[styles.input, { color: isDark ? '#fff' : '#333' }, I18nManager.isRTL && { textAlign: 'right' }]}
+                                placeholder={t('auth.email_placeholder')}
                                 placeholderTextColor={isDark ? "#aaa" : "#888"}
                                 value={email}
                                 onChangeText={setEmail}
@@ -113,8 +115,8 @@ export default function LoginScreen() {
                         <View style={[styles.inputContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
                             <Lock size={20} color={isDark ? "#ccc" : "#666"} style={styles.inputIcon} />
                             <TextInput
-                                style={[styles.input, { color: isDark ? '#fff' : '#333' }]}
-                                placeholder="Password"
+                                style={[styles.input, { color: isDark ? '#fff' : '#333' }, I18nManager.isRTL && { textAlign: 'right' }]}
+                                placeholder={t('auth.password_placeholder')}
                                 placeholderTextColor={isDark ? "#aaa" : "#888"}
                                 value={password}
                                 onChangeText={setPassword}
@@ -126,23 +128,23 @@ export default function LoginScreen() {
                         </View>
 
                         <TouchableOpacity style={styles.forgotPassword} onPress={() => router.push('/auth/forgot-password')}>
-                            <Text style={[styles.forgotPasswordText, { color: isDark ? '#ccc' : '#666' }]}>Forgot Password?</Text>
+                            <Text style={[styles.forgotPasswordText, { color: isDark ? '#ccc' : '#666' }]}>{t('auth.forgot_password')}</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity style={styles.loginButton} onPress={handleLogin} disabled={loading}>
                             {loading ? (
-                                <Text style={styles.loginButtonText}>Logging in...</Text>
+                                <Text style={styles.loginButtonText}>{t('common.loading')}</Text>
                             ) : (
                                 <View style={styles.loginContent}>
-                                    <Text style={styles.loginButtonText}>Sign In</Text>
-                                    <ArrowRight size={20} color="white" />
+                                    <Text style={styles.loginButtonText}>{t('auth.login_button')}</Text>
+                                    <ArrowRight size={20} color="white" style={{ transform: [{ scaleX: I18nManager.isRTL ? -1 : 1 }] }} />
                                 </View>
                             )}
                         </TouchableOpacity>
 
                         <View style={styles.dividerContainer}>
                             <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)' }]} />
-                            <Text style={[styles.dividerText, { color: isDark ? '#aaa' : '#888' }]}>OR</Text>
+                            <Text style={[styles.dividerText, { color: isDark ? '#aaa' : '#888' }]}>{t('common.ok') === 'OK' ? 'OR' : 'OU'}</Text>
                             <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)' }]} />
                         </View>
 
@@ -157,9 +159,9 @@ export default function LoginScreen() {
                     </View>
 
                     <View style={styles.footer}>
-                        <Text style={[styles.footerText, { color: isDark ? '#ccc' : '#666' }]}>Don't have an account? </Text>
+                        <Text style={[styles.footerText, { color: isDark ? '#ccc' : '#666' }]}>{t('auth.no_account')} </Text>
                         <TouchableOpacity onPress={() => router.push('/auth/signup')}>
-                            <Text style={styles.signupText}>Sign Up</Text>
+                            <Text style={styles.signupText}>{t('auth.signup_button')}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>

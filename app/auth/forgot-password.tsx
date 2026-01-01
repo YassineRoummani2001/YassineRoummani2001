@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ArrowLeft, ArrowRight, Mail } from 'lucide-react-native';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
     Dimensions,
     Image,

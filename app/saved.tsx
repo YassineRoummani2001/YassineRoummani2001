@@ -1,4 +1,3 @@
-import { Colors } from '@/constants/Colors';
 import { API_BASE_URL } from '@/constants/Config';
 import { useUser } from '@/context/UserContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -18,11 +17,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useThemeContext } from '@/context/ThemeContext';
+
 export default function SavedScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const { user } = (useUser() || {}) as any;
     const { width } = useWindowDimensions();
+    const { colors } = useThemeContext();
 
     // 0: All (Posts), 1: Reels
     const [activeTab, setActiveTab] = useState(params.tab === 'reels' ? 1 : 0);
@@ -75,7 +77,7 @@ export default function SavedScreen() {
 
         return (
             <TouchableOpacity
-                style={[styles.gridItem, { width: itemSize, height: itemSize * 1.3 }]}
+                style={[styles.gridItem, { width: itemSize, height: itemSize * 1.3, backgroundColor: colors.background }]}
                 activeOpacity={0.8}
                 onPress={() => router.push({
                     pathname: '/media-view',
@@ -102,35 +104,35 @@ export default function SavedScreen() {
                 )}
             </TouchableOpacity>
         );
-    }, [width, router]);
+    }, [width, router, colors]);
 
     const ListHeader = () => (
-        <View style={{ backgroundColor: Colors.light.white }}>
+        <View style={{ backgroundColor: colors.background }}>
             {/* Header Title Section */}
             <View style={styles.titleSection}>
-                <Text style={styles.pageTitle}>Saved</Text>
-                <Text style={styles.pageSubtitle}>
+                <Text style={[styles.pageTitle, { color: colors.text }]}>Saved</Text>
+                <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>
                     {savedPosts.length} {savedPosts.length === 1 ? 'post' : 'posts'} saved
                 </Text>
             </View>
 
             {/* Custom Tabs */}
-            <View style={styles.tabContainer}>
-                <View style={styles.tabRow}>
+            <View style={[styles.tabContainer, { backgroundColor: colors.background }]}>
+                <View style={[styles.tabRow, { borderBottomColor: colors.border }]}>
                     <TouchableOpacity
                         style={[styles.tabButton, activeTab === 0 && styles.tabButtonActive]}
                         onPress={() => setActiveTab(0)}
                     >
-                        <Grid3X3 color={activeTab === 0 ? "black" : "#999"} size={22} />
-                        <Text style={[styles.tabText, activeTab === 0 && styles.tabTextActive]}>All Posts</Text>
+                        <Grid3X3 color={activeTab === 0 ? colors.text : colors.textSecondary} size={22} />
+                        <Text style={[styles.tabText, { color: activeTab === 0 ? colors.text : colors.textSecondary }]}>All Posts</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
                         style={[styles.tabButton, activeTab === 1 && styles.tabButtonActive]}
                         onPress={() => setActiveTab(1)}
                     >
-                        <Clapperboard color={activeTab === 1 ? "black" : "#999"} size={22} />
-                        <Text style={[styles.tabText, activeTab === 1 && styles.tabTextActive]}>Reels</Text>
+                        <Clapperboard color={activeTab === 1 ? colors.text : colors.textSecondary} size={22} />
+                        <Text style={[styles.tabText, { color: activeTab === 1 ? colors.text : colors.textSecondary }]}>Reels</Text>
                     </TouchableOpacity>
                 </View>
                 {/* Animated Indicator Line */}
@@ -139,6 +141,7 @@ export default function SavedScreen() {
                         styles.indicatorLine,
                         {
                             width: '50%',
+                            backgroundColor: colors.text,
                             transform: [{ translateX: activeTab === 0 ? 0 : width / 2 }] // Simple translation
                         }
                     ]} />
@@ -148,13 +151,13 @@ export default function SavedScreen() {
     );
 
     return (
-        <SafeAreaView style={styles.container} edges={['top']}>
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
             {/* Navigation Header */}
-            <View style={styles.navHeader}>
+            <View style={[styles.navHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <ArrowLeft size={24} color="#1A1A1A" />
+                    <ArrowLeft size={24} color={colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.navHeaderTitle}>Collections</Text>
+                <Text style={[styles.navHeaderTitle, { color: colors.text }]}>Collections</Text>
                 <TouchableOpacity style={styles.backButton}>
                     {/* Placeholder for future "New Collection" or similar */}
                     <Layers size={24} color="transparent" />
@@ -163,7 +166,7 @@ export default function SavedScreen() {
 
             {loading ? (
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={Colors.light.primary} />
+                    <ActivityIndicator size="large" color={colors.primary} />
                 </View>
             ) : (
                 <FlatList
@@ -174,13 +177,13 @@ export default function SavedScreen() {
                     ListHeaderComponent={ListHeader}
                     ListEmptyComponent={
                         <View style={styles.emptyState}>
-                            <View style={styles.emptyIconContainer}>
-                                {activeTab === 0 ? <Grid3X3 size={32} color="#666" /> : <Clapperboard size={32} color="#666" />}
+                            <View style={[styles.emptyIconContainer, { backgroundColor: colors.gray }]}>
+                                {activeTab === 0 ? <Grid3X3 size={32} color={colors.textSecondary} /> : <Clapperboard size={32} color={colors.textSecondary} />}
                             </View>
-                            <Text style={styles.emptyStateText}>
+                            <Text style={[styles.emptyStateText, { color: colors.text }]}>
                                 {activeTab === 0 ? 'No saved posts yet' : 'No saved reels yet'}
                             </Text>
-                            <Text style={styles.emptySubText}>
+                            <Text style={[styles.emptySubText, { color: colors.textSecondary }]}>
                                 {activeTab === 0 ? 'When you save posts, they will appear here.' : 'Videos and Reels you save will appear here.'}
                             </Text>
                         </View>
@@ -190,7 +193,8 @@ export default function SavedScreen() {
                         <RefreshControl
                             refreshing={refreshing}
                             onRefresh={onRefresh}
-                            colors={[Colors.light.primary]}
+                            colors={[colors.primary]}
+                            tintColor={colors.primary}
                         />
                     }
                     showsVerticalScrollIndicator={false}
@@ -203,7 +207,6 @@ export default function SavedScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.light.white,
     },
     navHeader: {
         flexDirection: 'row',
@@ -211,9 +214,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 16,
         paddingVertical: 12,
-        backgroundColor: Colors.light.white,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
     },
     backButton: {
         padding: 4,
@@ -221,7 +222,6 @@ const styles = StyleSheet.create({
     navHeaderTitle: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#1A1A1A',
     },
     titleSection: {
         paddingHorizontal: 20,
@@ -231,22 +231,19 @@ const styles = StyleSheet.create({
     pageTitle: {
         fontSize: 30,
         fontWeight: '800',
-        color: '#1A1A1A',
         marginBottom: 4,
         letterSpacing: -0.5,
     },
     pageSubtitle: {
         fontSize: 14,
-        color: '#666',
         fontWeight: '500',
     },
     tabContainer: {
-        backgroundColor: Colors.light.white,
+        // bg comes from theme
     },
     tabRow: {
         flexDirection: 'row',
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
     },
     tabButton: {
         flex: 1,
@@ -262,10 +259,9 @@ const styles = StyleSheet.create({
     tabText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#9CA3AF',
     },
     tabTextActive: {
-        color: '#1A1A1A',
+        // color comes from theme
     },
     indicatorTrack: {
         width: '100%',
@@ -276,11 +272,9 @@ const styles = StyleSheet.create({
     },
     indicatorLine: {
         height: 2,
-        backgroundColor: '#1A1A1A',
     },
     gridItem: {
         padding: 1,
-        backgroundColor: Colors.light.white,
     },
     gridImage: {
         width: '100%',
@@ -309,19 +303,16 @@ const styles = StyleSheet.create({
         width: 64,
         height: 64,
         borderRadius: 32,
-        backgroundColor: '#F3F4F6',
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 16,
     },
     emptyStateText: {
-        color: '#1A1A1A',
         fontSize: 18,
         fontWeight: '600',
         marginBottom: 8,
     },
     emptySubText: {
-        color: '#6B7280',
         fontSize: 14,
         textAlign: 'center',
         lineHeight: 20,

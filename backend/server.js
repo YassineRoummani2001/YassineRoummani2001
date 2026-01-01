@@ -7,6 +7,11 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
+
 app.use(cors({
     origin: '*', // Allow all origins in development
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
@@ -30,6 +35,10 @@ require('./models/Story');
 require('./models/Notification');
 require('./models/Chat');
 require('./models/Message');
+require('./models/MarketItem');
+require('./models/Announcement');
+require('./models/Report');
+
 
 // Routes definitions
 app.use('/api/auth', require('./routes/auth'));
@@ -39,6 +48,9 @@ app.use('/api/posts', require('./routes/posts'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/chats', require('./routes/chats'));
 app.use('/api/upload', require('./routes/upload'));
+app.use('/api/marketplace', require('./routes/marketplace'));
+app.use('/api/announcements', require('./routes/announcements'));
+
 
 app.get('/', (req, res) => {
     res.send('Vibe API is running...');

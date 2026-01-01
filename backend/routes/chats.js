@@ -3,12 +3,21 @@ const router = express.Router();
 const Chat = require('../models/Chat');
 const Message = require('../models/Message');
 const Post = require('../models/Post');
+const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 
 // Get all chats for user
 router.get('/', protect, async (req, res) => {
     try {
-        const chats = await Chat.find({ participants: req.user._id })
+        const currentUser = await User.findById(req.user._id);
+        const blockedUsers = currentUser.blockedUsers || [];
+
+        const chats = await Chat.find({ 
+            participants: { 
+                $all: [req.user._id],
+                $nin: blockedUsers
+            } 
+        })
             .populate('participants', 'name handle avatar')
             .sort({ updatedAt: -1 });
         res.json(chats);
@@ -48,6 +57,7 @@ router.get('/:chatId/messages', protect, async (req, res) => {
         const messages = await Message.find({ chatId: req.params.chatId })
             .populate('sender', 'name handle avatar')
             .populate('postId', 'uri videoUri')
+            .populate('marketitemId')
             .populate({
                 path: 'replyTo',
                 select: 'content type sender',
@@ -77,6 +87,7 @@ router.post('/:chatId/messages', protect, async (req, res) => {
             type: type || 'text',
             duration: duration,
             postId: req.body.postId,
+            marketitemId: req.body.marketitemId,
             replyTo: req.body.replyTo,
             expireAt: expireAt
         });
@@ -89,6 +100,7 @@ router.post('/:chatId/messages', protect, async (req, res) => {
 
         const fullMessage = await Message.findById(message._id)
             .populate('sender', 'name handle avatar')
+            .populate('marketitemId')
             .populate({
                 path: 'replyTo',
                 select: 'content type sender',

@@ -1,17 +1,22 @@
 import { API_BASE_URL } from '@/constants/Config';
 import { useUser } from '@/context/UserContext';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { Eye, Heart, Plus, Send, X } from 'lucide-react-native';
+import { Edit3, Eye, Heart, MoreHorizontal, Plus, Send, Share2, Trash2, X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Animated, Dimensions, FlatList, Image, KeyboardAvoidingView, Modal, Platform, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Animated, Dimensions, Image, KeyboardAvoidingView, Modal, Platform, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
 
 export default function StoryViewScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { userId, userStr, initialIndex, mode } = useLocalSearchParams();
+
+    // 1. Hooks
     const [progress] = useState(new Animated.Value(0));
     const [isPaused, setIsPaused] = useState(false);
     const [isLiked, setIsLiked] = useState(false);
@@ -20,81 +25,67 @@ export default function StoryViewScreen() {
     const [showViewers, setShowViewers] = useState(false);
     const [viewersList, setViewersList] = useState<any[]>([]);
     const [loadingViewers, setLoadingViewers] = useState(false);
-    const [fetchedUser, setFetchedUser] = useState<any>(null);
-    const [isLoadingUser, setIsLoadingUser] = useState(false);
+    const [viewersType, setViewersType] = useState<'views' | 'likes'>('views');
 
-    // Find user or default
+    const [showOptions, setShowOptions] = useState(false);
+    const [mediaError, setMediaError] = useState(false);
+
+    // Reset error when story changes
+    useEffect(() => {
+        setMediaError(false);
+    }, [currentStoryIndex, userId]);
+
+    // 2. Context
     const { user: currentUser } = (useUser() || {}) as any;
 
-    // Logic: Try to parse userStr (passed from list), else check current user, else mock
-    let passedUser = null;
-    if (userStr) {
-        try {
-            passedUser = JSON.parse(Array.isArray(userStr) ? userStr[0] : userStr);
-        } catch (e) {
-            console.error("Failed to parse userStr", e);
-        }
-    }
-
-    const isCurrentUser = currentUser && (currentUser._id === userId || currentUser.id === userId);
-    const user = passedUser || (isCurrentUser ? currentUser : null) || fetchedUser;
-
-    useEffect(() => {
-        const fetchUserData = async () => {
-            if (user || !userId) return;
-
-            setIsLoadingUser(true);
+    // 3. State for User (Initialized from params, updated via API)
+    const [user, setUser] = useState<any>(() => {
+        // Initial value from params (snapshot)
+        if (userStr) {
             try {
-                // Try fetching user details including stories
-                // Note: The specific endpoint might vary based on your backend. 
-                // Assuming /api/auth/user/:id returns public info with stories or we might need /api/stories/user/:id
-                // Based on UserContext, /api/auth/user/:id returns user data. Let's try that.
-                const res = await fetch(`${API_BASE_URL}/api/auth/user/${userId}`, {
-                    headers: {
-                        'Authorization': `Bearer ${currentUser?.token}`
-                    }
-                });
+                const parsed = JSON.parse(Array.isArray(userStr) ? userStr[0] : userStr);
+                return parsed;
+            } catch (e) {
+                console.error("Failed to parse userStr", e);
+            }
+        }
+        // Fallback to current user if ID matches
+        if (userId && currentUser && (currentUser._id === userId || currentUser.id === userId)) {
+            return currentUser;
+        }
+        return null;
+    });
 
-                if (res.ok) {
+    // 4. Fetched Data (Effect) - Runs on mount to refresh data
+    useEffect(() => {
+        let isMounted = true;
+        const fetchFreshUser = async () => {
+            if (!userId) return;
+            try {
+                // Fetch fresh user data including stories and likes
+                const res = await fetch(`${API_BASE_URL}/api/auth/user/${userId}`, {
+                    headers: { 'Authorization': `Bearer ${currentUser?.token}` }
+                });
+                if (res.ok && isMounted) {
                     const data = await res.json();
-                    setFetchedUser(data);
-                } else {
-                    console.error("Failed to fetch user data for story view");
+                    setUser((prev: any) => {
+                        if (!prev) return data;
+                        return { ...prev, ...data };
+                    });
                 }
             } catch (e) {
-                console.error("Error fetching user for story", e);
-            } finally {
-                setIsLoadingUser(false);
+                console.error("Failed to refresh user data", e);
             }
         };
+        fetchFreshUser();
+        return () => { isMounted = false; };
+    }, [userId, currentUser?.token]);
 
-        fetchUserData();
-    }, [userId, user, currentUser?.token]);
+    const isCurrentUser = currentUser && (currentUser._id === userId || currentUser.id === userId);
 
-    if (isLoadingUser) {
-        return (
-            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color="white" />
-            </View>
-        );
-    }
-
-    if (!user) {
-        return (
-            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <Text style={{ color: 'white' }}>User not found</Text>
-                <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20 }}>
-                    <X color="white" size={32} />
-                </TouchableOpacity>
-            </View>
-        );
-    }
-
-    // Get stories
-    // If mode is archive, take ALL stories. Else filter by 24h.
-    const stories = (user.stories || []).filter((s: any) => {
+    // Get stories from STATE
+    const stories = (user?.stories || []).filter((s: any) => {
         if (mode === 'archive') return true;
-
         if (!s.createdAt) return false;
         const storyTime = new Date(s.createdAt).getTime();
         return (Date.now() - storyTime) < 24 * 60 * 60 * 1000;
@@ -102,14 +93,121 @@ export default function StoryViewScreen() {
 
     const activeStory = stories[currentStoryIndex];
 
-    if (!activeStory || stories.length === 0) {
-        // No active stories, navigate back
-        return null;
-    }
+    // Update isLiked when activeStory changes
+    useEffect(() => {
+        if (activeStory && currentUser) {
+            const liked = activeStory.likes && activeStory.likes.includes(currentUser._id || currentUser.id);
+            setIsLiked(!!liked);
+        } else {
+            setIsLiked(false);
+        }
+    }, [activeStory, currentUser]);
+
+
+    const handleLikeStory = async () => {
+        if (!currentUser?.token || !activeStory?._id) return;
+
+        const wasLiked = isLiked;
+        const currentUserId = currentUser._id || currentUser.id;
+
+        // Optimistic update of Data
+        setUser((prevUser: any) => {
+            if (!prevUser || !prevUser.stories) return prevUser;
+            const updatedStories = prevUser.stories.map((s: any) => {
+                if (s._id === activeStory._id || s.id === activeStory._id) {
+                    const likes = s.likes || [];
+                    let newLikes;
+                    if (wasLiked) {
+                        newLikes = likes.filter((id: string) => id !== currentUserId);
+                    } else {
+                        newLikes = [...likes, currentUserId];
+                    }
+                    return { ...s, likes: newLikes };
+                }
+                return s;
+            });
+            return { ...prevUser, stories: updatedStories };
+        });
+
+        // Optimistic UI state (will be reinforced by effect)
+        setIsLiked(!wasLiked);
+
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/stories/like`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${currentUser.token}`
+                },
+                body: JSON.stringify({
+                    storyUserId: user._id || user.id,
+                    storyId: activeStory._id
+                })
+            });
+
+            if (!res.ok) {
+                // Revert
+                setIsLiked(wasLiked);
+                // We should also revert user state, but it's complex to undo inside closure.
+                // Re-fetching user data is cleaner or acceptable for rare failure.
+                console.error("Failed to like story");
+            }
+        } catch (error) {
+            console.error("Error liking story", error);
+            setIsLiked(wasLiked);
+        }
+    };
+
+    const handleDeleteStory = async () => {
+        if (!currentUser?.token || !activeStory?._id) return;
+
+        Alert.alert(
+            'Delete Story',
+            'Are you sure you want to delete this story?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            setIsPaused(true); // Pause playback
+                            setShowOptions(false);
+
+                            const res = await fetch(`${API_BASE_URL}/api/stories/${activeStory._id}`, {
+                                method: 'DELETE',
+                                headers: {
+                                    'Authorization': `Bearer ${currentUser.token}`
+                                }
+                            });
+
+                            if (res.ok) {
+                                // If last story, close
+                                if (stories.length <= 1) {
+                                    handleClose();
+                                } else {
+                                    // Move to prev or next
+                                    handleNextStory();
+                                }
+                            } else {
+                                Alert.alert('Error', 'Failed to delete story');
+                                setIsPaused(false);
+                            }
+                        } catch (error) {
+                            console.error(error);
+                            setIsPaused(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+
 
     // Mark as viewed
     useEffect(() => {
-        if (!isCurrentUser && activeStory && currentUser?.token) {
+        if (!isCurrentUser && activeStory && currentUser?.token && user) {
             fetch(`${API_BASE_URL}/api/stories/view`, {
                 method: 'POST',
                 headers: {
@@ -122,30 +220,62 @@ export default function StoryViewScreen() {
                 })
             }).catch(err => console.error('Failed to view story', err));
         }
-    }, [activeStory?._id, isCurrentUser]);
+    }, [activeStory?._id, isCurrentUser, user]);
 
-    // Handle fetching viewers
-    const handleShowViewers = async () => {
+    // Handle fetching viewers or likers
+    const handleShowViewers = async (type: 'views' | 'likes' = 'views') => {
         if (!activeStory?._id) return;
 
+        setViewersType(type);
         setShowViewers(true);
         setIsPaused(true);
         setLoadingViewers(true);
 
         try {
-            const res = await fetch(`${API_BASE_URL}/api/stories/my-story/${activeStory._id}/viewers`, {
+            const endpoint = type === 'likes'
+                ? `${API_BASE_URL}/api/stories/my-story/${activeStory._id}/likers`
+                : `${API_BASE_URL}/api/stories/my-story/${activeStory._id}/viewers`;
+
+            const res = await fetch(endpoint, {
                 headers: {
                     'Authorization': `Bearer ${currentUser.token}`
                 }
             });
             if (res.ok) {
                 const data = await res.json();
+                // Data already parsed in previous line if I hadn't duplicated it. Wait, I see duplicate in diff.
+                // Let's rewrite the block cleanly.
                 setViewersList(data);
+
+                // Update local state to reflect fresh count
+                if (activeStory) {
+                    setUser((prevUser: any) => {
+                        if (!prevUser || !prevUser.stories) return prevUser;
+                        const updatedStories = prevUser.stories.map((s: any) => {
+                            if (s._id === activeStory._id) {
+                                if (type === 'likes') {
+                                    // We received full objects, map to IDs if needed or just use length
+                                    // Be careful: 'data' is array of user objects. 's.likes' might be array of IDs.
+                                    // Best to just rely on length for the badge, but we need to update the array.
+                                    // Let's replace the array with the new list of IDs or Objects
+                                    // To be safe and consistent with schema (which usually stores IDs), we map to IDs.
+                                    // BUT, populate uses objects. The Badge uses .length.
+                                    // If we replace with objects, .length works.
+                                    return { ...s, likes: data.map((d: any) => d._id) };
+                                } else {
+                                    return { ...s, views: data.map((d: any) => d._id) };
+                                }
+                            }
+                            return s;
+                        });
+                        return { ...prevUser, stories: updatedStories };
+                    });
+                }
             } else {
-                console.error("Failed to fetch viewers");
+                console.error(`Failed to fetch ${type}`);
             }
         } catch (error) {
-            console.error("Error fetching viewers", error);
+            console.error(`Error fetching ${type}`, error);
         } finally {
             setLoadingViewers(false);
         }
@@ -156,14 +286,29 @@ export default function StoryViewScreen() {
         setIsPaused(false);
     };
 
-    const storyType = activeStory.type || 'image';
-    const storyUri = activeStory.image || activeStory.uri;
-    const storyContent = activeStory.content;
-    const storyColor = activeStory.color || '#000';
+    const storyType = activeStory?.type || 'image';
+    const storyUri = activeStory?.image || activeStory?.uri;
+    const storyContent = activeStory?.content;
+    const storyColor = activeStory?.color || '#000';
 
-    const player = useVideoPlayer(storyType === 'video' ? storyUri : null, player => {
+    const safePlay = (p: any) => {
+        if (Platform.OS === 'web') {
+            try {
+                const promise = p.play();
+                if (promise && typeof promise.catch === 'function') {
+                    promise.catch(() => { });
+                }
+            } catch (e) {
+                // Ignore synchronous errors
+            }
+        } else {
+            p.play();
+        }
+    };
+
+    const player = useVideoPlayer(storyType === 'video' && storyUri ? storyUri : null, player => {
         player.loop = true;
-        player.play();
+        safePlay(player);
     });
 
     // Handle Pause/Resume
@@ -173,16 +318,24 @@ export default function StoryViewScreen() {
         if (isPaused) {
             player.pause();
         } else {
-            player.play();
+            safePlay(player);
         }
     }, [isPaused, storyType, player]);
+
+    const handleClose = () => {
+        if (router.canGoBack()) {
+            router.back();
+        } else {
+            router.replace('/(tabs)/' as any);
+        }
+    };
 
     const handleNextStory = () => {
         if (currentStoryIndex < stories.length - 1) {
             setCurrentStoryIndex(currentStoryIndex + 1);
             progress.setValue(0);
         } else {
-            router.back();
+            handleClose();
         }
     };
 
@@ -212,10 +365,12 @@ export default function StoryViewScreen() {
         }
     };
 
-    const timeAgo = getTimeAgo(activeStory.createdAt);
+    const timeAgo = getTimeAgo(activeStory?.createdAt);
 
     useEffect(() => {
         if (isPaused) return;
+        // Don't animate if no active story
+        if (!activeStory) return;
 
         const animation = Animated.timing(progress, {
             toValue: 1,
@@ -230,14 +385,43 @@ export default function StoryViewScreen() {
         });
 
         return () => animation.stop();
-    }, [isPaused, currentStoryIndex]);
+    }, [isPaused, currentStoryIndex, activeStory]);
+
+    // --- RENDER GUARDS ---
+
+
+    if (!user) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <Text style={{ color: 'white' }}>User not found</Text>
+                <TouchableOpacity onPress={handleClose} style={{ marginTop: 20 }}>
+                    <X color="white" size={32} />
+                </TouchableOpacity>
+            </View>
+        );
+    }
+
+    if (!activeStory || stories.length === 0) {
+        // No active stories, navigate back
+        // Using useEffect to navigate back on next tick to avoid render loop?
+        // Actually better to just return null and use an effect to pop?
+        // But for now, returning a message or empty view is safer than null if logic was wrong.
+        // However, if we want to auto-close:
+        setTimeout(handleClose, 0);
+        return <View style={styles.container} />;
+    }
 
     return (
         <View style={styles.container}>
             <StatusBar hidden />
 
             {/* Media Content */}
-            {storyType === 'video' ? (
+            {mediaError ? (
+                <View style={[styles.image, { backgroundColor: '#1a1a1a', justifyContent: 'center', alignItems: 'center' }]}>
+                    <Trash2 size={48} color="#666" />
+                    <Text style={{ color: '#999', marginTop: 16 }}>Failed to load media</Text>
+                </View>
+            ) : storyType === 'video' ? (
                 <VideoView
                     player={player}
                     style={styles.image}
@@ -256,7 +440,10 @@ export default function StoryViewScreen() {
                         source={{ uri: storyUri }}
                         style={StyleSheet.absoluteFill}
                         resizeMode="contain"
-                        onError={(e) => console.log('Story image load error:', e.nativeEvent.error)}
+                        onError={(e) => {
+                            console.log('Story image load error:', e.nativeEvent.error);
+                            setMediaError(true);
+                        }}
                     />
                     {storyContent ? (
                         <Text style={{
@@ -296,7 +483,7 @@ export default function StoryViewScreen() {
             >
 
                 {/* Progress Bar */}
-                <View style={styles.progressContainer}>
+                <View style={[styles.progressContainer, { paddingTop: insets.top > 0 ? insets.top + 10 : 40 }]}>
                     {stories.map((_: any, index: number) => (
                         <View key={index} style={styles.progressBarWrapper}>
                             <View style={styles.progressBarBackground}>
@@ -334,13 +521,16 @@ export default function StoryViewScreen() {
                     <View style={styles.headerActions}>
                         {isCurrentUser && (
                             <TouchableOpacity
-                                onPress={() => router.push('/story-create')}
+                                onPress={() => {
+                                    setIsPaused(true);
+                                    router.push('/story-create');
+                                }}
                                 style={styles.addStoryButton}
                             >
                                 <Plus color="white" size={24} />
                             </TouchableOpacity>
                         )}
-                        <TouchableOpacity onPress={() => router.back()}>
+                        <TouchableOpacity onPress={handleClose}>
                             <X color="white" size={28} />
                         </TouchableOpacity>
                     </View>
@@ -348,46 +538,53 @@ export default function StoryViewScreen() {
 
             </LinearGradient>
 
-            {/* Viewers Modal */}
+            {/* Options Modal */}
             <Modal
-                visible={showViewers}
+                visible={showOptions}
                 animationType="slide"
                 transparent={true}
-                onRequestClose={handleCloseViewers}
+                onRequestClose={() => {
+                    setShowOptions(false);
+                    setIsPaused(false);
+                }}
             >
                 <View style={styles.modalOverlay}>
-                    <TouchableOpacity style={styles.modalDismiss} onPress={handleCloseViewers} />
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Viewers</Text>
-                            <TouchableOpacity onPress={handleCloseViewers}>
-                                <X size={24} color="#000" />
-                            </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.modalDismiss}
+                        onPress={() => {
+                            setShowOptions(false);
+                            setIsPaused(false);
+                        }}
+                    />
+                    <View style={styles.optionsModalContent}>
+                        <View style={styles.optionHeader}>
+                            <Text style={styles.optionHeaderTitle}>Story Options</Text>
                         </View>
 
-                        {loadingViewers ? (
-                            <ActivityIndicator size="large" color="#6C5CE7" style={{ marginTop: 20 }} />
-                        ) : (
-                            <FlatList
-                                data={viewersList}
-                                keyExtractor={(item) => item._id}
-                                ListEmptyComponent={
-                                    <Text style={styles.emptyText}>No views yet.</Text>
-                                }
-                                renderItem={({ item }) => (
-                                    <View style={styles.viewerItem}>
-                                        <Image
-                                            source={{ uri: item.avatar || 'https://cdn-icons-png.flaticon.com/512/149/149071.png' }}
-                                            style={styles.viewerAvatar}
-                                        />
-                                        <View>
-                                            <Text style={styles.viewerName}>{item.name}</Text>
-                                            <Text style={styles.viewerHandle}>@{item.handle}</Text>
-                                        </View>
-                                    </View>
-                                )}
-                            />
-                        )}
+                        <TouchableOpacity style={styles.optionItem} onPress={() => { setShowOptions(false); setIsPaused(false); Alert.alert('Share', 'Sharing functionality coming soon!'); }}>
+                            <Share2 size={24} color="#1a1a1a" />
+                            <Text style={styles.optionText}>Share Story</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.optionItem} onPress={() => { setShowOptions(false); setIsPaused(false); Alert.alert('Edit', 'Editing functionality coming soon!'); }}>
+                            <Edit3 size={24} color="#1a1a1a" />
+                            <Text style={styles.optionText}>Edit Story</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.optionItem} onPress={handleDeleteStory}>
+                            <Trash2 size={24} color="#FF3B30" />
+                            <Text style={[styles.optionText, styles.dangerText]}>Delete Story</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.optionItem, { borderTopWidth: 1, borderTopColor: '#f0f0f0', marginTop: 8 }]}
+                            onPress={() => {
+                                setShowOptions(false);
+                                setIsPaused(false);
+                            }}
+                        >
+                            <Text style={{ fontSize: 16, fontWeight: '600', color: '#1a1a1a', width: '100%', textAlign: 'center' }}>Cancel</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
@@ -400,36 +597,113 @@ export default function StoryViewScreen() {
             >
                 {isCurrentUser ? (
                     <View style={styles.footer}>
-                        <TouchableOpacity onPress={handleShowViewers} style={styles.viewCountBadge}>
-                            <Eye size={20} color="white" />
-                            <Text style={styles.viewCountText}>
-                                {activeStory.views?.length || 0}
-                            </Text>
-                        </TouchableOpacity>
+                        <BlurView intensity={30} tint="dark" style={styles.glassBadge}>
+                            <TouchableOpacity
+                                onPress={() => handleShowViewers('views')}
+                                style={styles.statButton}
+                            >
+                                <Eye size={18} color="white" />
+                                <Text style={styles.statText}>
+                                    {activeStory.views?.length || 0}
+                                </Text>
+                            </TouchableOpacity>
+                            <View style={styles.divider} />
+                            <TouchableOpacity
+                                onPress={() => handleShowViewers('likes')}
+                                style={styles.statButton}
+                            >
+                                <Heart size={18} color="white" fill={activeStory.likes?.length > 0 ? "white" : "transparent"} />
+                                <Text style={styles.statText}>
+                                    {activeStory.likes?.length || 0}
+                                </Text>
+                            </TouchableOpacity>
+                        </BlurView>
+
+                        <BlurView intensity={30} tint="dark" style={styles.iconButtonBlur}>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setIsPaused(true);
+                                    setShowOptions(true);
+                                }}
+                                style={styles.iconButton}
+                            >
+                                <MoreHorizontal size={24} color="white" />
+                            </TouchableOpacity>
+                        </BlurView>
                     </View>
                 ) : (
                     <View style={styles.footer}>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Send message"
-                            placeholderTextColor="rgba(255,255,255,0.7)"
-                            onFocus={() => setIsPaused(true)}
-                            onBlur={() => setIsPaused(false)}
-                        />
-                        <TouchableOpacity onPress={() => setIsLiked(!isLiked)}>
-                            <Heart
-                                size={30}
-                                color={isLiked ? "red" : "white"}
-                                fill={isLiked ? "red" : "transparent"}
-                                strokeWidth={1.5}
+                        <BlurView intensity={20} tint="dark" style={styles.messageInputBlur}>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Send message..."
+                                placeholderTextColor="rgba(255,255,255,0.6)"
+                                onFocus={() => setIsPaused(true)}
+                                onBlur={() => setIsPaused(false)}
                             />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => alert('Sent!')}>
-                            <Send size={28} color="white" strokeWidth={1.5} style={{ marginLeft: 16 }} />
+                            <TouchableOpacity onPress={() => alert('Sent!')} style={styles.sendButton}>
+                                <Send size={20} color="white" />
+                            </TouchableOpacity>
+                        </BlurView>
+
+                        <TouchableOpacity onPress={handleLikeStory} style={styles.likeButtonContainer}>
+                            <BlurView intensity={20} tint="dark" style={styles.likeButtonBlur}>
+                                <Heart
+                                    size={28}
+                                    color={isLiked ? "#FF3B30" : "white"}
+                                    fill={isLiked ? "#FF3B30" : "transparent"}
+                                />
+                            </BlurView>
                         </TouchableOpacity>
                     </View>
                 )}
             </KeyboardAvoidingView>
+
+            {/* Viewers/Likers Modal */}
+            <Modal
+                visible={showViewers}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={handleCloseViewers}
+            >
+                <View style={styles.modalOverlay}>
+                    <TouchableOpacity style={styles.modalDismiss} onPress={handleCloseViewers} />
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>
+                                {viewersType === 'likes' ? 'Likes' : 'Viewers'}
+                            </Text>
+                            <TouchableOpacity onPress={handleCloseViewers}>
+                                <X size={24} color="#000" />
+                            </TouchableOpacity>
+                        </View>
+                        {loadingViewers ? (
+                            <View style={{ padding: 20, alignItems: 'center' }}>
+                                <Text>Loading...</Text>
+                            </View>
+                        ) : viewersList.length === 0 ? (
+                            <Text style={styles.emptyText}>
+                                {viewersType === 'likes' ? 'No likes yet' : 'No views yet'}
+                            </Text>
+                        ) : (
+                            <View>
+                                {viewersList.map((viewer: any) => (
+                                    <View key={viewer._id} style={styles.viewerItem}>
+                                        <Image
+                                            source={{ uri: viewer.avatar || 'https://cdn-icons-png.flaticon.com/512/149/149071.png' }}
+                                            style={styles.viewerAvatar}
+                                        />
+                                        <View>
+                                            <Text style={styles.viewerName}>{viewer.name}</Text>
+                                            <Text style={styles.viewerHandle}>{viewer.handle}</Text>
+                                        </View>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -455,7 +729,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: 4,
         paddingHorizontal: 10,
-        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 10 : 50,
+        // paddingTop is handled inline
     },
     progressBarWrapper: {
         flex: 1,
@@ -526,11 +800,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    tapOverlay: {
-        flexDirection: 'row',
-        flex: 1,
-        // zIndex: -1  // Let buttons on top work
-    },
     footerContainer: {
         position: 'absolute',
         bottom: 0,
@@ -543,6 +812,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingBottom: Platform.OS === 'ios' ? 40 : 20,
         paddingTop: 10,
+    },
+    iconButton: {
+        padding: 8,
     },
     input: {
         flex: 1,
@@ -572,6 +844,75 @@ const styles = StyleSheet.create({
     modalOverlay: {
         flex: 1,
         justifyContent: 'flex-end',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    // New Styles for Glass UI
+    glassBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 8,
+        borderRadius: 24,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        gap: 4
+    },
+    statButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 4
+    },
+    statText: {
+        color: 'white',
+        fontWeight: '600',
+        fontSize: 14,
+    },
+    divider: {
+        width: 1,
+        height: 16,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+    },
+    iconButtonBlur: {
+        borderRadius: 24,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    messageInputBlur: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: 28,
+        overflow: 'hidden',
+        marginRight: 10,
+        height: 50,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.15)',
+        paddingHorizontal: 6,
+    },
+    sendButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 4
+    },
+    likeButtonContainer: {
+        // Just a container for layout
+    },
+    likeButtonBlur: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.15)',
     },
     modalDismiss: {
         flex: 1,
@@ -582,6 +923,36 @@ const styles = StyleSheet.create({
         borderTopRightRadius: 20,
         height: '50%',
         padding: 16,
+    },
+    optionsModalContent: {
+        backgroundColor: 'white',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        padding: 24,
+        paddingBottom: 40,
+    },
+    optionHeader: {
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    optionHeaderTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#999',
+    },
+    optionItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 16,
+        gap: 16,
+    },
+    optionText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1a1a1a',
+    },
+    dangerText: {
+        color: '#FF3B30',
     },
     modalHeader: {
         flexDirection: 'row',

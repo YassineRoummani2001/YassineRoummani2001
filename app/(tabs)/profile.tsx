@@ -1,8 +1,8 @@
 import { SkeletonGridItem } from '@/components/Skeletons';
 import { API_BASE_URL } from '@/constants/Config';
 import { useNotifications } from '@/context/NotificationContext';
+import { useThemeContext } from '@/context/ThemeContext';
 import { useUser } from '@/context/UserContext';
-import { useTheme } from '@/hooks/useTheme';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { AlignRight, Bell, Clapperboard, Grid3X3, MonitorPlay, UserPlus } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
@@ -12,17 +12,26 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = width / 3;
 
-import { Redirect, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 // Helper to normalize URIs
-const getValidUri = (uri: string) => {
-    if (!uri) return '';
-    if (uri.startsWith('http') || uri.startsWith('data:')) return uri;
-    return `${API_BASE_URL}${uri.startsWith('/') ? '' : '/'}${uri}`;
+const getCorrectUrl = (url: string) => {
+    if (!url || typeof url !== 'string') return '';
+    if (url.startsWith('blob:')) return '';
+
+    // Force use of current API_BASE_URL for any internal uploads
+    if (url.includes('/uploads/')) {
+        const uploadIndex = url.indexOf('/uploads/');
+        return `${API_BASE_URL}${url.substring(uploadIndex)}`;
+    }
+
+    if (url.startsWith('data:')) return url;
+    if (url.startsWith('http')) return url;
+    return `${API_BASE_URL}/uploads/${url}`;
 };
 
 function GridVideoItem({ uri, style }: { uri: string, style: any }) {
-    const player = useVideoPlayer(getValidUri(uri), player => {
+    const player = useVideoPlayer(getCorrectUrl(uri), player => {
         player.loop = true;
         player.muted = true;
     });
@@ -42,7 +51,13 @@ function GridVideoItem({ uri, style }: { uri: string, style: any }) {
 export default function ProfileScreen() {
     console.log('👤 ProfileScreen Mounting...');
     const router = useRouter();
-    const { user, logout, loading } = (useUser() || {}) as any;
+    const { userId } = useLocalSearchParams();
+    const { user: currentUser, logout, loading } = (useUser() || {}) as any;
+
+    // If userId is provided, fetch that user's profile, otherwise use current user
+    const [profileUser, setProfileUser] = useState<any>(null);
+    const [loadingProfile, setLoadingProfile] = useState(!!userId);
+
     const [activeTab, setActiveTab] = useState(0);
     const [userPosts, setUserPosts] = useState<any[]>([]);
     const [postsLoading, setPostsLoading] = useState(true);
@@ -53,8 +68,34 @@ export default function ProfileScreen() {
     const { unreadCount } = useNotifications();
     const insets = useSafeAreaInsets();
 
-    const colors = useTheme();
-    const styles = useMemo(() => createStyles(colors, insets), [colors, insets]);
+    const { colors, isDark } = useThemeContext();
+    const styles = useMemo(() => createStyles(colors, isDark, insets), [colors, isDark, insets]);
+
+    // Fetch profile user if userId is provided
+    useEffect(() => {
+        if (userId) {
+            fetchProfileUser();
+        }
+    }, [userId]);
+
+    const fetchProfileUser = async () => {
+        try {
+            setLoadingProfile(true);
+            const response = await fetch(`${API_BASE_URL}/api/auth/user/${userId}`);
+            if (response.ok) {
+                const data = await response.json();
+                setProfileUser(data);
+            }
+        } catch (error) {
+            console.error('Error fetching profile user:', error);
+        } finally {
+            setLoadingProfile(false);
+        }
+    };
+
+    // Use profileUser if viewing someone else's profile, otherwise use currentUser
+    const user = profileUser || currentUser;
+    const isOwnProfile = !userId || userId === currentUser?._id;
 
     // Fetch user posts
     useEffect(() => {
@@ -146,7 +187,7 @@ export default function ProfileScreen() {
             if (userPosts.length === 0) {
                 return (
                     <View style={styles.emptyState}>
-                        <Grid3X3 size={48} color="#ccc" />
+                        <Grid3X3 size={48} color={colors.textSecondary} />
                         <Text style={styles.emptyStateText}>No posts yet</Text>
                     </View>
                 );
@@ -188,7 +229,7 @@ export default function ProfileScreen() {
             if (reels.length === 0) {
                 return (
                     <View style={styles.emptyState}>
-                        <Clapperboard size={48} color="#ccc" />
+                        <Clapperboard size={48} color={colors.textSecondary} />
                         <Text style={styles.emptyStateText}>No reels yet</Text>
                     </View>
                 );
@@ -221,7 +262,7 @@ export default function ProfileScreen() {
             // Tagged / Videos (Placeholder for now)
             return (
                 <View style={styles.emptyState}>
-                    <MonitorPlay size={48} color="#ccc" />
+                    <MonitorPlay size={48} color={colors.textSecondary} />
                     <Text style={styles.emptyStateText}>No videos yet</Text>
                 </View>
             );
@@ -264,11 +305,11 @@ export default function ProfileScreen() {
                 }
             >
                 {/* Cover Image */}
-                <Image source={{ uri: getValidUri(user.coverImage) || 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80' }} style={styles.coverImage} resizeMode="cover" />
+                <Image source={{ uri: getCorrectUrl(user.coverImage) || 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80' }} style={styles.coverImage} resizeMode="cover" />
 
                 <View style={styles.profileHeader}>
                     <View style={styles.avatarBorder}>
-                        <Image source={{ uri: getValidUri(user.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random` }} style={styles.avatar} />
+                        <Image source={{ uri: getCorrectUrl(user.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random` }} style={styles.avatar} />
                     </View>
 
                     <View style={styles.userInfo}>
@@ -327,15 +368,15 @@ export default function ProfileScreen() {
 
                     {/* Modern Action Buttons */}
                     <View style={styles.actionsRow}>
-                        <TouchableOpacity style={[styles.actionButtonPrimary, { backgroundColor: colors.gray }]} onPress={() => router.push('/edit-profile')}>
+                        <TouchableOpacity style={[styles.actionButtonPrimary, { backgroundColor: isDark ? '#2C2C2E' : colors.gray }]} onPress={() => router.push('/edit-profile')}>
                             <Text style={[styles.actionButtonText, { color: colors.text }]}>Edit Profile</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={[styles.actionButtonPrimary, { backgroundColor: colors.gray }]} onPress={() => router.push('/qr-code')}>
+                        <TouchableOpacity style={[styles.actionButtonPrimary, { backgroundColor: isDark ? '#2C2C2E' : colors.gray }]} onPress={() => router.push('/qr-code')}>
                             <Text style={[styles.actionButtonText, { color: colors.text }]}>Share Profile</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={[styles.actionIconButton, { width: 48 }]} onPress={() => router.push('/discover-people')}>
+                        <TouchableOpacity style={[styles.actionIconButton, { width: 48, backgroundColor: isDark ? '#2C2C2E' : colors.gray }]} onPress={() => router.push('/discover-people')}>
                             <UserPlus size={20} color={colors.text} />
                         </TouchableOpacity>
                     </View>
@@ -344,13 +385,13 @@ export default function ProfileScreen() {
                 <View style={styles.tabSection}>
                     <View style={styles.tabHeader}>
                         <TouchableOpacity style={styles.tabIcon} onPress={() => setActiveTab(0)}>
-                            <Grid3X3 color={activeTab === 0 ? colors.text : "#999"} size={24} />
+                            <Grid3X3 color={activeTab === 0 ? colors.text : colors.textSecondary} size={24} />
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.tabIcon} onPress={() => setActiveTab(1)}>
-                            <Clapperboard color={activeTab === 1 ? colors.text : "#999"} size={24} />
+                            <Clapperboard color={activeTab === 1 ? colors.text : colors.textSecondary} size={24} />
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.tabIcon} onPress={() => setActiveTab(2)}>
-                            <MonitorPlay color={activeTab === 2 ? colors.text : "#999"} size={24} />
+                            <MonitorPlay color={activeTab === 2 ? colors.text : colors.textSecondary} size={24} />
                         </TouchableOpacity>
 
                         {/* Animated indicator position based on activeTab */}
@@ -364,7 +405,7 @@ export default function ProfileScreen() {
     );
 }
 
-const createStyles = (colors: any, insets: any) => StyleSheet.create({
+const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background,
@@ -442,7 +483,7 @@ const createStyles = (colors: any, insets: any) => StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
-        backgroundColor: colors.gray,
+        backgroundColor: isDark ? '#2C2C2E' : colors.gray,
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 12,
@@ -474,7 +515,7 @@ const createStyles = (colors: any, insets: any) => StyleSheet.create({
     actionIconButton: {
         padding: 12,
         borderRadius: 12,
-        backgroundColor: colors.gray,
+        backgroundColor: isDark ? '#2C2C2E' : colors.gray,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
@@ -488,6 +529,7 @@ const createStyles = (colors: any, insets: any) => StyleSheet.create({
         justifyContent: 'center',
         borderWidth: 1,
         borderColor: colors.border,
+        backgroundColor: isDark ? '#2C2C2E' : colors.gray,
     },
     actionButtonText: {
         fontWeight: '600',

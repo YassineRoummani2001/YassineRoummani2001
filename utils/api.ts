@@ -72,6 +72,7 @@ export const api = async <T = any>(
             };
         }
 
+        ErrorHandler.log(`API Success: ${response.status} ${url}`);
         return { success: true, data: data as T, status: response.status };
 
     } catch (error: any) {

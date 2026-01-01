@@ -54,7 +54,7 @@ export default function FollowRequestsScreen() {
                 const allUsers = await res.json();
                 const notFollowing = allUsers.filter((u: any) =>
                     u._id !== user._id &&
-                    !user.following?.includes(u._id) &&
+                    !(user.following || []).some((f: any) => (typeof f === 'string' ? f : f._id) === u._id) &&
                     (!user.sentRequests || !user.sentRequests.includes(u._id)) && // Don't suggest if I already requested
                     !requests.some(r => r._id === u._id) // Don't suggest people who requested to follow me
                 );

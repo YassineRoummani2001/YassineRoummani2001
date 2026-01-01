@@ -1,4 +1,5 @@
 import { Colors } from '@/constants/Colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useMemo, useState } from 'react';
 import { useColorScheme } from 'react-native';
 
@@ -30,14 +31,51 @@ export const THEME_COLORS = [
 export function CustomThemeProvider({ children }: { children: React.ReactNode }) {
     const systemScheme = useColorScheme();
     const [theme, setThemeState] = useState<ThemeType>('light');
-    const [primaryColor, setPrimaryColor] = useState('#6C5CE7');
+    const [primaryColor, setPrimaryColorState] = useState('#6C5CE7');
+    const [isLoaded, setIsLoaded] = useState(false);
+
+    // Load persisted theme on mount
+    React.useEffect(() => {
+        const loadTheme = async () => {
+            try {
+                const storedTheme = await AsyncStorage.getItem('vibe_theme');
+                const storedColor = await AsyncStorage.getItem('vibe_primary_color');
+
+                if (storedTheme) {
+                    setThemeState(storedTheme as ThemeType);
+                } else if (systemScheme) {
+                    // Optional: Default to system if nothing stored
+                    // setThemeState(systemScheme);
+                }
+
+                if (storedColor) {
+                    setPrimaryColorState(storedColor);
+                }
+            } catch (e) {
+                console.error("Failed to load theme", e);
+            } finally {
+                setIsLoaded(true);
+            }
+        };
+        loadTheme();
+    }, []);
 
     const toggleTheme = () => {
-        setThemeState(prev => (prev === 'light' ? 'dark' : 'light'));
+        setThemeState(prev => {
+            const newTheme = prev === 'light' ? 'dark' : 'light';
+            AsyncStorage.setItem('vibe_theme', newTheme);
+            return newTheme;
+        });
     };
 
     const setTheme = (newTheme: ThemeType) => {
         setThemeState(newTheme);
+        AsyncStorage.setItem('vibe_theme', newTheme);
+    };
+
+    const setPrimaryColor = (color: string) => {
+        setPrimaryColorState(color);
+        AsyncStorage.setItem('vibe_primary_color', color);
     };
 
     const isDark = theme === 'dark';
@@ -53,6 +91,10 @@ export function CustomThemeProvider({ children }: { children: React.ReactNode })
             tabIconSelected: isDark ? '#FFFFFF' : primaryColor,
         };
     }, [isDark, primaryColor]);
+
+    if (!isLoaded) {
+        return null;
+    }
 
     return (
         <ThemeContext.Provider value={{

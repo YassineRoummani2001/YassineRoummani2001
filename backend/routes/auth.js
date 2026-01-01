@@ -99,7 +99,7 @@ router.post('/register', async (req, res) => {
                 gender: user.gender,
                 links: user.links,
                 phone: user.phone,
-                stories: user.stories || [],
+                stories: [], // New user has no stories
                 following: user.following || [],
                 token: generateToken(user._id),
             });
@@ -136,6 +136,13 @@ router.post('/login', async (req, res) => {
         const user = await User.findOne({ email });
 
         if (user && (await user.matchPassword(password))) {
+            // Fetch active stories
+            const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            const stories = await Story.find({
+                user: user._id,
+                createdAt: { $gt: twentyFourHoursAgo }
+            }).sort({ createdAt: 1 });
+
             res.json({
                 _id: user._id,
                 name: user.name,
@@ -148,7 +155,7 @@ router.post('/login', async (req, res) => {
                 gender: user.gender,
                 links: user.links,
                 phone: user.phone,
-                stories: user.stories || [],
+                stories: stories || [],
                 following: user.following || [],
                 token: generateToken(user._id),
             });
@@ -209,6 +216,27 @@ router.put('/profile', protect, async (req, res) => {
 });
 
 
+
+// @desc    Update user push token
+// @route   POST /api/auth/push-token
+// @access  Private
+router.post('/push-token', protect, async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+
+        if (user) {
+            user.expoPushToken = req.body.token;
+            // platform is also sent in body if needed: req.body.platform
+            await user.save();
+            res.json({ message: 'Push token updated' });
+        } else {
+            res.status(404).json({ message: 'User not found' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 const Story = require('../models/Story');
 
 // @desc    Add a story
@@ -230,40 +258,27 @@ router.post('/stories', protect, async (req, res) => {
         const user = await User.findById(req.user._id);
 
         if (user) {
-            // 1. Create Story in Story Collection (The persisted DB collection)
+            // 1. Create Story in Story Collection
             const storyDoc = new Story({
                 user: user._id,
                 type,
                 uri: mediaUri,
                 content,
                 color,
-                // expiresAt handles itself via default
             });
             await storyDoc.save();
 
-            // 2. Add to User's embedded stories (for current Frontend compatibility)
-            // We can optionally store the storyDoc._id here if we update the schema later
-            const newStory = {
-                _id: storyDoc._id, // Consistent ID
-                type,
-                uri: mediaUri,
-                content,
-                color,
-                createdAt: storyDoc.createdAt
-            };
+            console.log(`✅ Story added for user ${user.name} to Story collection`);
 
-            user.stories.push(newStory);
-            
-            // Optional: Limit stories to last 10 to prevent bloat if needed
-            if (user.stories.length > 10) {
-                user.stories.shift(); 
-            }
+            // 2. Fetch and return updated active stories list to maintain frontend compatibility
+            // which expects the updated list of stories
+            const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            const stories = await Story.find({
+                user: user._id,
+                createdAt: { $gt: twentyFourHoursAgo }
+            }).sort({ createdAt: 1 });
 
-            await user.save();
-
-            console.log(`✅ Story added for user ${user.name} to both User array and Story collection`);
-
-            res.status(201).json(user.stories);
+            res.status(201).json(stories);
         } else {
             res.status(404).json({ message: 'User not found' });
         }
@@ -278,14 +293,17 @@ router.post('/stories', protect, async (req, res) => {
 // @access  Public
 router.get('/user/:id/stories', async (req, res) => {
     try {
-        const user = await User.findById(req.params.id).select('name handle avatar stories');
+        const user = await User.findById(req.params.id).select('name handle avatar');
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
         
         console.log('📖 User:', user.name);
-        console.log('📚 Total stories:', user.stories.length);
-        user.stories.forEach((story, i) => {
+
+        const stories = await Story.find({ user: user._id }).sort({ createdAt: -1 });
+
+        console.log('📚 Total stories:', stories.length);
+        stories.forEach((story, i) => {
             console.log(`  Story ${i + 1}:`, {
                 type: story.type,
                 createdAt: story.createdAt,
@@ -300,7 +318,7 @@ router.get('/user/:id/stories', async (req, res) => {
                 handle: user.handle,
                 avatar: user.avatar
             },
-            stories: user.stories
+            stories: stories
         });
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -336,6 +354,8 @@ router.put('/follow/:userId', protect, async (req, res) => {
         const sentRequests = currentUser.sentRequests;
         const isRequested = sentRequests.some(id => id.toString() === req.params.userId);
 
+        let responseData = {};
+
         if (isFollowing) {
             // Unfollow
             if (currentUser.following) {
@@ -344,7 +364,7 @@ router.put('/follow/:userId', protect, async (req, res) => {
             if (userToFollow.followers) {
                 userToFollow.followers = userToFollow.followers.filter(id => id.toString() !== req.user._id.toString());
             }
-            res.json({ status: 'unfollowed', isFollowing: false });
+            responseData = { status: 'unfollowed', isFollowing: false };
         } else if (isRequested) {
             // Cancel Request
             if (currentUser.sentRequests) {
@@ -353,7 +373,7 @@ router.put('/follow/:userId', protect, async (req, res) => {
             if (userToFollow.followerRequests) {
                 userToFollow.followerRequests = userToFollow.followerRequests.filter(id => id.toString() !== req.user._id.toString());
             }
-            res.json({ status: 'cancelled', isFollowing: false, isRequested: false });
+            responseData = { status: 'cancelled', isFollowing: false, isRequested: false };
         } else {
             // Check privacy
             if (userToFollow.isPrivate) {
@@ -383,7 +403,7 @@ router.put('/follow/:userId', protect, async (req, res) => {
                         );
                     }
                  }
-                 res.json({ status: 'requested', isFollowing: false, isRequested: true });
+                 responseData = { status: 'requested', isFollowing: false, isRequested: true };
             } else {
                 // Public Follow
                 // Ensure arrays exist
@@ -410,7 +430,7 @@ router.put('/follow/:userId', protect, async (req, res) => {
                         { type: 'user', userId: req.user._id }
                     );
                 }
-                res.json({ status: 'followed', isFollowing: true });
+                responseData = { status: 'followed', isFollowing: true };
             }
         }
 
@@ -422,6 +442,7 @@ router.put('/follow/:userId', protect, async (req, res) => {
 
         try {
             await Promise.all([currentUser.save(), userToFollow.save()]);
+            res.json(responseData);
         } catch (saveError) {
             console.error('Save Error:', saveError);
             return res.status(500).json({ message: 'Database save failed', error: saveError.message });
@@ -695,6 +716,13 @@ router.get('/user/:userId', async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
+        // Fetch active stories from the separate Story collection
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const stories = await Story.find({
+            user: user._id,
+            createdAt: { $gt: twentyFourHoursAgo }
+        }).sort({ createdAt: 1 });
+
         res.json({
             _id: user._id,
             name: user.name,
@@ -705,7 +733,7 @@ router.get('/user/:userId', async (req, res) => {
             pronouns: user.pronouns,
             gender: user.gender,
             links: user.links,
-            stories: user.stories || [],
+            stories: stories || [], // Return fetched stories
             followersCount: user.followers?.length || 0,
             followingCount: user.following?.length || 0,
             followers: user.followers || [],
@@ -818,6 +846,80 @@ router.post('/push-token', protect, async (req, res) => {
             res.status(404).json({ message: 'User not found' });
         }
     } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// @desc    Delete user account
+// @route   DELETE /api/auth/profile
+// @access  Private
+router.delete('/profile', protect, async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Import models locally to ensure availability
+        const Post = require('../models/Post');
+        const Story = require('../models/Story');
+        const MarketItem = require('../models/MarketItem');
+        const Message = require('../models/Message');
+        const Chat = require('../models/Chat');
+        // Notification and User are already available globally in this file
+
+        console.log(`Starting account deletion for ${user.email} (${userId})...`);
+
+        // 1. Delete User Content (Parallel)
+        await Promise.all([
+            Post.deleteMany({ user: userId }),
+            Story.deleteMany({ user: userId }),
+            MarketItem.deleteMany({ user: userId }),
+            Notification.deleteMany({ $or: [{ sender: userId }, { recipient: userId }] }),
+            Message.deleteMany({ sender: userId }),
+        ]);
+
+        // 2. Remove user from Chats
+        await Chat.updateMany(
+            { participants: userId },
+            { $pull: { participants: userId } }
+        );
+
+        // 3. Clean up relationships in other Users (Expensive but necessary)
+        await User.updateMany(
+            {},
+            { 
+                $pull: { 
+                    following: userId, 
+                    followers: userId, 
+                    blockedUsers: userId,
+                    followerRequests: userId,
+                    sentRequests: userId
+                } 
+            }
+        );
+
+        // 4. Remove User's Interactions (Likes & Comments on other posts)
+        await Post.updateMany(
+            {},
+            { 
+                $pull: { 
+                    likes: userId,
+                    comments: { user: userId }
+                } 
+            }
+        );
+
+        // 5. Finally, Delete the User
+        await User.findByIdAndDelete(userId);
+
+        console.log(`User ${userId} and all associated data deleted.`);
+
+        res.json({ message: 'User and all associated data deleted successfully' });
+    } catch (error) {
+        console.error('Delete account error:', error);
         res.status(500).json({ message: error.message });
     }
 });

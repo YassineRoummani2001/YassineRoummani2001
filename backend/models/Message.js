@@ -28,6 +28,10 @@ const messageSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Post'
   },
+  marketitemId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'MarketItem'
+  },
   readBy: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'

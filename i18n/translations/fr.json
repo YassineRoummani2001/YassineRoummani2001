@@ -1,0 +1,55 @@
+{
+    "common": {
+        "loading": "Chargement...",
+        "save": "Enregistrer",
+        "cancel": "Annuler",
+        "delete": "Supprimer",
+        "edit": "Modifier",
+        "error": "Erreur",
+        "success": "Succès",
+        "ok": "OK",
+        "search": "Rechercher",
+        "back": "Retour",
+        "next": "Suivant",
+        "done": "Terminé",
+        "close": "Fermer"
+    },
+    "auth": {
+        "login_title": "Bon retour",
+        "login_subtitle": "Connectez-vous pour continuer",
+        "signup_title": "Créer un compte",
+        "signup_subtitle": "Rejoignez la communauté Vibe",
+        "email_placeholder": "Adresse e-mail",
+        "password_placeholder": "Mot de passe",
+        "username_placeholder": "Nom d'utilisateur",
+        "login_button": "Se connecter",
+        "signup_button": "S'inscrire",
+        "forgot_password": "Mot de passe oublié ?",
+        "no_account": "Pas encore de compte ?",
+        "have_account": "Déjà un compte ?"
+    },
+    "navigation": {
+        "home": "Accueil",
+        "explore": "Explorer",
+        "create": "Créer",
+        "chat": "Chat",
+        "profile": "Profil",
+        "settings": "Paramètres",
+        "marketplace": "Marketplace",
+        "notifications": "Notifications"
+    },
+    "settings": {
+        "title": "Paramètres",
+        "account": "Compte",
+        "appearance": "Apparence",
+        "language": "Langue",
+        "notifications": "Notifications",
+        "privacy": "Confidentialité",
+        "security": "Sécurité",
+        "help": "Aide",
+        "about": "À propos",
+        "logout": "Se déconnecter",
+        "dark_mode": "Mode Sombre",
+        "theme": "Thème"
+    }
+}

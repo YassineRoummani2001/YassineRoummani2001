@@ -17,24 +17,32 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
     const [unreadCount, setUnreadCount] = useState(0);
     const [socket, setSocket] = useState<Socket | null>(null);
     const socketRef = useRef<Socket | null>(null);
+    const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const fetchUnreadCount = async () => {
         if (!user?.token) return;
 
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/chats/unread/count`, {
-                headers: {
-                    'Authorization': `Bearer ${user.token}`
-                }
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                setUnreadCount(data.count || 0);
-            }
-        } catch (error) {
-            console.error('Error fetching unread count:', error);
+        // Debounce the call to avoid excessive fetches on burst messages
+        if (fetchTimeoutRef.current) {
+            clearTimeout(fetchTimeoutRef.current);
         }
+
+        fetchTimeoutRef.current = setTimeout(async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/chats/unread/count`, {
+                    headers: {
+                        'Authorization': `Bearer ${user.token}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    setUnreadCount(data.count || 0);
+                }
+            } catch (error) {
+                console.error('Error fetching unread count:', error);
+            }
+        }, 500); // 500ms debounce
     };
 
     const markChatAsRead = async (chatId: string) => {

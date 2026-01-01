@@ -1,0 +1,55 @@
+{
+    "common": {
+        "loading": "Loading...",
+        "save": "Save",
+        "cancel": "Cancel",
+        "delete": "Delete",
+        "edit": "Edit",
+        "error": "Error",
+        "success": "Success",
+        "ok": "OK",
+        "search": "Search",
+        "back": "Back",
+        "next": "Next",
+        "done": "Done",
+        "close": "Close"
+    },
+    "auth": {
+        "login_title": "Welcome Back",
+        "login_subtitle": "Sign in to continue",
+        "signup_title": "Create Account",
+        "signup_subtitle": "Join the Vibe community",
+        "email_placeholder": "Email Address",
+        "password_placeholder": "Password",
+        "username_placeholder": "Username",
+        "login_button": "Log In",
+        "signup_button": "Sign Up",
+        "forgot_password": "Forgot Password?",
+        "no_account": "Don't have an account?",
+        "have_account": "Already have an account?"
+    },
+    "navigation": {
+        "home": "Home",
+        "explore": "Explore",
+        "create": "Create",
+        "chat": "Chat",
+        "profile": "Profile",
+        "settings": "Settings",
+        "marketplace": "Marketplace",
+        "notifications": "Notifications"
+    },
+    "settings": {
+        "title": "Settings",
+        "account": "Account",
+        "appearance": "Appearance",
+        "language": "Language",
+        "notifications": "Notifications",
+        "privacy": "Privacy",
+        "security": "Security",
+        "help": "Help",
+        "about": "About",
+        "logout": "Log Out",
+        "dark_mode": "Dark Mode",
+        "theme": "Theme"
+    }
+}

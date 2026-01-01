@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const Post = require('../models/Post');
 const Story = require('../models/Story');
+const MarketItem = require('../models/MarketItem');
 require('dotenv').config({ path: '../.env' });
 
 const properCase = (str) => {
@@ -19,6 +20,7 @@ const seedDatabase = async () => {
         await User.deleteMany({});
         await Post.deleteMany({});
         await Story.deleteMany({});
+        await MarketItem.deleteMany({});
 
         // Create Users
         console.log('👤 Creating users...');
@@ -128,6 +130,121 @@ const seedDatabase = async () => {
             }
         ]);
 
+        // Create Marketplace Items
+        console.log('🛍️ Creating marketplace items...');
+        const marketItems = await MarketItem.create([
+            {
+                user: users[2]._id, // Mike
+                title: 'iPhone 13 Pro Max - 256GB',
+                description: 'Perfect condition, battery health 92%. Comes with box and original cable. Unlocked for all carriers.',
+                price: 8500,
+                currency: 'MAD',
+                category: 'Electronics',
+                condition: 'Like New',
+                location: {
+                    city: 'Casablanca',
+                    address: 'Maarif'
+                },
+                images: [
+                    'https://images.unsplash.com/photo-1632661674596-df8be070a5c5?w=800&q=80',
+                    'https://images.unsplash.com/photo-1632661674209-54311894a4dc?w=800&q=80'
+                ],
+                status: 'available',
+                views: 45
+            },
+            {
+                user: users[1]._id, // Sarah
+                title: 'Vintage Denim Jacket',
+                description: 'Authentic vintage oversized denim jacket. Size M but fits L too. Great for layering.',
+                price: 350,
+                currency: 'MAD',
+                category: 'Clothing',
+                condition: 'Good',
+                location: {
+                    city: 'Marrakech',
+                    address: 'Gueliz'
+                },
+                images: [
+                    'https://images.unsplash.com/photo-1576871337632-b9aef4c17ab9?w=800&q=80',
+                    'https://images.unsplash.com/photo-1576871337622-98d48d1cf531?w=800&q=80'
+                ],
+                status: 'available',
+                views: 120
+            },
+            {
+                user: users[0]._id, // Alex
+                title: 'Professional Camera Tripod',
+                description: 'Manfrotto lightweight aluminum tripod. Stable and durable, perfect for landscape photography.',
+                price: 1200,
+                currency: 'MAD',
+                category: 'Electronics',
+                condition: 'New',
+                location: {
+                    city: 'Rabat',
+                    address: 'Agdal'
+                },
+                images: [
+                    'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80'
+                ],
+                status: 'available',
+                views: 8
+            },
+            {
+                user: users[2]._id, // Mike
+                title: 'PlayStation 5 Digital Edition',
+                description: 'Brand new, never opened. Won in a contest but I already have one.',
+                price: 4500,
+                currency: 'MAD',
+                category: 'Electronics',
+                condition: 'New',
+                location: {
+                    city: 'Casablanca',
+                    address: 'Ain Diab'
+                },
+                images: [
+                    'https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?w=800&q=80'
+                ],
+                status: 'available',
+                views: 200
+            },
+            {
+                user: users[0]._id, // Alex
+                title: 'Mountain Bike - Trek Marlin 5',
+                description: 'Used for one summer, detailed recently. Shimano gears, hydraulic disc brakes.',
+                price: 3800,
+                currency: 'MAD',
+                category: 'Sports',
+                condition: 'Good',
+                location: {
+                    city: 'Tangier',
+                    address: 'City Center'
+                },
+                images: [
+                    'https://images.unsplash.com/photo-1576435728678-be95d39e8f70?w=800&q=80'
+                ],
+                status: 'reserved',
+                views: 65
+            },
+            {
+                user: users[1]._id, // Sarah
+                title: 'Modern Coffee Table',
+                description: 'Minimalist glass coffee table with oak legs. Slight scratch on the glass, barely visible.',
+                price: 800,
+                currency: 'MAD',
+                category: 'Home',
+                condition: 'Fair',
+                location: {
+                    city: 'Casablanca',
+                    address: 'California'
+                },
+                images: [
+                    'https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc?w=800&q=80'
+                ],
+                status: 'available',
+                views: 30
+            }
+        ]);
+
         // IMPORTANT: Also push to User.stories embedded array for the App API to see them
         for (const story of stories) {
             await User.findByIdAndUpdate(story.user, {
@@ -159,6 +276,7 @@ const seedDatabase = async () => {
         console.log(`- Created ${users.length} users`);
         console.log(`- Created ${posts.length} posts`);
         console.log(`- Created ${stories.length} stories`);
+        console.log(`- Created ${marketItems.length} market items`);
 
     } catch (error) {
         console.error('❌ Error seeding database:', error);

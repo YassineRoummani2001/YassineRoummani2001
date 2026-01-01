@@ -1,6 +1,7 @@
 import { useSettings } from '@/context/SettingsContext';
 import { THEME_COLORS, useThemeContext } from '@/context/ThemeContext';
 import { useUser } from '@/context/UserContext';
+import { changeLanguage } from '@/i18n';
 import { useRouter } from 'expo-router';
 import {
     ArrowLeft,
@@ -10,7 +11,6 @@ import {
     ChevronRight,
     Clock,
     Eye,
-    Film,
     Globe,
     HelpCircle,
     Lock,
@@ -25,8 +25,10 @@ import {
     X
 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Alert,
+    I18nManager,
     Modal,
     Platform,
     ScrollView,
@@ -35,14 +37,16 @@ import {
     Text,
     TouchableOpacity,
     TouchableWithoutFeedback,
-    View
+    View,
 } from 'react-native';
-
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+// Actually I18nManager + Updates.reloadAsync() is the expo way. But user said no backend logic change and expo managed.
+// We will rely on purely JS reload if possible or just the context switch.
 
 export default function SettingsScreen() {
     const router = useRouter();
-    const { user, logout } = (useUser() || {}) as any;
+    const { t, i18n } = useTranslation();
+    const { user, logout, deleteAccount } = (useUser() || {}) as any;
     const { isDark, toggleTheme, colors, primaryColor, setPrimaryColor } = useThemeContext();
     const { settings, updateSetting } = useSettings();
     const insets = useSafeAreaInsets();
@@ -54,13 +58,9 @@ export default function SettingsScreen() {
     // Use Memoized styles
     const styles = useMemo(() => createStyles(colors, insets), [colors, insets]);
 
-    const handleDarkModeToggle = () => {
-        toggleTheme();
-    };
-
     const handleLogout = async () => {
         if (Platform.OS === 'web') {
-            const confirmed = window.confirm("Are you sure you want to log out?");
+            const confirmed = window.confirm(t('settings.logout') + "?");
             if (confirmed) {
                 if (logout) {
                     await logout();
@@ -69,16 +69,47 @@ export default function SettingsScreen() {
             }
         } else {
             Alert.alert(
-                "Log Out",
-                "Are you sure you want to log out?",
+                t('settings.logout'),
+                t('settings.logout') + "?",
                 [
-                    { text: "Cancel", style: "cancel" },
+                    { text: t('common.cancel'), style: "cancel" },
                     {
-                        text: "Log Out",
+                        text: t('settings.logout'),
                         style: "destructive",
                         onPress: async () => {
                             if (logout) {
                                 await logout();
+                                router.replace('/auth/login');
+                            }
+                        }
+                    }
+                ]
+            );
+        }
+    };
+
+    const handleDeleteAccount = () => {
+        if (Platform.OS === 'web') {
+            if (window.confirm("Are you sure you want to delete your account? This action cannot be undone.")) {
+                deleteAccount?.().then((res: any) => {
+                    if (!res.success) alert(res.message || "Failed to delete account");
+                    else router.replace('/auth/login');
+                });
+            }
+        } else {
+            Alert.alert(
+                (t('common.delete') || "Delete") + " Account",
+                "Are you sure you want to delete your account? This action cannot be undone.",
+                [
+                    { text: t('common.cancel'), style: 'cancel' },
+                    {
+                        text: (t('common.delete') || "Delete"),
+                        style: 'destructive',
+                        onPress: async () => {
+                            const res = await deleteAccount?.();
+                            if (!res?.success) {
+                                Alert.alert("Error", res?.message || "Failed to delete account");
+                            } else {
                                 router.replace('/auth/login');
                             }
                         }
@@ -128,7 +159,7 @@ export default function SettingsScreen() {
                     <TouchableWithoutFeedback>
                         <View style={styles.modalContent}>
                             <View style={styles.modalHeader}>
-                                <Text style={styles.modalTitle}>Choose Accent Color</Text>
+                                <Text style={styles.modalTitle}>{t('settings.theme')}</Text>
                                 <TouchableOpacity onPress={() => setColorModalVisible(false)}>
                                     <X size={24} color={colors.text} />
                                 </TouchableOpacity>
@@ -158,6 +189,12 @@ export default function SettingsScreen() {
         </Modal>
     );
 
+    const LANGUAGES = [
+        { code: 'en', label: 'English' },
+        { code: 'fr', label: 'Français' },
+        { code: 'ar', label: 'العربية' },
+    ];
+
     const renderLanguageModal = () => (
         <Modal
             visible={isLanguageModalVisible}
@@ -170,22 +207,22 @@ export default function SettingsScreen() {
                     <TouchableWithoutFeedback>
                         <View style={styles.modalContent}>
                             <View style={styles.modalHeader}>
-                                <Text style={styles.modalTitle}>Select Language</Text>
+                                <Text style={styles.modalTitle}>{t('settings.language')}</Text>
                                 <TouchableOpacity onPress={() => setLanguageModalVisible(false)}>
                                     <X size={24} color={colors.text} />
                                 </TouchableOpacity>
                             </View>
-                            {['English', 'Spanish', 'French', 'German', 'Chinese', 'Japanese'].map((lang) => (
+                            {LANGUAGES.map((lang) => (
                                 <TouchableOpacity
-                                    key={lang}
+                                    key={lang.code}
                                     style={styles.languageOption}
                                     onPress={() => {
-                                        updateSetting('language', lang);
+                                        changeLanguage(lang.code as any);
                                         setLanguageModalVisible(false);
                                     }}
                                 >
-                                    <Text style={[styles.languageText, { color: colors.text }]}>{lang}</Text>
-                                    {settings.language === lang && <Check size={20} color={colors.primary} />}
+                                    <Text style={[styles.languageText, { color: colors.text }]}>{lang.label}</Text>
+                                    {i18n.language === lang.code && <Check size={20} color={colors.primary} />}
                                 </TouchableOpacity>
                             ))}
                         </View>
@@ -197,7 +234,7 @@ export default function SettingsScreen() {
 
     const SettingSection = ({ title, children }: any) => (
         <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{title}</Text>
+            <Text style={[styles.sectionTitle, { textAlign: 'left' }]}>{title}</Text>
             <View style={styles.sectionContent}>
                 {children}
             </View>
@@ -209,30 +246,30 @@ export default function SettingsScreen() {
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <ArrowLeft size={24} color={colors.text} />
+                    <ArrowLeft size={24} color={colors.text} style={{ transform: [{ scaleX: I18nManager.isRTL ? -1 : 1 }] }} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Settings</Text>
+                <Text style={styles.headerTitle}>{t('settings.title')}</Text>
                 <View style={{ width: 40 }} />
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
                 {/* Account Section */}
-                <SettingSection title="Account">
+                <SettingSection title={t('settings.account')}>
                     <SettingItem
                         icon={User}
-                        title="Edit Profile"
+                        title={t('common.edit') + " " + t('navigation.profile')}
                         subtitle="Update your personal information"
                         onPress={() => router.push('/edit-profile')}
                     />
                     <SettingItem
                         icon={Lock}
-                        title="Privacy"
+                        title={t('settings.privacy')}
                         subtitle="Manage your privacy settings"
                         onPress={() => router.push('/privacy')}
                     />
                     <SettingItem
                         icon={Shield}
-                        title="Security"
+                        title={t('settings.security')}
                         subtitle="Password, 2FA, and more"
                         onPress={() => router.push('/security')}
                     />
@@ -260,26 +297,20 @@ export default function SettingsScreen() {
                         subtitle="View saved posts"
                         onPress={() => router.push('/saved')}
                     />
-                    <SettingItem
-                        icon={Film}
-                        title="Saved Reels"
-                        subtitle="View saved reels"
-                        onPress={() => router.push('/saved?tab=reels')}
-                    />
+
                 </SettingSection>
 
                 {/* Appearance Section */}
-                <SettingSection title="Appearance">
+                <SettingSection title={t('settings.appearance')}>
                     <SettingItem
                         icon={isDark ? Moon : Sun}
-                        title="Dark Mode"
+                        title={t('settings.dark_mode')}
                         subtitle={isDark ? 'Dark theme enabled' : 'Light theme enabled'}
                         showArrow={false}
                         rightComponent={
                             <Switch
                                 value={isDark}
                                 onValueChange={(val) => {
-                                    // Properly handle toggle based on switch value
                                     if (val !== isDark) {
                                         toggleTheme();
                                     }
@@ -291,7 +322,7 @@ export default function SettingsScreen() {
                     />
                     <SettingItem
                         icon={Palette}
-                        title="Theme Color"
+                        title={t('settings.theme')}
                         subtitle="Customize your accent color"
                         onPress={() => setColorModalVisible(true)}
                         rightComponent={
@@ -301,11 +332,11 @@ export default function SettingsScreen() {
                 </SettingSection>
 
                 {/* Notifications Section */}
-                <SettingSection title="Notifications">
+                <SettingSection title={t('settings.notifications')}>
                     <SettingItem
                         icon={Bell}
                         title="Push Notifications"
-                        subtitle={settings.notifications ? 'Enabled' : 'Disabled'}
+                        subtitle={settings.notifications ? t('common.success') : 'Disabled'}
                         showArrow={false}
                         rightComponent={
                             <Switch
@@ -350,25 +381,36 @@ export default function SettingsScreen() {
                     />
                     <SettingItem
                         icon={Globe}
-                        title="Language"
-                        subtitle={settings.language}
+                        title={t('settings.language')}
+                        subtitle={LANGUAGES.find(l => l.code === i18n.language)?.label || 'English'}
                         onPress={() => setLanguageModalVisible(true)}
                     />
                 </SettingSection>
 
                 {/* Support Section */}
-                <SettingSection title="Support">
+                <SettingSection title={t('settings.help')}>
                     <SettingItem
                         icon={HelpCircle}
-                        title="Help Center"
+                        title={t('settings.help')}
                         subtitle="Get help and support"
                         onPress={() => router.push('/help')}
                     />
                     <SettingItem
                         icon={Shield}
-                        title="About"
+                        title={t('settings.about')}
                         subtitle="Version 1.0.0"
                         onPress={() => router.push('/about')}
+                    />
+                </SettingSection>
+
+                {/* Danger Zone */}
+                <SettingSection title="Danger Zone">
+                    <SettingItem
+                        icon={X}
+                        title="Delete Account"
+                        subtitle="Permanently delete your account and data"
+                        onPress={handleDeleteAccount}
+                        isDestructive
                     />
                 </SettingSection>
 
@@ -377,7 +419,7 @@ export default function SettingsScreen() {
                     <View style={styles.sectionContent}>
                         <SettingItem
                             icon={LogOut}
-                            title="Log Out"
+                            title={t('settings.logout')}
                             showArrow={false}
                             onPress={handleLogout}
                             isDestructive
