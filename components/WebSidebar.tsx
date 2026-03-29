@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, Pressable } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Pressable, Image, ScrollView } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeContext } from '@/context/ThemeContext';
@@ -21,22 +21,28 @@ export default function WebSidebar() {
         { name: 'Home', icon: 'home', outline: 'home-outline', path: '/(tabs)' },
         { name: 'Search', icon: 'search', outline: 'search-outline', path: '/(tabs)/search' },
         { name: 'Explore', icon: 'compass', outline: 'compass-outline', path: '/(tabs)/explore' },
+        { name: 'Reels', icon: 'videocam', outline: 'videocam-outline', path: '/(tabs)/reels' },
         { name: 'Messages', icon: 'chatbubble', outline: 'chatbubble-outline', path: '/chat' },
         { name: 'Notifications', icon: 'notifications', outline: 'notifications-outline', path: '/notifications' },
-        { name: 'Create', icon: 'add-circle', outline: 'add-circle-outline', path: '/create' },
+        { name: 'Create', icon: 'add-circle', outline: 'add-circle-outline', path: '/(tabs)/create' },
         { name: 'Profile', icon: 'person', outline: 'person-outline', path: '/(tabs)/profile' },
     ];
 
     return (
         <View style={[styles.sidebar, { backgroundColor: colors.background, borderRightColor: isDark ? '#333' : '#eee' }]}>
             <View style={styles.logoContainer}>
-                 <View style={[styles.logoIcon, { backgroundColor: colors.primary }]}>
-                    <Ionicons name="flash" size={24} color="white" />
-                </View>
+                 <Image 
+                    source={require('@/assets/images/vibe-logo.png')} 
+                    style={{ width: 44, height: 44, borderRadius: 12 }} 
+                />
                 <Text style={[styles.logoText, { color: colors.primary }]}>Vibe</Text>
             </View>
 
-            <View style={styles.menuContainer}>
+            <ScrollView 
+                style={styles.menuContainer} 
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 20 }}
+            >
                 {menuItems.map((item) => {
                     const isActive = pathname === item.path || (item.path === '/(tabs)' && pathname === '/');
                     const isHovered = hoveredItem === item.name;
@@ -68,13 +74,20 @@ export default function WebSidebar() {
                         </Pressable>
                     );
                 })}
-            </View>
+            </ScrollView>
 
             <View style={styles.footer}>
-                <TouchableOpacity style={styles.moreButton}>
-                    <Ionicons name="menu-outline" size={26} color={colors.text} />
+                <Pressable 
+                    onHoverIn={() => setHoveredItem('settings')}
+                    onHoverOut={() => setHoveredItem(null)}
+                    style={[
+                        styles.moreButton,
+                        hoveredItem === 'settings' && { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }
+                    ]}
+                >
+                    <Ionicons name="settings-outline" size={26} color={colors.text} />
                     <Text style={[styles.menuText, { color: colors.text }]}>Settings</Text>
-                </TouchableOpacity>
+                </Pressable>
             </View>
         </View>
     );

@@ -970,4 +970,38 @@ router.delete('/profile', protect, async (req, res) => {
     }
 });
 
+// @desc    Search users and posts
+// @route   GET /api/auth/search
+// @access  Public
+router.get('/search', async (req, res) => {
+    try {
+        const { q } = req.query;
+        if (!q) return res.json({ users: [], posts: [] });
+
+        const Post = require('../models/Post');
+        const query = q.startsWith('#') ? q : q; // Keep hashtag if present
+
+        // Parallel Search
+        const [users, posts] = await Promise.all([
+            User.find({
+                $or: [
+                    { name: { $regex: query, $options: 'i' } },
+                    { handle: { $regex: query, $options: 'i' } }
+                ]
+            }).select('name handle avatar followers').limit(10),
+            
+            Post.find({
+                $or: [
+                    { caption: { $regex: query, $options: 'i' } },
+                    { tags: { $regex: query, $options: 'i' } }
+                ]
+            }).populate('user', 'name avatar handle').sort({ createdAt: -1 }).limit(20)
+        ]);
+
+        res.json({ users, posts });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 module.exports = router;

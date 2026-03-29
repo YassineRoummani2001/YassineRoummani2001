@@ -126,9 +126,11 @@ export default function ReelsScreen() {
         [reelHeight]
     );
 
+    const isDesktop = Platform.OS === 'web' && screenWidth > 768;
+
     // 🎨 Render
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, isDesktop && { width: 450, alignSelf: 'center', backgroundColor: '#000' }]}>
             <StatusBar
                 barStyle="light-content"
                 translucent

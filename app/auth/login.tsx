@@ -7,7 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import { ArrowRight, Eye, EyeOff, Lock, Mail } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Dimensions, I18nManager, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Dimensions, I18nManager, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
@@ -91,7 +91,11 @@ export default function LoginScreen() {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.keyboardView}
             >
-                <View style={[styles.contentContainer, isDesktop && styles.desktopContent]}>
+                <View style={[
+                    styles.contentContainer, 
+                    isDesktop && styles.desktopContent,
+                    isDesktop && { backgroundColor: isDark ? '#1A1A1A' : '#fff' }
+                ]}>
                     {isDesktop && (
                         <View style={styles.brandingSection}>
                              <LinearGradient
@@ -324,7 +328,6 @@ const styles = StyleSheet.create({
         maxWidth: 1000,
         height: 600,
         alignSelf: 'center',
-        backgroundColor: '#fff',
         borderRadius: 24,
         overflow: 'hidden',
         boxShadow: '0px 20px 40px rgba(0,0,0,0.1)',
@@ -360,5 +363,13 @@ const styles = StyleSheet.create({
     signupText: {
         fontSize: 15,
         fontWeight: 'bold',
+    },
+    footer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginTop: 40,
+    },
+    footerText: {
+        fontSize: 15,
     },
 });

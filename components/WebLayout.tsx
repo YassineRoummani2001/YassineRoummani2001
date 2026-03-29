@@ -12,6 +12,9 @@ export function WebLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const isLargeScreen = width > 768;
 
+    const isAuthPage = pathname.includes('/auth/');
+    if (isAuthPage) return <>{children}</>;
+
     // Different screens need different widths on Web
     const isProfile = pathname.includes('/profile') || pathname.includes('/user/');
     const isMarketplace = pathname.includes('/marketplace');
