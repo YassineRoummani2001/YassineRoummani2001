@@ -1,8 +1,8 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const User = require('./models/User');
-const Post = require('./models/Post');
-require('dotenv').config();
+const User = require('../models/User');
+const Post = require('../models/Post');
+require('dotenv').config({ path: '../.env' });
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/vibe';
 
