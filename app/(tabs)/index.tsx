@@ -5,9 +5,10 @@ import { useThemeContext } from '@/context/ThemeContext';
 import { lazyLoad, MinimalLoader } from '@/utils/lazyLoad';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
-import { Bell, MessageCircle, ShoppingBag, Zap } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Lazy load heavy components
@@ -140,6 +141,45 @@ export default function HomeScreen() {
 
   // Theme
   const { colors, isDark } = useThemeContext();
+  // Animation Shared Values
+  const bellRotation = useSharedValue(0);
+  const badgeScale = useSharedValue(1);
+
+  // Trigger animations if unreadCount > 0
+  useFocusEffect(
+    useCallback(() => {
+      if (unreadCount > 0) {
+        // Swing bell
+        bellRotation.value = withRepeat(
+          withSequence(
+            withTiming(15, { duration: 100 }),
+            withTiming(-15, { duration: 100 }),
+            withTiming(0, { duration: 100 })
+          ),
+          -1, // infinite
+          true // reverse
+        );
+        // Pulse badge
+        badgeScale.value = withRepeat(
+          withTiming(1.2, { duration: 600 }),
+          -1,
+          true
+        );
+      } else {
+        bellRotation.value = withTiming(0);
+        badgeScale.value = withTiming(1);
+      }
+    }, [unreadCount])
+  );
+
+  const bellAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${bellRotation.value}deg` }]
+  }));
+
+  const badgeAnimatedStyle = useAnimatedStyle(() => ({
+     transform: [{ scale: badgeScale.value }]
+  }));
+
   const insets = useSafeAreaInsets();
 
   return (
@@ -148,7 +188,7 @@ export default function HomeScreen() {
       <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderBottomWidth: 1 }]}>
         <View style={styles.logoContainer}>
           <View style={[styles.logoIcon, { backgroundColor: colors.primary }]}>
-            <Zap size={20} color="white" fill="white" />
+            <Ionicons name="flash" size={20} color="white" />
           </View>
           <Text style={[styles.logoText, { color: colors.primary }]}>Vibe</Text>
         </View>
@@ -158,18 +198,20 @@ export default function HomeScreen() {
             style={[styles.iconButton, { backgroundColor: isDark ? '#2C2C2E' : '#F3F4F6' }]}
             onPress={() => router.push('/marketplace')}
           >
-            <ShoppingBag size={22} color={colors.text} />
+            <Ionicons name="cart-outline" size={24} color={colors.text} />
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.iconButton, { backgroundColor: isDark ? '#2C2C2E' : '#F3F4F6' }]}
             onPress={() => router.push('/notifications')}
           >
-            <Bell size={22} color={colors.text} />
+            <Animated.View style={bellAnimatedStyle}>
+              <Ionicons name="notifications-outline" size={24} color={colors.text} />
+            </Animated.View>
             {unreadCount > 0 && (
-              <View style={[styles.badge, { borderColor: colors.background }]}>
+              <Animated.View style={[styles.badge, { borderColor: colors.background }, badgeAnimatedStyle]}>
                 <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-              </View>
+              </Animated.View>
             )}
           </TouchableOpacity>
 
@@ -177,7 +219,7 @@ export default function HomeScreen() {
             style={[styles.iconButton, { backgroundColor: isDark ? '#2C2C2E' : '#F3F4F6' }]}
             onPress={() => router.push('/chat')}
           >
-            <MessageCircle size={22} color={colors.text} />
+            <Ionicons name="paper-plane-outline" size={23} color={colors.text} style={{ transform: [{ rotate: '5deg' }] }} />
             {unreadMessagesCount > 0 && (
               <View style={[styles.badge, { borderColor: colors.background }]}>
                 <Text style={styles.badgeText}>{unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}</Text>

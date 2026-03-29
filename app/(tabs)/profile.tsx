@@ -4,7 +4,7 @@ import { useNotifications } from '@/context/NotificationContext';
 import { useThemeContext } from '@/context/ThemeContext';
 import { useUser } from '@/context/UserContext';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { AlignRight, Bell, Clapperboard, Grid3X3, MonitorPlay, UserPlus } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Dimensions, Image, Platform, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -194,7 +194,7 @@ export default function ProfileScreen() {
             if (userPosts.length === 0) {
                 return (
                     <View style={styles.emptyState}>
-                        <Grid3X3 size={48} color={colors.textSecondary} />
+                        <Ionicons name="grid-outline" size={48} color={colors.textSecondary} />
                         <Text style={styles.emptyStateText}>No posts yet</Text>
                     </View>
                 );
@@ -210,7 +210,6 @@ export default function ProfileScreen() {
                                 onPress={() => router.push({
                                     pathname: '/media-view',
                                     params: {
-                                        // uri: post.uri, // Avoid passing large URIs
                                         type: isVideo ? 'video' : 'image',
                                         postId: post._id
                                     }
@@ -223,7 +222,7 @@ export default function ProfileScreen() {
                                 )}
                                 {isVideo && (
                                     <View style={styles.videoIconOverlay}>
-                                        <MonitorPlay size={20} color="white" />
+                                        <Ionicons name="play" size={16} color="white" />
                                     </View>
                                 )}
                             </TouchableOpacity>
@@ -236,7 +235,7 @@ export default function ProfileScreen() {
             if (reels.length === 0) {
                 return (
                     <View style={styles.emptyState}>
-                        <Clapperboard size={48} color={colors.textSecondary} />
+                        <Ionicons name="film-outline" size={48} color={colors.textSecondary} />
                         <Text style={styles.emptyStateText}>No reels yet</Text>
                     </View>
                 );
@@ -258,7 +257,7 @@ export default function ProfileScreen() {
                         >
                             <GridVideoItem uri={post.uri || post.image} style={styles.gridImage} />
                             <View style={styles.reelIconOverlay}>
-                                <Clapperboard size={16} color="white" />
+                                <Ionicons name="play" size={16} color="white" />
                                 <Text style={styles.reelViews}>{post.views || 0}</Text>
                             </View>
                         </TouchableOpacity>
@@ -269,7 +268,7 @@ export default function ProfileScreen() {
             // Tagged / Videos (Placeholder for now)
             return (
                 <View style={styles.emptyState}>
-                    <MonitorPlay size={48} color={colors.textSecondary} />
+                    <Ionicons name="play-outline" size={48} color={colors.textSecondary} />
                     <Text style={styles.emptyStateText}>No videos yet</Text>
                 </View>
             );
@@ -286,7 +285,7 @@ export default function ProfileScreen() {
                         style={styles.headerIcon}
                         onPress={() => router.push('/notifications')}
                     >
-                        <Bell size={24} color="white" />
+                        <Ionicons name="notifications-outline" size={24} color="white" />
                         {unreadCount > 0 && (
                             <View style={styles.notificationBadge}>
                                 <Text style={styles.badgeText}>{unreadCount}</Text>
@@ -294,7 +293,7 @@ export default function ProfileScreen() {
                         )}
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.headerIcon} onPress={() => router.push('/settings')}>
-                        <AlignRight size={24} color="white" />
+                        <Ionicons name="menu-outline" size={24} color="white" />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -398,7 +397,7 @@ export default function ProfileScreen() {
                         </TouchableOpacity>
 
                         <TouchableOpacity style={[styles.actionIconButton, { width: 48, backgroundColor: isDark ? '#2C2C2E' : colors.gray }]} onPress={() => router.push('/discover-people')}>
-                            <UserPlus size={20} color={colors.text} />
+                            <Ionicons name="person-add-outline" size={20} color={colors.text} />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -406,13 +405,13 @@ export default function ProfileScreen() {
                 <View style={styles.tabSection}>
                     <View style={styles.tabHeader}>
                         <TouchableOpacity style={styles.tabIcon} onPress={() => setActiveTab(0)}>
-                            <Grid3X3 color={activeTab === 0 ? colors.text : colors.textSecondary} size={24} />
+                            <Ionicons name={activeTab === 0 ? "grid" : "grid-outline"} color={activeTab === 0 ? colors.text : colors.textSecondary} size={24} />
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.tabIcon} onPress={() => setActiveTab(1)}>
-                            <Clapperboard color={activeTab === 1 ? colors.text : colors.textSecondary} size={24} />
+                            <Ionicons name={activeTab === 1 ? "film" : "film-outline"} color={activeTab === 1 ? colors.text : colors.textSecondary} size={24} />
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.tabIcon} onPress={() => setActiveTab(2)}>
-                            <MonitorPlay color={activeTab === 2 ? colors.text : colors.textSecondary} size={24} />
+                            <Ionicons name={activeTab === 2 ? "play" : "play-outline"} color={activeTab === 2 ? colors.text : colors.textSecondary} size={24} />
                         </TouchableOpacity>
 
                         {/* Animated indicator position based on activeTab */}

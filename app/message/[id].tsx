@@ -10,7 +10,7 @@ import { Image as ExpoImage } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Check, Copy, Download, Edit2, Forward, Image as ImageIcon, Mic, Pause, Phone, Play, Reply, Send, Trash2, Video, X } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -79,6 +79,8 @@ const AvatarImage = ({ uri, name, size = 32 }: { uri?: string, name?: string, si
 /*                                Voice Component                             */
 /* -------------------------------------------------------------------------- */
 
+const WAVEFORM_BARS = [4, 6, 8, 14, 12, 8, 10, 16, 20, 14, 10, 8, 12, 18, 16, 10, 8, 6, 4, 10, 12, 16, 20, 18, 12, 10, 8, 6, 4];
+
 const VoiceMessage = ({ uri, itemsDuration, isMe, colors }: { uri: string, itemsDuration?: number, isMe: boolean, colors: any }) => {
     const [sound, setSound] = useState<Audio.Sound | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -88,23 +90,28 @@ const VoiceMessage = ({ uri, itemsDuration, isMe, colors }: { uri: string, items
 
     useEffect(() => {
         return () => {
-            if (sound) {
-                sound.unloadAsync();
-            }
+            if (sound) sound.unloadAsync();
         };
     }, [sound]);
 
     const loadAndPlay = async () => {
         try {
             if (sound) {
-                if (isPlaying) {
-                    await sound.pauseAsync();
-                    setIsPlaying(false);
+                const status = await sound.getStatusAsync();
+                if (status.isLoaded) {
+                    if (isPlaying) {
+                        await sound.pauseAsync();
+                        setIsPlaying(false);
+                    } else {
+                        await sound.playAsync();
+                        setIsPlaying(true);
+                    }
+                    return;
                 } else {
-                    await sound.playAsync();
-                    setIsPlaying(true);
+                    // Sound object exists but is not loaded (likely was unloaded)
+                    await sound.unloadAsync().catch(() => {});
+                    setSound(null);
                 }
-                return;
             }
 
             const { sound: newSound, status } = await Audio.Sound.createAsync(
@@ -127,12 +134,11 @@ const VoiceMessage = ({ uri, itemsDuration, isMe, colors }: { uri: string, items
             setPosition(status.positionMillis);
             setIsPlaying(status.isPlaying);
 
-            // Animate progress bar
             if (status.durationMillis > 0) {
                 const percent = status.positionMillis / status.durationMillis;
                 Animated.timing(progress, {
                     toValue: percent,
-                    duration: 100, // short duration for smooth updates
+                    duration: 100,
                     useNativeDriver: false
                 }).start();
             }
@@ -141,54 +147,74 @@ const VoiceMessage = ({ uri, itemsDuration, isMe, colors }: { uri: string, items
                 setIsPlaying(false);
                 setPosition(0);
                 progress.setValue(0);
-                // Optionally unload or just reset
+                // Reset animation
             }
         }
     };
 
-    // Format mm:ss
     const formatDuration = (millis: number) => {
         const totalSeconds = Math.floor(millis / 1000);
         const m = Math.floor(totalSeconds / 60);
         const s = totalSeconds % 60;
-        return `${m}:${s < 10 ? '0' : ''}${s} `;
+        return `${m}:${s < 10 ? '0' : ''}${s}`;
     };
+
+    const activeColor = isMe ? '#FFF' : colors.primary;
+    const inactiveColor = isMe ? 'rgba(255,255,255,0.4)' : (colors.background === '#000' ? '#444' : '#CCC');
 
     return (
         <View style={{
-            borderRadius: 20,
-            padding: 12,
+            borderRadius: 18,
+            padding: 10,
+            paddingRight: 16,
             minWidth: 200,
-            maxWidth: 240,
             backgroundColor: isMe ? colors.primary : (colors.background === '#000' ? '#262626' : '#F2F2F2'),
-            borderBottomRightRadius: isMe ? 4 : 20,
-            borderBottomLeftRadius: isMe ? 20 : 4,
+            borderBottomRightRadius: isMe ? 4 : 18,
+            borderBottomLeftRadius: isMe ? 18 : 4,
             flexDirection: 'row', alignItems: 'center', gap: 12
         }}>
             <TouchableOpacity onPress={loadAndPlay} style={{
-                width: 36, height: 36, borderRadius: 18,
-                backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)',
+                width: 32, height: 32, borderRadius: 16,
+                backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : colors.primary,
                 alignItems: 'center', justifyContent: 'center'
             }}>
                 {isPlaying ?
-                    <Pause size={18} color={isMe ? '#FFF' : colors.text} fill={isMe ? '#FFF' : colors.text} /> :
-                    <Play size={18} color={isMe ? '#FFF' : colors.text} fill={isMe ? '#FFF' : colors.text} />
+                    <Ionicons name="pause" size={18} color="#FFF" /> :
+                    <Ionicons name="play" size={18} color="#FFF" style={{ marginLeft: 2 }} />
                 }
             </TouchableOpacity>
 
-            <View style={{ flex: 1, gap: 4 }}>
-                {/* Progress Bar Container */}
-                <View style={{ height: 4, backgroundColor: isMe ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)', borderRadius: 2, overflow: 'hidden' }}>
-                    <Animated.View style={{
-                        height: '100%',
-                        backgroundColor: isMe ? '#FFF' : colors.text,
-                        width: progress.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: ['0%', '100%']
-                        })
-                    }} />
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                {/* Waveform Visualization */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, flex: 1, height: 24, justifyContent: 'center' }}>
+                    {WAVEFORM_BARS.map((height, i) => {
+                        const barProgress = i / WAVEFORM_BARS.length;
+                        return (
+                            <Animated.View
+                                key={i}
+                                style={{
+                                    width: 2.5,
+                                    height: height,
+                                    borderRadius: 1.5,
+                                    backgroundColor: progress.interpolate({
+                                        inputRange: [barProgress, barProgress + 0.01],
+                                        outputRange: [inactiveColor, activeColor],
+                                        extrapolate: 'clamp'
+                                    })
+                                }}
+                            />
+                        );
+                    })}
                 </View>
-                <Text style={{ fontSize: 11, color: isMe ? 'rgba(255,255,255,0.8)' : colors.textSecondary, fontWeight: '500' }}>
+
+                {/* Duration */}
+                <Text style={{
+                    fontSize: 11,
+                    color: isMe ? '#FFF' : colors.textSecondary,
+                    fontWeight: '600',
+                    width: 35,
+                    textAlign: 'right'
+                }}>
                     {formatDuration(position > 0 ? position : duration)}
                 </Text>
             </View>
@@ -355,10 +381,11 @@ export default function MessageScreen() {
         try {
             const res = await ApiClient.get<any[]>(`/api/chats/${chatId}/messages?limit=50&before=${lastMsg.createdAt}`, { 'Authorization': `Bearer ${user.token}` });
             if (res.success && res.data) {
-                if (res.data.length < 50) setHasMore(false);
+                const fetchedItems = res.data;
+                if (fetchedItems.length < 50) setHasMore(false);
                 setMessages(prev => {
                     const existing = new Set(prev.map(m => m._id));
-                    const newMsgs = res.data.filter((m: any) => !existing.has(m._id));
+                    const newMsgs = fetchedItems.filter((m: any) => !existing.has(m._id));
                     return [...prev, ...newMsgs];
                 });
             } else {
@@ -763,7 +790,7 @@ export default function MessageScreen() {
                                     <ExpoImage source={{ uri: imageUrl }} style={{ width: '100%', height: 220 }} contentFit="cover" />
                                 ) : (
                                     <View style={{ width: '100%', height: 220, backgroundColor: isDark ? '#333' : '#E0E0E0', alignItems: 'center', justifyContent: 'center' }}>
-                                        <ImageIcon size={40} color={colors.textSecondary} />
+                                        <Ionicons name="image-outline" size={40} color={colors.textSecondary} />
                                     </View>
                                 )}
 
@@ -800,7 +827,7 @@ export default function MessageScreen() {
                                 }
                                 return (
                                     <View style={{ width: 220, height: 280, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? '#333' : '#DDD' }}>
-                                        <ImageIcon size={40} color={colors.textSecondary} />
+                                        <Ionicons name="image-outline" size={40} color={colors.textSecondary} />
                                     </View>
                                 );
                             })()}
@@ -901,7 +928,7 @@ export default function MessageScreen() {
             <View style={[styles.header, { paddingTop: insets.top, backgroundColor: isDark ? '#000' : '#FFF', borderBottomColor: isDark ? '#262626' : '#F2F2F2' }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 4 }}>
                     <TouchableOpacity onPress={() => router.back()} style={{ padding: 4 }}>
-                        <ArrowLeft size={24} color={colors.text} />
+                        <Ionicons name="arrow-back" size={24} color={colors.text} />
                     </TouchableOpacity>
 
                     {recipient ? (
@@ -920,8 +947,8 @@ export default function MessageScreen() {
                 </View>
 
                 <View style={{ flexDirection: 'row', gap: 24, alignItems: 'center', paddingRight: 8 }}>
-                    <TouchableOpacity><Phone size={24} color={colors.text} /></TouchableOpacity>
-                    <TouchableOpacity><Video size={26} color={colors.text} /></TouchableOpacity>
+                    <TouchableOpacity><Ionicons name="call-outline" size={24} color={colors.text} /></TouchableOpacity>
+                    <TouchableOpacity><Ionicons name="videocam-outline" size={26} color={colors.text} /></TouchableOpacity>
                 </View>
             </View>
 
@@ -970,7 +997,7 @@ export default function MessageScreen() {
                                 zIndex: 50
                             }}
                         >
-                            <ArrowLeft size={20} color="#FFF" style={{ transform: [{ rotate: '-90deg' }] }} />
+                            <Ionicons name="arrow-down" size={20} color="#FFF" />
                         </TouchableOpacity>
                     )}
                 </View>
@@ -995,7 +1022,7 @@ export default function MessageScreen() {
                                 </Text>
                             </View>
                             <TouchableOpacity onPress={() => setReplyingTo(null)}>
-                                <X size={20} color={colors.textSecondary} />
+                                <Ionicons name="close" size={20} color={colors.textSecondary} />
                             </TouchableOpacity>
                         </View>
                     )}
@@ -1012,7 +1039,7 @@ export default function MessageScreen() {
                                 <Text style={{ fontWeight: '700', color: colors.text }}>Editing Message</Text>
                             </View>
                             <TouchableOpacity onPress={() => { setEditingMessage(null); setInputText(''); }}>
-                                <X size={20} color={colors.textSecondary} />
+                                <Ionicons name="close" size={20} color={colors.textSecondary} />
                             </TouchableOpacity>
                         </View>
                     )}
@@ -1031,7 +1058,7 @@ export default function MessageScreen() {
                                         <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Cancel</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity onPress={stopRecording} style={[styles.iconWrapper, { backgroundColor: colors.primary }]}>
-                                        <ArrowLeft size={24} color="#FFF" style={{ transform: [{ rotate: '90deg' }] }} />
+                                        <Ionicons name="stop" size={24} color="#FFF" />
                                     </TouchableOpacity>
                                 </View>
                             </View>
@@ -1039,7 +1066,7 @@ export default function MessageScreen() {
                             /* Standard Input UI */
                             <>
                                 <TouchableOpacity onPress={pickImage} style={[styles.iconWrapper, { backgroundColor: isDark ? '#262626' : '#F3F4F6' }]}>
-                                    <ImageIcon size={20} color={colors.primary} />
+                                    <Ionicons name="image-outline" size={20} color={colors.primary} />
                                 </TouchableOpacity>
 
                                 <View style={[styles.inputField, { backgroundColor: isDark ? '#262626' : '#F3F4F6' }]}>
@@ -1055,11 +1082,11 @@ export default function MessageScreen() {
 
                                 {inputText.trim() || editingMessage ? (
                                     <TouchableOpacity onPress={() => handleSend()} style={[styles.iconWrapper, { backgroundColor: colors.primary }]}>
-                                        {editingMessage ? <Check size={20} color="#FFF" /> : <Send size={20} color="#FFF" />}
+                                        {editingMessage ? <Ionicons name="checkmark" size={20} color="#FFF" /> : <Ionicons name="send" size={20} color="#FFF" />}
                                     </TouchableOpacity>
                                 ) : (
                                     <TouchableOpacity onPress={startRecording} style={[styles.iconWrapper, { backgroundColor: isDark ? '#262626' : '#F3F4F6' }]}>
-                                        <Mic size={20} color={colors.text} />
+                                        <Ionicons name="mic-outline" size={20} color={colors.text} />
                                     </TouchableOpacity>
                                 )}
                             </>
@@ -1091,37 +1118,37 @@ export default function MessageScreen() {
 
                                 {/* Actions */}
                                 <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 }} onPress={() => handleAction('reply')}>
-                                    <Reply size={20} color={colors.text} />
+                                    <Ionicons name="arrow-undo-outline" size={20} color={colors.text} />
                                     <Text style={{ fontSize: 16, color: colors.text, fontWeight: '500' }}>Reply</Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 }} onPress={() => handleAction('copy')}>
-                                    <Copy size={20} color={colors.text} />
+                                    <Ionicons name="copy-outline" size={20} color={colors.text} />
                                     <Text style={{ fontSize: 16, color: colors.text, fontWeight: '500' }}>Copy</Text>
                                 </TouchableOpacity>
 
                                 {selectedMessage?.type === 'image' && (
                                     <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 }} onPress={() => handleAction('download')}>
-                                        <Download size={20} color={colors.text} />
+                                        <Ionicons name="cloud-download-outline" size={20} color={colors.text} />
                                         <Text style={{ fontSize: 16, color: colors.text, fontWeight: '500' }}>Save Image</Text>
                                     </TouchableOpacity>
                                 )}
 
                                 <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 }} onPress={() => handleAction('forward')}>
-                                    <Forward size={20} color={colors.text} />
+                                    <Ionicons name="arrow-redo-outline" size={20} color={colors.text} />
                                     <Text style={{ fontSize: 16, color: colors.text, fontWeight: '500' }}>Forward</Text>
                                 </TouchableOpacity>
 
                                 {(selectedMessage?.sender?._id === user?._id || selectedMessage?.sender === user?._id) && selectedMessage?.type === 'text' && (
                                     <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 }} onPress={() => handleAction('edit')}>
-                                        <Edit2 size={20} color={colors.text} />
+                                        <Ionicons name="pencil-outline" size={20} color={colors.text} />
                                         <Text style={{ fontSize: 16, color: colors.text, fontWeight: '500' }}>Edit</Text>
                                     </TouchableOpacity>
                                 )}
 
                                 {(selectedMessage?.sender?._id === user?._id || selectedMessage?.sender === user?._id) && (
                                     <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 }} onPress={() => handleAction('delete')}>
-                                        <Trash2 size={20} color="#FF3B30" />
+                                        <Ionicons name="trash-outline" size={20} color="#FF3B30" />
                                         <Text style={{ fontSize: 16, color: '#FF3B30', fontWeight: '500' }}>Delete Message</Text>
                                     </TouchableOpacity>
                                 )}
@@ -1150,7 +1177,7 @@ export default function MessageScreen() {
                                     <AvatarImage uri={other.avatar} name={other.name} size={40} />
                                     <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>{other.name}</Text>
                                     <View style={{ flex: 1 }} />
-                                    <Forward size={20} color={colors.primary} />
+                                    <Ionicons name="arrow-redo" size={20} color={colors.primary} />
                                 </TouchableOpacity>
                             );
                         }}

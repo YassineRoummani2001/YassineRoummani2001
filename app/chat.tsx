@@ -9,7 +9,7 @@ import { useUser } from '@/context/UserContext';
 import { ApiClient } from '@/utils/api';
 import { formatDistanceToNow } from 'date-fns';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ArrowLeft, ChevronDown, Music, PenBox, Plus, Search, SquarePen } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     FlatList,
@@ -52,7 +52,7 @@ const UserNoteBubble = ({ note, isDark }: { note: any, isDark: boolean }) => {
 
             {note.music && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.2)' }}>
-                    <Music size={10} color="#FFF" />
+                    <Ionicons name="musical-notes" size={10} color="#FFF" />
                     <Text numberOfLines={1} style={{ fontSize: 9, color: '#FFF', opacity: 0.8 }}>
                         {note.music.track}
                     </Text>
@@ -173,31 +173,35 @@ export default function ChatScreen() {
             <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
             {/* Custom Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={{ width: 40 }}>
-                    <ArrowLeft size={24} color={colors.text} />
-                </TouchableOpacity>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={{ fontSize: 24, fontWeight: '800', color: colors.text, letterSpacing: -0.5 }}>
-                        {user?.username || user?.name || 'Messages'}
-                    </Text>
-                    <ChevronDown size={16} color={colors.text} strokeWidth={2.5} />
+            <View style={[styles.header, { borderBottomColor: colors.border }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <TouchableOpacity onPress={() => router.back()}>
+                        <Ionicons name="arrow-back" size={24} color={colors.text} />
+                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Text style={[styles.headerTitle, { color: colors.text }]}>{user?.username || 'Messages'}</Text>
+                        <Ionicons name="chevron-down" size={16} color={colors.text} />
+                    </View>
                 </View>
 
-                <TouchableOpacity onPress={() => setShowNewChat(true)} style={{ width: 40, alignItems: 'flex-end' }}>
-                    <SquarePen size={26} color={colors.text} />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                    <TouchableOpacity>
+                        <Ionicons name="create-outline" size={24} color={colors.text} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setShowNewChat(true)}>
+                        <Ionicons name="add" size={28} color={colors.text} />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {/* Search */}
-            <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+            <View style={styles.searchContainer}>
                 <View style={[styles.searchBar, { backgroundColor: isDark ? '#262626' : '#F3F4F6' }]}>
-                    <Search size={18} color={isDark ? '#A0A0A0' : '#9CA3AF'} />
+                    <Ionicons name="search" size={18} color={colors.textSecondary} style={{ marginRight: 8 }} />
                     <TextInput
-                        placeholder="Search"
-                        placeholderTextColor={isDark ? '#A0A0A0' : '#9CA3AF'}
-                        style={[styles.input, { color: colors.text }]}
+                        placeholder="Search messages..."
+                        placeholderTextColor={colors.textSecondary}
+                        style={[styles.searchInput, { color: colors.text }]}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                     />
@@ -272,7 +276,7 @@ export default function ChatScreen() {
                                                     {isMe ? (
                                                         <View style={styles.plusBadge}>
                                                             <View style={styles.plusInner}>
-                                                                <Plus size={14} color={colors.text} />
+                                                                <Ionicons name="add" size={14} color={colors.text} />
                                                             </View>
                                                         </View>
                                                     ) : (
@@ -310,7 +314,7 @@ export default function ChatScreen() {
                     }
                     ListEmptyComponent={
                         <View style={{ alignItems: 'center', marginTop: 50, padding: 20 }}>
-                            <PenBox size={40} color={colors.text} style={{ opacity: 0.5, marginBottom: 10 }} />
+                            <Ionicons name="create-outline" size={40} color={colors.text} style={{ opacity: 0.5, marginBottom: 10 }} />
                             <Text style={{ color: colors.textSecondary, fontSize: 16 }}>No chats found.</Text>
                         </View>
                     }
@@ -388,6 +392,9 @@ const styles = StyleSheet.create({
         elevation: 2
     },
     input: { flex: 1, fontSize: 16, height: '100%', fontWeight: '500' },
+    headerTitle: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
+    searchContainer: { paddingHorizontal: 16, marginBottom: 16 },
+    searchInput: { flex: 1, fontSize: 16, height: '100%', fontWeight: '500' },
     plusBadge: {
         position: 'absolute', bottom: 0, right: 0, width: 24, height: 24,
         borderRadius: 12, alignItems: 'center', justifyContent: 'center',

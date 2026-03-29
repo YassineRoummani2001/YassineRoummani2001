@@ -3,8 +3,9 @@ import { API_BASE_URL } from '@/constants/Config';
 import { useNotifications } from '@/context/NotificationContext';
 import { useThemeContext } from '@/context/ThemeContext';
 import { useUser } from '@/context/UserContext';
-import { useRouter } from 'expo-router';
-import { ArrowLeft, Bell, Heart, MessageCircle, UserPlus, Video } from 'lucide-react-native';
+import { formatDistanceToNow } from 'date-fns';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
     Image,
@@ -16,35 +17,50 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /* ================= UTILS ================= */
 const formatTime = (dateString: string) => {
-    const now = new Date();
-    const date = new Date(dateString);
-    const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-    if (diff < 60) return `${diff}s`;
-    if (diff < 3600) return `${Math.floor(diff / 60)}m`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-    if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
-    return `${Math.floor(diff / 604800)}w`;
-};
-
-const NotificationIcon = ({ type, color, borderColor }: { type?: string, color: string, borderColor: string }) => {
-    switch (type) {
-        case 'like':
-            return <View style={[styles.iconBadge, { backgroundColor: '#FF3040', borderColor }]}><Heart size={10} color="white" fill="white" /></View>;
-        case 'comment':
-            return <View style={[styles.iconBadge, { backgroundColor: '#3B82F6', borderColor }]}><MessageCircle size={10} color="white" fill="white" /></View>;
-        case 'follow':
-            return <View style={[styles.iconBadge, { backgroundColor: '#8B5CF6', borderColor }]}><UserPlus size={10} color="white" /></View>;
-        case 'reel':
-            return <View style={[styles.iconBadge, { backgroundColor: '#EC4899', borderColor }]}><Video size={10} color="white" /></View>;
-        default:
-            return <View style={[styles.iconBadge, { backgroundColor: color, borderColor }]}><Bell size={10} color="white" /></View>;
+    try {
+        return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+    } catch (e) {
+        return 'recently';
     }
 };
+
+const AnimatedNotificationIcon = ({ type, color, borderColor }: any) => {
+    const scale = useSharedValue(0);
+
+    useEffect(() => {
+        scale.value = withSpring(1, { damping: 12, stiffness: 100 });
+    }, []);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: scale.value }]
+    }));
+
+    return (
+        <Animated.View style={animatedStyle}>
+            {(() => {
+                switch (type) {
+                    case 'like':
+                        return <View style={[styles.iconBadge, { backgroundColor: '#FF3040', borderColor }]}><Ionicons name="heart" size={10} color="white" /></View>;
+                    case 'comment':
+                        return <View style={[styles.iconBadge, { backgroundColor: '#3B82F6', borderColor }]}><Ionicons name="chatbubble" size={10} color="white" /></View>;
+                    case 'follow':
+                        return <View style={[styles.iconBadge, { backgroundColor: '#8B5CF6', borderColor }]}><Ionicons name="person-add" size={10} color="white" /></View>;
+                    case 'reel':
+                        return <View style={[styles.iconBadge, { backgroundColor: '#EC4899', borderColor }]}><Ionicons name="videocam" size={10} color="white" /></View>;
+                    default:
+                        return <View style={[styles.iconBadge, { backgroundColor: color, borderColor }]}><Ionicons name="notifications" size={10} color="white" /></View>;
+                }
+            })()}
+        </Animated.View>
+    );
+};
+
+const NotificationIcon = AnimatedNotificationIcon;
 
 /* ================= COMPONENT ================= */
 export default function NotificationsScreen() {
@@ -152,11 +168,28 @@ export default function NotificationsScreen() {
         }
     };
 
-    const renderSectionHeader = ({ section: { title } }: any) => (
-        <Text style={[styles.sectionHeader, { color: colors.text, backgroundColor: colors.background }]}>{title}</Text>
-    );
+const AnimatedNotificationItem = ({ children, index }: { children: React.ReactNode, index: number }) => {
+    const opacity = useSharedValue(0);
+    const translateY = useSharedValue(20);
 
-    const renderItem = ({ item }: { item: any }) => {
+    useEffect(() => {
+        opacity.value = withDelay(index * 50, withTiming(1, { duration: 400 }));
+        translateY.value = withDelay(index * 50, withSpring(0, { damping: 15 }));
+    }, []);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        opacity: opacity.value,
+        transform: [{ translateY: translateY.value }]
+    }));
+
+    return <Animated.View style={animatedStyle}>{children}</Animated.View>;
+};
+
+const renderSectionHeader = ({ section: { title } }: any) => (
+    <Text style={[styles.sectionHeader, { color: colors.text, backgroundColor: colors.background }]}>{title}</Text>
+);
+
+const renderItem = ({ item, index }: { item: any, index: number }) => {
         const isFollowNotification = item.type === 'follow';
         // Determine notification type from text if type field is missing or generic
         let type = item.type;
@@ -169,58 +202,60 @@ export default function NotificationsScreen() {
         const isFollowing = user?.following?.includes(item.sender?._id);
 
         return (
-            <TouchableOpacity
-                style={[
-                    styles.itemContainer,
-                    !item.isRead && { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)' }
-                ]}
-                onPress={() => handlePress(item)}
-                activeOpacity={0.7}
-            >
-                <View style={styles.avatarWrapper}>
-                    <Image
-                        source={{ uri: item.sender?.avatar || 'https://i.pravatar.cc/100' }}
-                        style={styles.avatar}
-                    />
-                    <View style={styles.iconOverlay}>
-                        <NotificationIcon type={type} color={colors.primary} borderColor={colors.background} />
+            <AnimatedNotificationItem index={index}>
+                <TouchableOpacity
+                    style={[
+                        styles.itemContainer,
+                        !item.isRead && { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)' }
+                    ]}
+                    onPress={() => handlePress(item)}
+                    activeOpacity={0.7}
+                >
+                    <View style={styles.avatarWrapper}>
+                        <Image
+                            source={{ uri: item.sender?.avatar || 'https://i.pravatar.cc/100' }}
+                            style={styles.avatar}
+                        />
+                        <View style={styles.iconOverlay}>
+                            <AnimatedNotificationIcon type={type} color={colors.primary} borderColor={colors.background} />
+                        </View>
                     </View>
-                </View>
 
-                <View style={styles.textContainer}>
-                    <Text style={[styles.mainText, { color: colors.text }]}>
-                        <Text style={styles.username}>{item.sender?.name || 'User'} </Text>
-                        {item.text.replace('started following you', 'started following you')}
-                        <Text style={[styles.timeText, { color: colors.textSecondary }]}> {formatTime(item.createdAt)}</Text>
-                    </Text>
-                    {item.subText && <Text style={[styles.subText, { color: colors.textSecondary }]}>{item.subText}</Text>}
-                </View>
-
-                {item.post && (item.post.image || item.post.thumbnail) && (
-                    <Image
-                        source={{ uri: item.post.image || item.post.thumbnail || item.post.uri }}
-                        style={styles.postThumbnail}
-                    />
-                )}
-
-                {isFollowNotification && (
-                    <TouchableOpacity
-                        style={[
-                            styles.followBtn,
-                            { backgroundColor: isFollowing ? (isDark ? '#333' : '#f0f0f0') : colors.primary },
-                            isFollowing && { borderWidth: 1, borderColor: colors.border }
-                        ]}
-                        onPress={() => item.sender?._id && handleFollowClick(item.sender._id)}
-                    >
-                        <Text style={[
-                            styles.followBtnText,
-                            { color: isFollowing ? colors.text : 'white' }
-                        ]}>
-                            {isFollowing ? 'Following' : 'Follow'}
+                    <View style={styles.textContainer}>
+                        <Text style={[styles.mainText, { color: colors.text }]}>
+                            <Text style={styles.username}>{item.sender?.name || 'User'} </Text>
+                            {item.text}
+                            <Text style={[styles.timeText, { color: colors.textSecondary }]}> {formatTime(item.createdAt)}</Text>
                         </Text>
-                    </TouchableOpacity>
-                )}
-            </TouchableOpacity>
+                        {item.subText && <Text style={[styles.subText, { color: colors.textSecondary }]}>{item.subText}</Text>}
+                    </View>
+
+                    {item.post && (item.post.image || item.post.thumbnail) && (
+                        <Image
+                            source={{ uri: item.post.image || item.post.thumbnail || item.post.uri }}
+                            style={styles.postThumbnail}
+                        />
+                    )}
+
+                    {isFollowNotification && (
+                        <TouchableOpacity
+                            style={[
+                                styles.followBtn,
+                                { backgroundColor: isFollowing ? (isDark ? '#333' : '#f0f0f0') : colors.primary },
+                                isFollowing && { borderWidth: 1, borderColor: colors.border }
+                            ]}
+                            onPress={() => item.sender?._id && handleFollowClick(item.sender._id)}
+                        >
+                            <Text style={[
+                                styles.followBtnText,
+                                { color: isFollowing ? colors.text : 'white' }
+                            ]}>
+                                {isFollowing ? 'Following' : 'Follow'}
+                            </Text>
+                        </TouchableOpacity>
+                    )}
+                </TouchableOpacity>
+            </AnimatedNotificationItem>
         );
     };
 
@@ -231,7 +266,7 @@ export default function NotificationsScreen() {
             {/* Header */}
             <View style={[styles.header, { borderBottomColor: colors.border }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                    <ArrowLeft size={24} color={colors.text} />
+                    <Ionicons name="arrow-back" size={24} color={colors.text} />
                 </TouchableOpacity>
                 <Text style={[styles.headerTitle, { color: colors.text }]}>Notifications</Text>
                 <View style={{ width: 40 }} />
@@ -279,7 +314,7 @@ export default function NotificationsScreen() {
                     ListEmptyComponent={
                         <View style={styles.emptyState}>
                             <View style={[styles.emptyIconCircle, { backgroundColor: isDark ? '#222' : '#f0f0f0' }]}>
-                                <Bell size={40} color={colors.textSecondary} />
+                                <Ionicons name="notifications-outline" size={40} color={colors.textSecondary} />
                             </View>
                             <Text style={[styles.emptyTitle, { color: colors.text }]}>No Notifications</Text>
                             <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>

@@ -3,7 +3,7 @@ import { useUser } from '@/context/AuthContext';
 import { useThemeContext } from '@/context/ThemeContext'; // Import ThemeContext
 import { useRouter } from 'expo-router';
 
-import { CornerUpRight, Heart, MessageCircle, MoreVertical, Play, Volume2, VolumeX } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Dimensions, Image, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { State, TapGestureHandler } from 'react-native-gesture-handler';
@@ -111,7 +111,7 @@ const FeedVideo = ({ videoSource, posterSource, isMuted, setIsMuted, active, sty
                     {!isPlaying && (
                         <View style={styles.playOverlay}>
                             <View style={styles.playButton}>
-                                <Play size={32} color="white" fill="white" />
+                                <Ionicons name="play" size={32} color="white" />
                             </View>
                         </View>
                     )}
@@ -126,9 +126,9 @@ const FeedVideo = ({ videoSource, posterSource, isMuted, setIsMuted, active, sty
                 }}
             >
                 {isMuted ? (
-                    <VolumeX size={16} color="white" />
+                    <Ionicons name="volume-mute" size={16} color="white" />
                 ) : (
-                    <Volume2 size={16} color="white" />
+                    <Ionicons name="volume-high" size={16} color="white" />
                 )}
             </TouchableOpacity>
         </View>
@@ -442,6 +442,9 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
 
     const [viewsCount, setViewsCount] = useState(post.views || 0);
 
+    // Save state
+    const [isSaved, setIsSaved] = useState(post.isSaved || (user?.saved?.includes(post.id || post._id)) || false);
+
     // Follow state
     const [userIsFollowing, setUserIsFollowing] = useState(false);
     const [userIsRequested, setUserIsRequested] = useState(false);
@@ -682,6 +685,9 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
         const postId = post.id || post._id;
         console.log('💾 Saving post:', postId);
 
+        const wasSaved = isSaved;
+        setIsSaved(!wasSaved);
+
         try {
             const url = `${API_BASE_URL}/api/auth/save/${postId}`;
             console.log('📡 Save request to:', url);
@@ -697,15 +703,11 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
             console.log('📥 Save response status:', response.status);
 
             if (response.ok) {
-                const data = await response.json();
-                console.log('✅ Post saved successfully');
-                Alert.alert(
-                    'Success',
-                    data.message || 'Post saved to your collection!',
-                    [{ text: 'OK' }]
-                );
+                console.log('✅ Post save/unsave toggled successfully');
+                // State already updated optimistically
             } else {
                 const errorText = await response.text();
+                setIsSaved(wasSaved); // Revert
                 console.error('❌ Save failed:', response.status, errorText);
 
                 let errorMessage = 'Failed to save post';
@@ -731,6 +733,7 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
             }
 
             Alert.alert('Error', errorMsg, [{ text: 'OK' }]);
+            setIsSaved(wasSaved);
         }
     };
 
@@ -873,14 +876,8 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
                             )}
                         </TouchableOpacity>
                     )}
-                    <TouchableOpacity
-                        ref={menuAnchorRef}
-                        onPress={handleOpenMenu}
-                        style={styles.menuButton}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        activeOpacity={0.6}
-                    >
-                        <MoreVertical size={20} color={colors.textSecondary} />
+                    <TouchableOpacity onPress={handleOpenMenu} style={styles.menuButton}>
+                        <Ionicons name="ellipsis-horizontal" size={20} color={colors.textSecondary} />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -954,7 +951,7 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
                     <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
                         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                             <Animated.View style={{ transform: [{ scale: likeScale }], shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { height: 5, width: 0 }, shadowColor: '#000' }}>
-                                <Heart size={100} color="white" fill="white" />
+                                <Ionicons name="heart" size={100} color="white" />
                             </Animated.View>
                         </View>
                     </View>
@@ -965,20 +962,21 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
                 <View style={styles.actions}>
                     <View style={styles.actionGroup}>
                         <TouchableOpacity style={styles.actionButton} onPress={handleLike} activeOpacity={0.7}>
-                            <Heart size={20} color={isLiked ? "#FF3B30" : colors.text} fill={isLiked ? "#FF3B30" : "transparent"} strokeWidth={2.5} />
+                            <Ionicons name={isLiked ? "heart" : "heart-outline"} size={22} color={isLiked ? "#FF3B30" : colors.text} />
                             <Text style={styles.actionText}>{likesCount}</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.actionButton} onPress={() => setShowCommentsModal(true)} activeOpacity={0.7}>
-                            <MessageCircle size={20} color={colors.text} strokeWidth={2.5} />
-                            <Text style={styles.actionText}>{commentsCount}</Text>
+                        <TouchableOpacity style={styles.actionButton} onPress={() => setShowCommentsModal(true)}>
+                            <Ionicons name="chatbubble-outline" size={22} color={colors.text} />
+                            {commentsCount > 0 && <Text style={styles.actionText}>{commentsCount}</Text>}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
+                            <Ionicons name="paper-plane-outline" size={22} color={colors.text} style={{ transform: [{ rotate: '5deg' }] }} />
                         </TouchableOpacity>
                     </View>
 
-                    <TouchableOpacity style={styles.viewsInfo} onPress={handleShare} activeOpacity={0.7}>
-                        <View style={styles.viewsInfo}>
-                            <Text style={styles.viewsText}>{viewsCount} shares</Text>
-                            <CornerUpRight size={18} color={colors.textSecondary} strokeWidth={2.5} />
-                        </View>
+                    <TouchableOpacity style={styles.actionButton} onPress={handleSavePost}>
+                        <Ionicons name={isSaved ? "bookmark" : "bookmark-outline"} size={21} color={isSaved ? colors.primary : colors.text} />
                     </TouchableOpacity>
                 </View>
             </View>

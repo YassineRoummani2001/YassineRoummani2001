@@ -135,6 +135,18 @@ io.on('connection', (socket) => {
     });
 });
 
+// Global Error Handler
+app.use((err, req, res, next) => {
+    console.error(`[ERROR] ${req.method} ${req.url}:`, err.message);
+    console.error(err.stack);
+    
+    const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
+    res.status(statusCode).json({
+        message: err.message || 'Internal Server Error',
+        stack: process.env.NODE_ENV === 'production' ? null : err.stack
+    });
+});
+
 server.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     console.log(`🔌 Socket.IO ready for real-time messaging`);

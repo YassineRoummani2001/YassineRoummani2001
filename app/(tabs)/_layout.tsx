@@ -1,15 +1,15 @@
 import { useUser } from '@/context/AuthContext';
 import { useTheme } from '@/hooks/useTheme';
 import { Tabs } from 'expo-router';
-import { Clapperboard, Home, PlusSquare, Search, User } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Image, Platform, StyleSheet, View } from 'react-native';
 
 export default function TabLayout() {
   const { user } = (useUser() || {}) as any;
   const colors = useTheme();
-  const { t } = useTranslation();
-
+  const strokeWidth = 1.8;
+  const activeSize = 26;
 
   return (
     <Tabs
@@ -36,7 +36,7 @@ export default function TabLayout() {
         name="index"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <Home size={28} color={color} strokeWidth={focused ? 3 : 2} />
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={activeSize} color={color} />
           ),
         }}
       />
@@ -44,7 +44,7 @@ export default function TabLayout() {
         name="search"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <Search size={28} color={color} strokeWidth={focused ? 3 : 2} />
+            <Ionicons name={focused ? 'search' : 'search-outline'} size={activeSize} color={color} />
           ),
         }}
       />
@@ -52,7 +52,7 @@ export default function TabLayout() {
         name="create"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <PlusSquare size={28} color={color} strokeWidth={focused ? 3 : 2} />
+            <Ionicons name={focused ? 'add-circle' : 'add-circle-outline'} size={activeSize + 4} color={color} />
           ),
         }}
       />
@@ -60,7 +60,7 @@ export default function TabLayout() {
         name="reels"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <Clapperboard size={28} color={color} strokeWidth={focused ? 3 : 2} />
+            <Ionicons name={focused ? 'videocam' : 'videocam-outline'} size={activeSize} color={color} />
           ),
         }}
       />
@@ -76,7 +76,7 @@ export default function TabLayout() {
                 />
               </View>
             ) : (
-              <User size={28} color={color} strokeWidth={focused ? 3 : 2} />
+              <Ionicons name={focused ? 'person-circle' : 'person-circle-outline'} size={activeSize} color={color} />
             )
           ),
         }}

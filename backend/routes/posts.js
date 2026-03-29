@@ -115,19 +115,33 @@ const upload = multer({
     storage: storage,
     limits: { fileSize: 100 * 1024 * 1024 }, // 100MB max
     fileFilter: (req, file, cb) => {
-        const allowedTypes = /mp4|mov|avi|mkv/;
-        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-        const mimetype = allowedTypes.test(file.mimetype);
+        console.log('📂 File Filter checking:', file.originalname, '(' + file.mimetype + ')');
+        const allowedExts = /\.(mp4|mov|avi|mkv|wmv|flv|webm|qt)$/i;
+        const isVideoMime = file.mimetype.startsWith('video/') || file.mimetype === 'application/octet-stream'; // Handle generic types
+        const isVideoExt = allowedExts.test(path.extname(file.originalname).toLowerCase());
         
-        if (extname && mimetype) {
-            return cb(null, true);
+        if (isVideoMime || isVideoExt) {
+            cb(null, true);
         } else {
+            console.error('❌ File Filter rejected:', file.originalname, file.mimetype);
             cb(new Error('Only video files are allowed!'));
         }
     }
 });
 
-router.post('/upload-reel', protect, upload.single('video'), async (req, res) => {
+router.post('/upload-reel', protect, (req, res, next) => {
+    upload.single('video')(req, res, (err) => {
+        if (err instanceof multer.MulterError) {
+            // A Multer error occurred when uploading.
+            return res.status(400).json({ message: `Multer error: ${err.message}` });
+        } else if (err) {
+            // An unknown error occurred when uploading.
+            return res.status(400).json({ message: err.message });
+        }
+        // Everything went fine.
+        next();
+    });
+}, async (req, res) => {
     console.log('📤 Upload reel request received');
     console.log('User:', req.user?._id);
     console.log('File:', req.file ? 'Present' : 'Missing');

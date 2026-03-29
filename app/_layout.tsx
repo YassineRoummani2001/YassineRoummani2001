@@ -94,6 +94,7 @@ function RootLayoutNav() {
       <Stack.Screen name="auth/login" options={{ headerShown: false, gestureEnabled: false }} />
       <Stack.Screen name="auth/signup" options={{ headerShown: false }} />
       <Stack.Screen name="auth/forgot-password" options={{ headerShown: false }} />
+      <Stack.Screen name="post/[id]" options={{ headerShown: false }} />
     </Stack>
   );
 }
