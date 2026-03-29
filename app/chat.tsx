@@ -404,4 +404,3 @@ const styles = StyleSheet.create({
     }
 });
 
-// tttt

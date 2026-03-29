@@ -1,50 +1,64 @@
-# Welcome to your Expo app 👋
+# Vibe • Social Community & Reels Platform
+<p align="center">
+  <img src="assets/images/vibe-logo.png" alt="Vibe Logo" width="200" style="border-radius: 40px;"/>
+</p>
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+## ✨ Experience the Future of Connection
+**Vibe** is a high-performance, social media application designed for the next generation of creators. Built with **React Native (Expo)** and powered by a real-time backend, Vibe offers a seamless, cinematic experience for sharing, watching, and connecting.
 
-## Get started
+---
 
-1. Install dependencies
+## 📽️ Core Features
+- **Cinematic Reels**: Immersive, vertical video feed for creative expressions.
+- **Real-time Connectivity**: Instant messaging and live updates powered by **Socket.io**.
+- **Social Feed**: Interactive posts with support for images, videos, and complex engagement.
+- **Dynamic Profile**: Personalized user profiles with showcase for content and interests.
+- **Secure Authentication**: Robust user management for a safe community experience.
+- **Global Presence**: Full localization support (i18n) for international users.
+- **Smart Notifications**: Stay in the loop with relevant triggers and alerts.
 
-   ```bash
-   npm install
-   ```
+---
 
-2. Start the app
+## 🚀 Technology Stack
+| Front-end | Back-end | Extras |
+| :--- | :--- | :--- |
+| **Expo / React Native** | **Node.js / Express** | **Socket.io** (Real-time) |
+| **Reanimated** (Smooth UI) | **MongoDB** (Database) | **Firebase** (Cloud Services) |
+| **Expo Router** (Navigation) | **JWT** (Security) | **i18next** (Localization) |
+| **Lucide Icons** | **Zustand / Redux** | **Expo AV / Video** |
 
-   ```bash
-   npx expo start
-   ```
+---
 
-In the output, you'll find options to open the app in a
+## 🛠️ Setup & Installation
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### 1. Project Prerequisites
+Ensure you have the following installed:
+- [Node.js](https://nodejs.org/) (LTS)
+- [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
+- [Expo Go](https://expo.dev/go) app (on your iOS or Android device)
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
+### 2. Backend Initialization
 ```bash
-npm run reset-project
+cd backend
+npm install
+npm run dev
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 3. Mobile Frontend Setup
+```bash
+npm install
+npx expo start
+```
+*Note: Scan the QR code with your camera (iOS) or Expo Go app (Android) to explore Vibe.*
 
-## Learn more
+---
 
-To learn more about developing your project with Expo, look at the following resources:
+## 📄 License
+This project is private and for internal development use.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+---
 
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+<p align="center">
+  Built with ❤️ by <b>Yassine Roummani</b><br/>
+  <i>Connecting hearts through digital vibes.</i>
+</p>
