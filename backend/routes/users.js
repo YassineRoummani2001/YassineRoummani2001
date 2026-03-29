@@ -65,6 +65,21 @@ router.put('/:id/follow', protect, async (req, res) => {
     }
 });
 
+// @desc    Get all/suggested users
+// @route   GET /api/users/all
+// @access  Public
+router.get('/all', async (req, res) => {
+    try {
+        const users = await User.find({})
+            .select('-password')
+            .limit(20)
+            .sort({ followers: -1 }); // Sort by most followers as simple "suggestions" algorithm
+        res.json(users);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 // @desc    Search users
 // @route   GET /api/users/search/:query
 // @access  Public

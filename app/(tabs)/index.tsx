@@ -11,6 +11,7 @@ import { ActivityIndicator, FlatList, Platform, RefreshControl, StyleSheet, Text
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SkeletonPost } from '@/components/Skeletons';
+import { Search } from 'lucide-react-native';
 
 // Lazy load heavy components
 const FeedPost = lazyLoad(() => import('@/components/FeedPost'), <MinimalLoader />);
@@ -27,6 +28,9 @@ export default function HomeScreen() {
   const { unreadCount } = useNotifications();
   const { unreadCount: unreadMessagesCount } = useMessages();
   const isFocused = useIsFocused();
+  const { width } = useWindowDimensions();
+  const isDesktop = Platform.OS === 'web' && width > 768;
+  const insets = useSafeAreaInsets();
 
   // State
   const [posts, setPosts] = useState<any[]>([]);
@@ -124,21 +128,23 @@ export default function HomeScreen() {
   const renderItem = useCallback(({ item }: { item: any }) => {
     const isVideo = item.type === 'reel' || item.type === 'video' || (item.uri && /\.(mp4|mov|m4v|webm)$/i.test(item.uri));
     return (
-      <FeedPost
-        onDelete={handlePostDelete}
-        active={isFocused && viewableItems.includes(item._id)}
-        post={{
-          ...item,
-          id: item._id, // Ensure ID consistency
-          isVideo: !!isVideo,
-          videoUri: isVideo ? item.uri : undefined,
-          image: !isVideo ? item.uri : item.coverImage,
-          likes: item.likes || [],
-          comments: item.comments || [],
-        }}
-      />
+      <View style={isDesktop ? { width: '100%', maxWidth: 500, alignSelf: 'center', marginBottom: 20 } : undefined}>
+          <FeedPost
+            onDelete={handlePostDelete}
+            active={isFocused && viewableItems.includes(item._id)}
+            post={{
+              ...item,
+              id: item._id, // Ensure ID consistency
+              isVideo: !!isVideo,
+              videoUri: isVideo ? item.uri : undefined,
+              image: !isVideo ? item.uri : item.coverImage,
+              likes: item.likes || [],
+              comments: item.comments || [],
+            }}
+          />
+      </View>
     );
-  }, [viewableItems, handlePostDelete, isFocused]);
+  }, [viewableItems, handlePostDelete, isFocused, isDesktop]);
 
   // Theme
   const { colors, isDark } = useThemeContext();
@@ -201,10 +207,6 @@ export default function HomeScreen() {
      transform: [{ scale: badgeScale.value }]
   }));
 
-  const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const isDesktop = Platform.OS === 'web' && width > 768;
-
   return (
     <View style={[
       styles.container, 
@@ -213,11 +215,21 @@ export default function HomeScreen() {
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderBottomWidth: 1 }]}>
         <View style={styles.logoContainer}>
-          <View style={[styles.logoIcon, { backgroundColor: colors.primary }]}>
-            <Ionicons name="flash" size={20} color="white" />
-          </View>
-          <Text style={[styles.logoText, { color: colors.primary }]}>Vibe</Text>
-          {refreshing && (
+          {!isDesktop && (
+            <>
+              <View style={[styles.logoIcon, { backgroundColor: colors.primary }]}>
+                <Ionicons name="flash" size={20} color="white" />
+              </View>
+              <Text style={[styles.logoText, { color: colors.primary }]}>Vibe</Text>
+            </>
+          )}
+          {isDesktop && (
+              <View style={[styles.desktopSearchContainer, { backgroundColor: isDark ? '#2C2C2E' : '#F3F4F6' }]}>
+                  <Search size={20} color={colors.textSecondary} />
+                  <Text style={{ color: colors.textSecondary, marginLeft: 10, fontSize: 16 }}>Search</Text>
+              </View>
+          )}
+          {refreshing && !isDesktop && (
             <Animated.View style={[{ marginLeft: 8 }, refreshAnimatedStyle]}>
               <Ionicons name="sync" size={18} color={colors.primary} />
             </Animated.View>
@@ -225,13 +237,6 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={[styles.iconButton, { backgroundColor: isDark ? '#2C2C2E' : '#F3F4F6' }]}
-            onPress={() => router.push('/marketplace')}
-          >
-            <Ionicons name="cart-outline" size={24} color={colors.text} />
-          </TouchableOpacity>
-
           <TouchableOpacity
             style={[styles.iconButton, { backgroundColor: isDark ? '#2C2C2E' : '#F3F4F6' }]}
             onPress={() => router.push('/notifications')}
@@ -250,13 +255,23 @@ export default function HomeScreen() {
             style={[styles.iconButton, { backgroundColor: isDark ? '#2C2C2E' : '#F3F4F6' }]}
             onPress={() => router.push('/chat')}
           >
-            <Ionicons name="paper-plane-outline" size={23} color={colors.text} style={{ transform: [{ rotate: '5deg' }] }} />
+            <Ionicons name="chatbubble-ellipses-outline" size={24} color={colors.text} />
             {unreadMessagesCount > 0 && (
               <View style={[styles.badge, { borderColor: colors.background }]}>
                 <Text style={styles.badgeText}>{unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}</Text>
               </View>
             )}
           </TouchableOpacity>
+
+          {isDesktop && (
+              <TouchableOpacity
+                  style={styles.createPostBtn}
+                  onPress={() => router.push('/create' as any)}
+              >
+                  <Ionicons name="add" size={20} color="white" />
+                  <Text style={styles.createPostText}>Create a post</Text>
+              </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -344,6 +359,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flex: 1, // Added flex to let search take up space
+  },
+  desktopSearchContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      height: 44,
+      borderRadius: 22,
+      width: '100%',
+      maxWidth: 400,
   },
   logoIcon: {
     width: 34,
@@ -391,4 +416,19 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 100,
   },
+  createPostBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#FF6B6B', // Example orange/red gradient fallback
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 24,
+      gap: 6,
+      marginLeft: 10,
+  },
+  createPostText: {
+      color: 'white',
+      fontWeight: '600',
+      fontSize: 15,
+  }
 });

@@ -44,6 +44,34 @@ router.get('/reels', async (req, res) => {
     }
 });
 
+// @desc    Get trending hashtags
+// @route   GET /api/posts/trending-hashtags
+// @access  Public
+router.get('/trending-hashtags', async (req, res) => {
+    try {
+        const posts = await Post.find({ caption: { $regex: /#/ } });
+        const hashtagCounts = {};
+
+        posts.forEach(post => {
+            const matches = post.caption.match(/#[\w]+/g);
+            if (matches) {
+                matches.forEach(tag => {
+                    hashtagCounts[tag] = (hashtagCounts[tag] || 0) + 1;
+                });
+            }
+        });
+
+        const sortedTags = Object.keys(hashtagCounts)
+            .map(tag => ({ tag, count: hashtagCounts[tag] }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5); // top 5
+
+        res.json(sortedTags);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 // @desc    Get single post by ID
 // @route   GET /api/posts/:id
 // @access  Public

@@ -3,6 +3,7 @@ import { View, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import WebSidebar from './WebSidebar';
 import { useThemeContext } from '@/context/ThemeContext';
 import { usePathname } from 'expo-router';
+import DesktopRightSidebar from './DesktopRightSidebar';
 
 export function WebLayout({ children }: { children: React.ReactNode }) {
     if (Platform.OS !== 'web') return <>{children}</>;
@@ -18,7 +19,12 @@ export function WebLayout({ children }: { children: React.ReactNode }) {
     // Different screens need different widths on Web
     const isProfile = pathname.includes('/profile') || pathname.includes('/user/');
     const isMarketplace = pathname.includes('/marketplace');
-    const contentMaxWidth = isProfile ? 935 : isMarketplace ? 1200 : 600;
+    const isHome = pathname === '/' || pathname === '/(tabs)';
+    
+    // IG Standard Width: 935px total (with sidebar it can be wider). Feed width is usually wider if it has grid.
+    const contentMaxWidth = isMarketplace ? 1200 : (isProfile || isHome) ? 935 : 600;
+
+    const showRightSidebar = isLargeScreen && width > 1100 && !isProfile && !isMarketplace;
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -26,20 +32,26 @@ export function WebLayout({ children }: { children: React.ReactNode }) {
             
             <View style={[
                 styles.content, 
-                isLargeScreen && { paddingLeft: 240 },
-                !isLargeScreen && { paddingBottom: 60 } // For bottom tabs on mobile web
+                isLargeScreen && { paddingLeft: 280 }, // Account for thicker WebSidebar
+                showRightSidebar && { paddingRight: 350 }, // Prevent overlap with Right Sidebar
+                !isLargeScreen && { paddingBottom: 60 } 
             ]}>
                 <View style={[
                     styles.main,
-                    isLargeScreen && { width: contentMaxWidth, alignSelf: 'center', maxWidth: '100%' }
+                    isLargeScreen && { 
+                        width: '100%', 
+                        maxWidth: contentMaxWidth, 
+                        marginHorizontal: 'auto', 
+                        paddingHorizontal: isMarketplace ? 20 : 0
+                    }
                 ]}>
                     {children}
                 </View>
 
                 {/* Optional Right Sidebar (Desktop only) */}
-                {isLargeScreen && width > 1100 && !isProfile && !isMarketplace && (
+                {showRightSidebar && (
                     <View style={[styles.rightSidebar, { borderLeftColor: isDark ? '#333' : '#eee' }]}>
-                        {/* Suggestions, Trending, Fetch from components etc. */}
+                        <DesktopRightSidebar />
                     </View>
                 )}
             </View>
@@ -55,10 +67,10 @@ const styles = StyleSheet.create({
     content: {
         flex: 1,
         flexDirection: 'row',
+        justifyContent: 'center', // Helps centering main when row
     },
     main: {
         flex: 1,
-        // minWidth: 600,
     },
     rightSidebar: {
         width: 350,

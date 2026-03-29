@@ -38,10 +38,38 @@ export default function WebSidebar() {
                 <Text style={[styles.logoText, { color: colors.primary }]}>Vibe</Text>
             </View>
 
+            {user && (
+                <View style={styles.profileSection}>
+                    <Image 
+                        source={{ uri: user.avatar || 'https://i.pravatar.cc/150' }} 
+                        style={styles.profileAvatar} 
+                    />
+                    <Text style={[styles.profileName, { color: colors.text }]}>{user.name || 'User'}</Text>
+                    <Text style={[styles.profileHandle, { color: colors.textSecondary }]}>{user.handle || '@user'}</Text>
+                    
+                    <View style={styles.statsRow}>
+                        <View style={styles.statItem}>
+                            <Text style={[styles.statValue, { color: colors.text }]}>{user.posts?.length || 0}</Text>
+                            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Posts</Text>
+                        </View>
+                        <View style={styles.statDivider} />
+                        <View style={styles.statItem}>
+                            <Text style={[styles.statValue, { color: colors.text }]}>{user.followers?.length || 0}</Text>
+                            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Followers</Text>
+                        </View>
+                        <View style={styles.statDivider} />
+                        <View style={styles.statItem}>
+                            <Text style={[styles.statValue, { color: colors.text }]}>{user.following?.length || 0}</Text>
+                            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Following</Text>
+                        </View>
+                    </View>
+                </View>
+            )}
+
             <ScrollView 
                 style={styles.menuContainer} 
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 20 }}
+                contentContainerStyle={{ paddingBottom: 20, paddingTop: 10 }}
             >
                 {menuItems.map((item) => {
                     const isActive = pathname === item.path || (item.path === '/(tabs)' && pathname === '/');
@@ -95,7 +123,7 @@ export default function WebSidebar() {
 
 const styles = StyleSheet.create({
     sidebar: {
-        width: 240,
+        width: 280,
         height: '100%',
         paddingHorizontal: 20,
         paddingVertical: 30,
@@ -156,5 +184,54 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         borderRadius: 12,
         gap: 16,
+    },
+    profileSection: {
+        alignItems: 'center',
+        marginBottom: 30,
+        paddingBottom: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(150,150,150,0.1)',
+    },
+    profileAvatar: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        marginBottom: 12,
+        borderWidth: 2,
+        borderColor: '#fff',
+        boxShadow: '0px 4px 10px rgba(0,0,0,0.1)',
+    },
+    profileName: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 4,
+    },
+    profileHandle: {
+        fontSize: 14,
+        marginBottom: 16,
+    },
+    statsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        width: '100%',
+        paddingHorizontal: 10,
+    },
+    statItem: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    statValue: {
+        fontSize: 15,
+        fontWeight: 'bold',
+        marginBottom: 2,
+    },
+    statLabel: {
+        fontSize: 11,
+    },
+    statDivider: {
+        width: 1,
+        height: 20,
+        backgroundColor: 'rgba(150,150,150,0.2)',
     }
 });
