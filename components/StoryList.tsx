@@ -35,7 +35,7 @@ export default function StoryList() {
     useEffect(() => {
         // Force refresh
         // Force refresh - version 2
-        console.log('StoryList mounted v2');
+        // console.log('StoryList mounted v2');
         const fetchStories = async () => {
             try {
                 // Use centralized URL
@@ -53,7 +53,7 @@ export default function StoryList() {
                     setFetchedUsers(filtered);
                 }
             } catch (error) {
-                console.log('Error fetching stories:', error);
+                // console.log('Error fetching stories:', error);
             } finally {
                 setIsLoading(false);
             }

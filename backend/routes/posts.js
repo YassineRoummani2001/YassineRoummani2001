@@ -115,7 +115,7 @@ const upload = multer({
     storage: storage,
     limits: { fileSize: 100 * 1024 * 1024 }, // 100MB max
     fileFilter: (req, file, cb) => {
-        console.log('📂 File Filter checking:', file.originalname, '(' + file.mimetype + ')');
+        // console.log('📂 File Filter checking:', file.originalname, '(' + file.mimetype + ')');
         const allowedExts = /\.(mp4|mov|avi|mkv|wmv|flv|webm|qt)$/i;
         const isVideoMime = file.mimetype.startsWith('video/') || file.mimetype === 'application/octet-stream'; // Handle generic types
         const isVideoExt = allowedExts.test(path.extname(file.originalname).toLowerCase());
@@ -142,10 +142,10 @@ router.post('/upload-reel', protect, (req, res, next) => {
         next();
     });
 }, async (req, res) => {
-    console.log('📤 Upload reel request received');
-    console.log('User:', req.user?._id);
-    console.log('File:', req.file ? 'Present' : 'Missing');
-    console.log('Body:', req.body);
+    // console.log('📤 Upload reel request received');
+    // console.log('User:', req.user?._id);
+    // console.log('File:', req.file ? 'Present' : 'Missing');
+    // console.log('Body:', req.body);
     
     try {
         if (!req.file) {
@@ -153,12 +153,12 @@ router.post('/upload-reel', protect, (req, res, next) => {
             return res.status(400).json({ message: 'Video file is required' });
         }
 
-        console.log('✅ File received:', req.file.filename);
+        // console.log('✅ File received:', req.file.filename);
         
         const { caption, music } = req.body;
         const videoPath = `/uploads/reels/${req.file.filename}`;
 
-        console.log('Creating post with:', { videoPath, caption, music });
+        // console.log('Creating post with:', { videoPath, caption, music });
 
         const post = await Post.create({
             user: req.user._id,
@@ -173,13 +173,13 @@ router.post('/upload-reel', protect, (req, res, next) => {
             shares: 0
         });
 
-        console.log('✅ Post created:', post._id);
+        // console.log('✅ Post created:', post._id);
 
         // Populate user details
         const populatedPost = await Post.findById(post._id)
             .populate('user', 'name handle avatar');
 
-        console.log('✅ Sending response');
+        // console.log('✅ Sending response');
         res.status(201).json(populatedPost);
     } catch (err) {
         console.error('❌ Upload reel error:', err);

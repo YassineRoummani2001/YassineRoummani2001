@@ -1,3 +1,4 @@
+import { SkeletonGridItem, SkeletonRow } from '@/components/Skeletons';
 import { API_BASE_URL } from '@/constants/Config';
 import { useTheme } from '@/hooks/useTheme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -210,7 +211,9 @@ export default function SearchScreen() {
                 ) : (
                     <View style={styles.resultsContainer}>
                         {isSearching ? (
-                            <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
+                            <View style={{ gap: 12 }}>
+                                {[1, 2, 3, 4].map(i => <SkeletonRow key={i} />)}
+                            </View>
                         ) : (
                             <>
                                 {results.users.length > 0 && (

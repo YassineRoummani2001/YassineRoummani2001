@@ -1,4 +1,3 @@
-import { Colors } from '@/constants/Colors';
 import { API_BASE_URL } from '@/constants/Config';
 import { useUser } from '@/context/UserContext';
 import { useRouter } from 'expo-router';
@@ -13,6 +12,7 @@ import {
     UserPlus,
     Video
 } from 'lucide-react-native';
+import { useTheme } from '@/hooks/useTheme';
 import { useEffect, useState } from 'react';
 import {
     Platform,
@@ -27,7 +27,9 @@ import {
 
 export default function ActivityScreen() {
     const router = useRouter();
-    const { user } = useUser() || {};
+    const { user } = (useUser() || {}) as any;
+    const colors = useTheme();
+    const styles = createStyles(colors);
     const [refreshing, setRefreshing] = useState(false);
 
     // Activity Stats
@@ -50,7 +52,7 @@ export default function ActivityScreen() {
         try {
             if (!user?._id) return;
 
-            console.log('📊 Fetching activity stats for user:', user._id);
+            // console.log('📊 Fetching activity stats for user:', user._id);
 
             // Fetch user's posts
             const postsResponse = await fetch(`${API_BASE_URL}/api/posts`);
@@ -73,7 +75,7 @@ export default function ActivityScreen() {
                     followersCount = userData.followersCount || userData.followers?.length || 0;
                 }
             } catch (err) {
-                console.log('Could not fetch followers, using context data');
+                // console.log('Could not fetch followers, using context data');
                 followersCount = user.followers?.length || 0;
             }
 
@@ -86,12 +88,12 @@ export default function ActivityScreen() {
                 reelsViews: reelsCount * 50, // Estimate: 50 views per reel
             });
 
-            console.log('✅ Activity stats loaded:', {
-                totalPosts,
-                totalLikes,
-                totalComments,
-                followersCount
-            });
+            // console.log('✅ Activity stats loaded:', {
+            //     totalPosts,
+            //     totalLikes,
+            //     totalComments,
+            //     followersCount
+            // });
         } catch (error) {
             console.error('❌ Error fetching activity stats:', error);
             // Fallback to default values
@@ -155,8 +157,8 @@ export default function ActivityScreen() {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        tintColor={Colors.primary}
-                        colors={[Colors.primary]}
+                        tintColor={colors.primary}
+                        colors={[colors.primary]}
                     />
                 }
             >
@@ -189,7 +191,7 @@ export default function ActivityScreen() {
                             icon={UserPlus}
                             title="Followers"
                             value={stats.newFollowers}
-                            color={Colors.primary}
+                            color={colors.primary}
                             subtitle="New this week"
                         />
                     </View>
@@ -198,7 +200,7 @@ export default function ActivityScreen() {
                 {/* Content Performance */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <TrendingUp size={20} color={Colors.primary} />
+                        <TrendingUp size={20} color={colors.primary} />
                         <Text style={styles.sectionTitle}>Content Performance</Text>
                     </View>
                     <View style={styles.performanceCard}>
@@ -223,7 +225,7 @@ export default function ActivityScreen() {
                 {/* Recent Activity */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <Calendar size={20} color={Colors.primary} />
+                        <Calendar size={20} color={colors.primary} />
                         <Text style={styles.sectionTitle}>Recent Activity</Text>
                     </View>
                     <View style={styles.activityList}>
@@ -246,7 +248,7 @@ export default function ActivityScreen() {
                             title="New Followers"
                             description="5 people started following you"
                             time="1 day ago"
-                            color={Colors.primary}
+                            color={colors.primary}
                         />
                         <ActivityItem
                             icon={Eye}
@@ -265,7 +267,7 @@ export default function ActivityScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#F8F9FA',
@@ -277,7 +279,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 16,
         paddingVertical: 16,
-        backgroundColor: Colors.white,
+        backgroundColor: colors.background,
         borderBottomWidth: 1,
         borderBottomColor: '#F0F0F0',
     },
@@ -315,7 +317,7 @@ const styles = StyleSheet.create({
     statCard: {
         flex: 1,
         minWidth: '45%',
-        backgroundColor: Colors.white,
+        backgroundColor: colors.background,
         borderRadius: 16,
         padding: 16,
         flexDirection: 'row',
@@ -340,13 +342,13 @@ const styles = StyleSheet.create({
     statValue: {
         fontSize: 24,
         fontWeight: '800',
-        color: '#1A1A1A',
+        color: colors.text,
         marginBottom: 2,
     },
     statTitle: {
         fontSize: 13,
         fontWeight: '600',
-        color: '#666',
+        color: colors.textSecondary,
         marginBottom: 2,
     },
     statSubtitle: {
@@ -354,7 +356,7 @@ const styles = StyleSheet.create({
         color: '#999',
     },
     performanceCard: {
-        backgroundColor: Colors.white,
+        backgroundColor: colors.background,
         marginHorizontal: 16,
         borderRadius: 16,
         padding: 16,
@@ -382,7 +384,7 @@ const styles = StyleSheet.create({
         color: '#666',
     },
     activityList: {
-        backgroundColor: Colors.white,
+        backgroundColor: colors.background,
         marginHorizontal: 16,
         borderRadius: 16,
         overflow: 'hidden',

@@ -430,7 +430,7 @@ export default function MessageScreen() {
             case 'download':
                 if (msg.type === 'image') {
                     const url = getCorrectUrl(msg.content);
-                    console.log('📥 Attempting to download image from:', url);
+                    // console.log('📥 Attempting to download image from:', url);
 
                     if (!url) {
                         Alert.alert("Error", "Invalid image URL");
@@ -481,7 +481,7 @@ export default function MessageScreen() {
                             }
 
                             const asset = await MediaLibrary.saveToLibraryAsync(saveUri);
-                            console.log('💾 Saved to gallery:', asset);
+                            // console.log('💾 Saved to gallery:', asset);
 
                             Alert.alert("Success", "Image saved to your gallery!");
                         } catch (e: any) {

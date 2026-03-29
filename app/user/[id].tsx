@@ -305,7 +305,7 @@ export default function UserProfileScreen() {
                                                 window.open(url, '_blank');
                                             } else {
                                                 // Handle native link opening if needed
-                                                console.log('Opening link:', url);
+                                                // console.log('Opening link:', url);
                                             }
                                         }}
                                     >
@@ -459,6 +459,34 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: Colors.light.primary,
         textDecorationLine: 'underline',
+    },
+    actionsRow: { 
+        flexDirection: 'row', 
+        gap: 12, 
+        paddingHorizontal: 20, 
+        marginBottom: 24, 
+        width: '100%',
+        marginTop: 10
+    },
+    followButton: { 
+        flex: 1, 
+        backgroundColor: Colors.light.primary, 
+        paddingVertical: 12, 
+        borderRadius: 12, 
+        alignItems: 'center', 
+        justifyContent: 'center' 
+    },
+    followingButton: { 
+        backgroundColor: 'transparent', 
+        borderWidth: 1 
+    },
+    followButtonText: { 
+        color: Colors.light.white, 
+        fontSize: 16, 
+        fontWeight: 'bold' 
+    },
+    followingButtonText: { 
+        color: Colors.light.primary 
     },
     statsRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', paddingHorizontal: 30, marginBottom: 20 },
     statItem: { alignItems: 'center' },

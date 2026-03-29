@@ -50,7 +50,7 @@ export default function LoginScreen() {
 
             if (response.success) {
                 // Success! User authentication verified
-                console.log('Login success:', response.data);
+                // console.log('Login success:', response.data);
 
                 // Save user to context
                 await login(response.data);

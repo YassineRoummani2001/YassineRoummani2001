@@ -77,7 +77,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
             setSocket(newSocket);
 
             newSocket.on('connect', () => {
-                console.log('✅ Socket connected');
+                // console.log('✅ Socket connected');
                 newSocket.emit('user:online', user._id);
             });
 
@@ -87,7 +87,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
             });
 
             return () => {
-                console.log('🔌 Disconnecting socket');
+                // console.log('🔌 Disconnecting socket');
                 newSocket.disconnect();
                 setSocket(null);
             };

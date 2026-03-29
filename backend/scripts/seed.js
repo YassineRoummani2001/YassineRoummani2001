@@ -13,17 +13,17 @@ const seedDatabase = async () => {
     try {
         const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/vibe';
         await mongoose.connect(uri);
-        console.log(`✅ Connected to MongoDB at ${uri}`);
+        // console.log(`✅ Connected to MongoDB at ${uri}`);
 
         // Clear existing data
-        console.log('🧹 Clearing existing data...');
+        // console.log('🧹 Clearing existing data...');
         await User.deleteMany({});
         await Post.deleteMany({});
         await Story.deleteMany({});
         await MarketItem.deleteMany({});
 
         // Create Users
-        console.log('👤 Creating users...');
+        // console.log('👤 Creating users...');
         const users = await User.create([
             {
                 name: 'Alex Johnson',
@@ -55,7 +55,7 @@ const seedDatabase = async () => {
         ]);
 
         // Create Posts
-        console.log('📸 Creating posts...');
+        // console.log('📸 Creating posts...');
         const posts = await Post.create([
             {
                 user: users[0]._id, // Alex
@@ -108,7 +108,7 @@ const seedDatabase = async () => {
         ]);
 
         // Create Stories
-        console.log('📖 Creating stories...');
+        // console.log('📖 Creating stories...');
         const stories = await Story.create([
             {
                 user: users[0]._id, // Alex
@@ -131,7 +131,7 @@ const seedDatabase = async () => {
         ]);
 
         // Create Marketplace Items
-        console.log('🛍️ Creating marketplace items...');
+        // console.log('🛍️ Creating marketplace items...');
         const marketItems = await MarketItem.create([
             {
                 user: users[2]._id, // Mike
@@ -272,11 +272,11 @@ const seedDatabase = async () => {
             $push: { followers: users[1]._id }
         });
 
-        console.log('✅ Database seeded successfully!');
-        console.log(`- Created ${users.length} users`);
-        console.log(`- Created ${posts.length} posts`);
-        console.log(`- Created ${stories.length} stories`);
-        console.log(`- Created ${marketItems.length} market items`);
+        // console.log('✅ Database seeded successfully!');
+        // console.log(`- Created ${users.length} users`);
+        // console.log(`- Created ${posts.length} posts`);
+        // console.log(`- Created ${stories.length} stories`);
+        // console.log(`- Created ${marketItems.length} market items`);
 
     } catch (error) {
         console.error('❌ Error seeding database:', error);

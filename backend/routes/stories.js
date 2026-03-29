@@ -24,7 +24,7 @@ router.get('/mine', protect, async (req, res) => {
 // @route   GET /api/stories
 router.get('/', protect, async (req, res) => {
     try {
-        console.log('📖 Fetching stories for user:', req.user._id);
+        // console.log('📖 Fetching stories for user:', req.user._id);
         
         const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
@@ -63,7 +63,7 @@ router.get('/', protect, async (req, res) => {
 
         const activeStoriesUsers = Array.from(usersMap.values());
 
-        console.log(`✅ Returning ${activeStoriesUsers.length} users with active stories`);
+        // console.log(`✅ Returning ${activeStoriesUsers.length} users with active stories`);
         res.json(activeStoriesUsers);
     } catch (err) {
         console.error('❌ Error fetching stories:', err);
@@ -77,7 +77,7 @@ router.post('/', async (req, res) => {
     try {
         const { userId, type, uri, content, color } = req.body;
         
-        console.log('📝 Creating story for user:', userId);
+        // console.log('📝 Creating story for user:', userId);
 
         const story = new Story({
             user: userId,

@@ -1,4 +1,4 @@
-import { SkeletonGridItem } from '@/components/Skeletons';
+import { SkeletonGridItem, SkeletonProfile } from '@/components/Skeletons';
 import { API_BASE_URL } from '@/constants/Config';
 import { useNotifications } from '@/context/NotificationContext';
 import { useThemeContext } from '@/context/ThemeContext';
@@ -49,7 +49,7 @@ function GridVideoItem({ uri, style }: { uri: string, style: any }) {
 }
 
 export default function ProfileScreen() {
-    console.log('👤 ProfileScreen Mounting...');
+    // console.log('👤 ProfileScreen Mounting...');
     const router = useRouter();
     const { userId } = useLocalSearchParams();
     const { user: currentUser, logout, loading } = (useUser() || {}) as any;
@@ -120,7 +120,7 @@ export default function ProfileScreen() {
                 setFollowersCount(data.followersCount || 0);
                 setFollowingCount(data.followingCount || 0);
             } else if (response.status === 404) {
-                console.log('User not found');
+                // console.log('User not found');
                 if (isOwnProfile) {
                     logout();
                     router.replace('/auth/login');
@@ -161,9 +161,8 @@ export default function ProfileScreen() {
     // Handle loading state
     if (loading || loadingProfile) {
         return (
-            <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={{ marginTop: 12, color: colors.textSecondary }}>Loading Profile...</Text>
+            <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+                <SkeletonProfile />
             </SafeAreaView>
         );
     }
@@ -375,7 +374,7 @@ export default function ProfileScreen() {
                                                 window.open(url, '_blank');
                                             } else {
                                                 // Handle native link opening if needed
-                                                console.log('Opening link:', url);
+                                                // console.log('Opening link:', url);
                                             }
                                         }}
                                     >

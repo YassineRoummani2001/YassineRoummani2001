@@ -4,16 +4,16 @@ const Post = require('./models/Post');
 
 mongoose.connect('mongodb://localhost:27017/vibe')
     .then(async () => {
-        console.log('✅ Connected to MongoDB\n');
+        // console.log('✅ Connected to MongoDB\n');
         
         // Get first user
         const user = await User.findOne();
         if (!user) {
-            console.log('❌ No users found. Please create a user first.');
+            // console.log('❌ No users found. Please create a user first.');
             process.exit(1);
         }
         
-        console.log(`👤 Using user: ${user.name}\n`);
+        // console.log(`👤 Using user: ${user.name}\n`);
         
         // Sample video URLs (free stock videos)
         const sampleVideos = [
@@ -71,7 +71,7 @@ mongoose.connect('mongodb://localhost:27017/vibe')
         
         // Check existing reels
         const existingReels = await Post.find({ type: 'reel' });
-        console.log(`📊 Current reels in DB: ${existingReels.length}\n`);
+        // console.log(`📊 Current reels in DB: ${existingReels.length}\n`);
         
         // Create new reels
         const newReels = sampleVideos.map(video => ({
@@ -87,17 +87,17 @@ mongoose.connect('mongodb://localhost:27017/vibe')
         
         // Delete old reels and insert new ones
         await Post.deleteMany({ type: 'reel' });
-        console.log('🗑️  Deleted old reels\n');
+        // console.log('🗑️  Deleted old reels\n');
         
         const created = await Post.insertMany(newReels);
-        console.log(`✅ Created ${created.length} new reels!\n`);
+        // console.log(`✅ Created ${created.length} new reels!\n`);
         
-        console.log('📝 Reels created:');
+        // console.log('📝 Reels created:');
         created.forEach((reel, i) => {
-            console.log(`${i + 1}. ${reel.caption}`);
+            // console.log(`${i + 1}. ${reel.caption}`);
         });
         
-        console.log('\n✨ Done! Refresh your app to see the new reels.');
+        // console.log('\n✨ Done! Refresh your app to see the new reels.');
         process.exit(0);
     })
     .catch(err => {

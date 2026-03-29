@@ -52,10 +52,10 @@ const validVideos = [
 
 async function recreateReels() {
     try {
-        console.log('🗑️  Deleting old reels...');
+        // console.log('🗑️  Deleting old reels...');
         await Post.deleteMany({ type: { $in: ['reel', 'video'] } });
         
-        console.log('👤 Finding first user...');
+        // console.log('👤 Finding first user...');
         const user = await User.findOne();
         
         if (!user) {
@@ -63,8 +63,8 @@ async function recreateReels() {
             process.exit(1);
         }
         
-        console.log(`✅ Using user: ${user.name}`);
-        console.log('\n📹 Creating new reels...');
+        // console.log(`✅ Using user: ${user.name}`);
+        // console.log('\n📹 Creating new reels...');
         
         for (let i = 0; i < validVideos.length; i++) {
             const video = validVideos[i];
@@ -81,10 +81,10 @@ async function recreateReels() {
                 views: Math.floor(Math.random() * 10000) + 1000
             });
             
-            console.log(`✅ Created reel ${i + 1}: ${video.caption.substring(0, 30)}...`);
+            // console.log(`✅ Created reel ${i + 1}: ${video.caption.substring(0, 30)}...`);
         }
         
-        console.log(`\n🎉 Successfully created ${validVideos.length} reels!`);
+        // console.log(`\n🎉 Successfully created ${validVideos.length} reels!`);
         process.exit(0);
     } catch (error) {
         console.error('❌ Error:', error);

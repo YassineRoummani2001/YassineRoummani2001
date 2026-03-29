@@ -58,13 +58,13 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
         // Web push is disabled to prevent page reloads and UX breaks
         // To enable: Set up Firebase and configure properly
         if (Platform.OS === 'web') {
-            console.log('ℹ️ Web push notifications are disabled (prevents page reloads)');
-            console.log('💡 To enable web push:');
-            console.log('   1. Set up Firebase Cloud Messaging');
-            console.log('   2. Configure VAPID key');
-            console.log('   3. Update this section in NotificationContext.tsx');
-            console.log('');
-            console.log('✅ App works normally without web push');
+            // console.log('ℹ️ Web push notifications are disabled (prevents page reloads)');
+            // console.log('💡 To enable web push:');
+            // console.log('   1. Set up Firebase Cloud Messaging');
+            // console.log('   2. Configure VAPID key');
+            // console.log('   3. Update this section in NotificationContext.tsx');
+            // console.log('');
+            // console.log('✅ App works normally without web push');
             return undefined;
         }
 
@@ -74,8 +74,8 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 
         // Check if running on a physical device (required for push notifications)
         if (!Device.isDevice) {
-            console.log('❌ Must use physical device for Push Notifications');
-            console.log('Simulators/Emulators do not support push notifications');
+            // console.log('❌ Must use physical device for Push Notifications');
+            // console.log('Simulators/Emulators do not support push notifications');
             return undefined;
         }
 
@@ -92,7 +92,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 
             // Step 3: Check if permission was granted
             if (finalStatus !== 'granted') {
-                console.log('❌ Permission not granted for push notifications');
+                // console.log('❌ Permission not granted for push notifications');
                 return undefined;
             }
 
@@ -108,42 +108,42 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 
                 if (isExpoGo || __DEV__) {
                     // Development mode - Expo Go
-                    console.log('📱 Getting push token for Expo Go (development)...');
+                    // console.log('📱 Getting push token for Expo Go (development)...');
                     pushTokenData = await Notifications.getExpoPushTokenAsync();
                 } else {
                     // Production build - use projectId
                     const projectId = '11e72fe5-37c3-46a4-b923-49b9ba5fd3b3'; // From app.json
-                    console.log('📱 Getting push token for production build...');
+                    // console.log('📱 Getting push token for production build...');
                     pushTokenData = await Notifications.getExpoPushTokenAsync({
                         projectId: projectId,
                     });
                 }
 
                 token = pushTokenData.data;
-                console.log('✅ Expo Push Token:', token);
+                // console.log('✅ Expo Push Token:', token);
             } catch (tokenError: any) {
                 console.error('❌ Error getting push token:', tokenError);
 
                 // Common error messages and solutions
                 if (tokenError.message?.includes('EXPERIENCE_NOT_FOUND')) {
-                    console.log('');
-                    console.log('🔧 EXPERIENCE_NOT_FOUND Error - Solutions:');
-                    console.log('');
-                    console.log('For Development (Expo Go):');
-                    console.log('  ✅ This error should not occur in Expo Go');
-                    console.log('  ✅ Make sure you\'re using the latest Expo Go app');
-                    console.log('');
-                    console.log('For Production Build:');
-                    console.log('  1. Run: npx eas init');
-                    console.log('  2. This will create a new project and update app.json');
-                    console.log('  3. Then run: npx eas build:configure');
-                    console.log('');
+                    // console.log('');
+                    // console.log('🔧 EXPERIENCE_NOT_FOUND Error - Solutions:');
+                    // console.log('');
+                    // console.log('For Development (Expo Go):');
+                    // console.log('  ✅ This error should not occur in Expo Go');
+                    // console.log('  ✅ Make sure you\'re using the latest Expo Go app');
+                    // console.log('');
+                    // console.log('For Production Build:');
+                    // console.log('  1. Run: npx eas init');
+                    // console.log('  2. This will create a new project and update app.json');
+                    // console.log('  3. Then run: npx eas build:configure');
+                    // console.log('');
                 } else if (tokenError.message?.includes('credentials')) {
-                    console.log('');
-                    console.log('🔧 Credentials Error - Solutions:');
-                    console.log('1. For iOS: Configure push notification credentials in Apple Developer');
-                    console.log('2. For Android: Ensure FCM is configured');
-                    console.log('3. Run: npx eas credentials');
+                    // console.log('');
+                    // console.log('🔧 Credentials Error - Solutions:');
+                    // console.log('1. For iOS: Configure push notification credentials in Apple Developer');
+                    // console.log('2. For Android: Ensure FCM is configured');
+                    // console.log('3. Run: npx eas credentials');
                 }
 
                 return undefined;
@@ -160,7 +160,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
                     enableVibrate: true,
                     showBadge: true,
                 });
-                console.log('✅ Android notification channel configured');
+                // console.log('✅ Android notification channel configured');
             }
 
             return token;
@@ -184,7 +184,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
                     platform: Platform.OS // Send platform info to backend
                 })
             });
-            console.log('✅ Push token sent to backend');
+            // console.log('✅ Push token sent to backend');
         } catch (error) {
             console.error("Error sending push token to backend:", error);
         }
@@ -215,7 +215,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 
         responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
             // When user taps notification
-            console.log('Notification tapped:', response);
+            // console.log('Notification tapped:', response);
             // Navigate to screen based on response.notification.request.content.data
         });
 

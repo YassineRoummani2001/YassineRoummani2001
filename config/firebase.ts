@@ -30,7 +30,7 @@ if (Platform.OS === 'web' && firebaseConfig) {
  */
 export const getWebPushToken = async (vapidKey: string): Promise<string | undefined> => {
     if (!messaging) {
-        console.log('Firebase messaging not initialized');
+        // console.log('Firebase messaging not initialized');
         return undefined;
     }
 
@@ -39,7 +39,7 @@ export const getWebPushToken = async (vapidKey: string): Promise<string | undefi
         const permission = await Notification.requestPermission();
 
         if (permission !== 'granted') {
-            console.log('Notification permission denied');
+            // console.log('Notification permission denied');
             return undefined;
         }
 
@@ -48,7 +48,7 @@ export const getWebPushToken = async (vapidKey: string): Promise<string | undefi
             vapidKey: vapidKey,
         });
 
-        console.log('✅ Web Push Token (FCM):', token);
+        // console.log('✅ Web Push Token (FCM):', token);
         return token;
     } catch (error) {
         console.error('Error getting web push token:', error);
@@ -66,7 +66,7 @@ export const onMessageListener = () =>
         }
 
         onMessage(messaging, (payload) => {
-            console.log('Foreground message received:', payload);
+            // console.log('Foreground message received:', payload);
             resolve(payload);
         });
     });

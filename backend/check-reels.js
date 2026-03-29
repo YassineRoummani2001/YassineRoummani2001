@@ -10,13 +10,13 @@ async function checkReels() {
     try {
         const reels = await Post.find({ type: { $in: ['reel', 'video'] } }).limit(3);
         
-        console.log('\n📹 Current reels in database:');
+        // console.log('\n📹 Current reels in database:');
         reels.forEach((reel, i) => {
-            console.log(`\nReel ${i + 1}:`);
-            console.log('  ID:', reel._id);
-            console.log('  URI:', reel.uri);
-            console.log('  VideoURI:', reel.videoUri);
-            console.log('  Type:', reel.type);
+            // console.log(`\nReel ${i + 1}:`);
+            // console.log('  ID:', reel._id);
+            // console.log('  URI:', reel.uri);
+            // console.log('  VideoURI:', reel.videoUri);
+            // console.log('  Type:', reel.type);
         });
         
         process.exit(0);

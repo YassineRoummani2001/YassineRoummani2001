@@ -22,11 +22,11 @@ const validVideoUrls = [
 
 async function fixReelUrls() {
     try {
-        console.log('🔧 Fixing reel URLs...');
+        // console.log('🔧 Fixing reel URLs...');
         
         // Get all reels
         const reels = await Post.find({ type: { $in: ['reel', 'video'] } });
-        console.log(`📹 Found ${reels.length} reels`);
+        // console.log(`📹 Found ${reels.length} reels`);
         
         // Update each reel with a valid URL
         for (let i = 0; i < reels.length; i++) {
@@ -37,10 +37,10 @@ async function fixReelUrls() {
             reel.videoUri = newUrl;
             await reel.save();
             
-            console.log(`✅ Updated reel ${i + 1}: ${newUrl.substring(0, 50)}...`);
+            // console.log(`✅ Updated reel ${i + 1}: ${newUrl.substring(0, 50)}...`);
         }
         
-        console.log('✅ All reels updated successfully!');
+        // console.log('✅ All reels updated successfully!');
         process.exit(0);
     } catch (error) {
         console.error('❌ Error:', error);

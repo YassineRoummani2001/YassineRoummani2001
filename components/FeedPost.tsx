@@ -384,7 +384,7 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
     const { colors, isDark } = useThemeContext(); // Access colors
     const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]); // Memoize styles
 
-    const [isMuted, setIsMuted] = useState(true);
+    const [isMuted, setIsMuted] = useState(false);
     const [showFullCaption, setShowFullCaption] = useState(false);
     const { user, followUser } = (useUser() || {}) as any;
 
@@ -444,6 +444,7 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
 
     // Save state
     const [isSaved, setIsSaved] = useState(post.isSaved || (user?.saved?.includes(post.id || post._id)) || false);
+    const saveScale = React.useRef(new Animated.Value(1)).current;
 
     // Follow state
     const [userIsFollowing, setUserIsFollowing] = useState(false);
@@ -477,7 +478,7 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
         setFollowLoading(true);
         const result = await followUser(postUserId);
 
-        console.log('Follow result:', result);
+        // console.log('Follow result:', result);
 
         if (result.success) {
             // Update local state based on what happened
@@ -546,11 +547,11 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
         setDeleteConfirmVisible(false);
 
         const postId = post.id || post._id;
-        console.log('🗑️ Attempting to delete post:', postId);
+        // console.log('🗑️ Attempting to delete post:', postId);
 
         try {
             const url = `${API_BASE_URL}/api/posts/${postId}`;
-            console.log('📡 DELETE request to:', url);
+            // console.log('📡 DELETE request to:', url);
 
             const response = await fetch(url, {
                 method: 'DELETE',
@@ -560,10 +561,10 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
                 }
             });
 
-            console.log('📥 Delete response status:', response.status);
+            // console.log('📥 Delete response status:', response.status);
 
             if (response.ok) {
-                console.log('✅ Post deleted successfully');
+                // console.log('✅ Post deleted successfully');
                 setDeleteSuccessVisible(true);
                 if (onDelete) onDelete(postId);
             } else {
@@ -639,17 +640,17 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
             menuAnchorRef.current.measure((x, y, width, height, pageX, pageY) => {
                 // Fallback if measure returns 0 (can happen on iOS)
                 if (pageX === 0 && pageY === 0) {
-                    // console.log('⚠️ Measure returned 0, using fallback');
+                    // // console.log('⚠️ Measure returned 0, using fallback');
                     setMenuAnchor({ x: 300, y: 100, height: 40 });
                 } else {
                     setMenuAnchor({ x: pageX, y: pageY, height });
                 }
 
                 setMenuVisible(true);
-                // console.log('✅ Menu should be visible now');
+                // // console.log('✅ Menu should be visible now');
             });
         } else {
-            // console.log('⚠️ menuAnchorRef is null, using fallback');
+            // // console.log('⚠️ menuAnchorRef is null, using fallback');
             // Fallback if ref is not available
             setMenuAnchor({ x: 300, y: 100, height: 40 });
             setMenuVisible(true);
@@ -661,7 +662,7 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
             const postId = post.id || post._id;
             const link = `vibe://post/${postId}`;
 
-            console.log('📋 Copying link:', link);
+            // console.log('📋 Copying link:', link);
 
             // For now, just show alert
             // TODO: Implement actual clipboard copy when Clipboard API is available
@@ -683,14 +684,21 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
         }
 
         const postId = post.id || post._id;
-        console.log('💾 Saving post:', postId);
+        // console.log('💾 Saving post:', postId);
 
         const wasSaved = isSaved;
-        setIsSaved(!wasSaved);
+        const newIsSaved = !wasSaved;
+        setIsSaved(newIsSaved);
+
+        // Animate
+        Animated.sequence([
+            Animated.timing(saveScale, { toValue: 1.3, duration: 100, useNativeDriver: true }),
+            Animated.spring(saveScale, { toValue: 1, friction: 3, useNativeDriver: true }),
+        ]).start();
 
         try {
             const url = `${API_BASE_URL}/api/auth/save/${postId}`;
-            console.log('📡 Save request to:', url);
+            // console.log('📡 Save request to:', url);
 
             const response = await fetch(url, {
                 method: 'PUT',
@@ -700,10 +708,10 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
                 }
             });
 
-            console.log('📥 Save response status:', response.status);
+            // console.log('📥 Save response status:', response.status);
 
             if (response.ok) {
-                console.log('✅ Post save/unsave toggled successfully');
+                // console.log('✅ Post save/unsave toggled successfully');
                 // State already updated optimistically
             } else {
                 const errorText = await response.text();
@@ -739,7 +747,7 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
 
     const handleReportPost = async () => {
         const postId = post.id || post._id;
-        console.log('🚩 Reporting post:', postId);
+        // console.log('🚩 Reporting post:', postId);
 
         Alert.alert(
             'Report Post',
@@ -772,7 +780,7 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
         }
 
         const postId = post.id || post._id;
-        console.log('📡 Submitting report:', reason);
+        // console.log('📡 Submitting report:', reason);
 
         try {
             const url = `${API_BASE_URL}/api/posts/${postId}/report`;
@@ -786,7 +794,7 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
             });
 
             if (response.ok) {
-                console.log('✅ Report submitted');
+                // console.log('✅ Report submitted');
                 Alert.alert(
                     'Thank You',
                     'Your report has been submitted. We\'ll review it shortly.',
@@ -940,7 +948,7 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
                             resizeMode="cover"
                             onError={(e) => {
                                 if (__DEV__) {
-                                    console.log('❌ Image Load Error:', e.nativeEvent.error, 'URI:', getValidUri(post.image || post.uri));
+                                    // console.log('❌ Image Load Error:', e.nativeEvent.error, 'URI:', getValidUri(post.image || post.uri));
                                 }
                                 // In Prod: Fail silently (Image component might show blank or grey, which is better than crash or alert)
                             }}
@@ -976,7 +984,13 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
                     </View>
 
                     <TouchableOpacity style={styles.actionButton} onPress={handleSavePost}>
-                        <Ionicons name={isSaved ? "bookmark" : "bookmark-outline"} size={21} color={isSaved ? colors.primary : colors.text} />
+                        <Animated.View style={{ transform: [{ scale: saveScale }] }}>
+                            <Ionicons 
+                                name={isSaved ? "bookmark" : "bookmark-outline"} 
+                                size={21} 
+                                color={isSaved ? "#FACD00" : colors.text} 
+                            />
+                        </Animated.View>
                     </TouchableOpacity>
                 </View>
             </View>

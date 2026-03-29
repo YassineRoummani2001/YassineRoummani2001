@@ -6,10 +6,11 @@ import { lazyLoad, MinimalLoader } from '@/utils/lazyLoad';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Platform, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SkeletonPost } from '@/components/Skeletons';
 
 // Lazy load heavy components
 const FeedPost = lazyLoad(() => import('@/components/FeedPost'), <MinimalLoader />);
@@ -137,12 +138,32 @@ export default function HomeScreen() {
         }}
       />
     );
-  }, [viewableItems, handlePostDelete]);
+  }, [viewableItems, handlePostDelete, isFocused]);
 
   // Theme
   const { colors, isDark } = useThemeContext();
   // Animation Shared Values
   const bellRotation = useSharedValue(0);
+  const refreshRotation = useSharedValue(0);
+
+  const refreshAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${refreshRotation.value}deg` }],
+    opacity: withTiming(refreshing ? 1 : 0, { duration: 200 })
+  }));
+
+  // Update refresh animation when refreshing
+  useEffect(() => {
+    if (refreshing) {
+      refreshRotation.value = withRepeat(
+        withTiming(360, { duration: 1000 }),
+        -1,
+        false
+      );
+    } else {
+      refreshRotation.value = 0;
+    }
+  }, [refreshing]);
+
   const badgeScale = useSharedValue(1);
 
   // Trigger animations if unreadCount > 0
@@ -191,6 +212,11 @@ export default function HomeScreen() {
             <Ionicons name="flash" size={20} color="white" />
           </View>
           <Text style={[styles.logoText, { color: colors.primary }]}>Vibe</Text>
+          {refreshing && (
+            <Animated.View style={[{ marginLeft: 8 }, refreshAnimatedStyle]}>
+              <Ionicons name="sync" size={18} color={colors.primary} />
+            </Animated.View>
+          )}
         </View>
 
         <View style={styles.headerActions}>
@@ -231,14 +257,18 @@ export default function HomeScreen() {
 
       <FlatList
         data={posts}
+        extraData={[viewableItems, isFocused]}
         keyExtractor={(item) => item._id}
         renderItem={renderItem}
         ListHeaderComponent={<StoryList />}
         ListEmptyComponent={
           loading ? (
-            <View style={{ padding: 40, alignItems: 'center' }}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={{ color: colors.textSecondary, marginTop: 16 }}>Loading posts...</Text>
+            <View style={{ flex: 1 }}>
+              {[1, 2, 3].map((i) => (
+                <View key={i} style={{ backgroundColor: isDark ? '#000' : '#fff', marginBottom: 16 }}>
+                  <SkeletonPost />
+                </View>
+              ))}
             </View>
           ) : (
             <View style={{ padding: 40, alignItems: 'center' }}>
@@ -264,6 +294,15 @@ export default function HomeScreen() {
         ListFooterComponent={isFetchingMore ? <ActivityIndicator size="small" color={colors.primary} style={{ margin: 20 }} /> : <View style={{ height: 40 }} />}
         onRefresh={onRefresh}
         refreshing={refreshing}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+            progressBackgroundColor={isDark ? '#1A1A1A' : '#FFFFFF'}
+          />
+        }
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
         onViewableItemsChanged={onViewableItemsChanged}

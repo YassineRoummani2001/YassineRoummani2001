@@ -3,7 +3,9 @@ import { SkeletonFullscreen } from '@/components/Skeletons';
 import { useReels } from '@/context/ReelContext';
 import { useTheme } from '@/hooks/useTheme';
 import { useRouter } from 'expo-router';
-import { Plus } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
+import { Camera, ChevronLeft, Search } from 'lucide-react-native';
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
     FlatList,
@@ -18,6 +20,7 @@ import {
     useWindowDimensions,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // 🎯 Memoized ReelItem to prevent unnecessary re-renders
 const MemoizedReelItem = memo(
@@ -32,10 +35,11 @@ const MemoizedReelItem = memo(
 
 export default function ReelsScreen() {
     const { height: screenHeight, width: screenWidth } = useWindowDimensions();
-    const reelHeight = screenHeight * 0.98; // Reduce height by 2%
+    const reelHeight = screenHeight; // Use full screen height to avoid black bar gap
     const colors = useTheme();
     const router = useRouter();
     const isFocused = useIsFocused();
+    const insets = useSafeAreaInsets();
 
     // Use ReelContext
     const { reels, loading, error, fetchReels } = useReels();
@@ -131,18 +135,28 @@ export default function ReelsScreen() {
                 backgroundColor="transparent"
             />
 
-            {/* 📝 Reels Title */}
-            <View style={styles.titleContainer}>
-                <Text style={styles.title}>Reels</Text>
+            {/* 📝 Header Actions */}
+            <View style={[styles.header, { top: Math.max(insets.top, 20) }]}>
+                <TouchableOpacity
+                    style={styles.headerButton}
+                    onPress={() => router.back()}
+                    activeOpacity={0.8}
+                >
+                    <BlurView intensity={20} tint="light" style={styles.headerButtonBlur}>
+                        <ChevronLeft size={24} color="#fff" strokeWidth={2.5} />
+                    </BlurView>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                    style={styles.headerButton}
+                    onPress={() => router.push('/search')}
+                    activeOpacity={0.8}
+                >
+                    <BlurView intensity={20} tint="light" style={styles.headerButtonBlur}>
+                        <Search size={22} color="#fff" strokeWidth={2.5} />
+                    </BlurView>
+                </TouchableOpacity>
             </View>
-
-            {/* ➕ Create Reel Button */}
-            <TouchableOpacity
-                style={styles.createButton}
-                onPress={() => router.push('/create-reel')}
-            >
-                <Plus size={24} color="#fff" />
-            </TouchableOpacity>
 
             {/* ❌ Error / Empty State */}
             {!loading && (error || reels.length === 0) && (
@@ -214,22 +228,36 @@ const styles = StyleSheet.create({
     listContent: {
         backgroundColor: '#000',
     },
-    createButton: {
+    header: {
         position: 'absolute',
-        top: 50,
-        right: 16,
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: '#007AFF',
-        justifyContent: 'center',
+        left: 20,
+        right: 20,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
         zIndex: 100,
-        shadowColor: 'rgba(0,0,0,1)',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 5,
+    },
+    title: {
+        color: 'white',
+        fontSize: 28,
+        fontWeight: '900',
+        letterSpacing: -0.5,
+        textShadowColor: 'rgba(0,0,0,0.5)',
+        textShadowOffset: { width: 0, height: 2 },
+        textShadowRadius: 8,
+    },
+    headerButton: {
+        borderRadius: 22,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.15)',
+    },
+    headerButtonBlur: {
+        width: 44,
+        height: 44,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.1)',
     },
     emptyState: {
         flex: 1,
@@ -255,19 +283,5 @@ const styles = StyleSheet.create({
         color: '#000',
         fontSize: 16,
         fontWeight: '700',
-    },
-    titleContainer: {
-        position: 'absolute',
-        top: 50,
-        left: 16,
-        zIndex: 100,
-    },
-    title: {
-        color: 'white',
-        fontSize: 28,
-        fontWeight: '700',
-        textShadowColor: 'rgba(0,0,0,0.75)',
-        textShadowOffset: { width: 0, height: 2 },
-        textShadowRadius: 4,
     },
 });

@@ -35,9 +35,9 @@ export const unstable_settings = {
 };
 
 function RootLayoutNav() {
-  console.log('📱 RootLayoutNav functions called');
+  // console.log('📱 RootLayoutNav functions called');
   const userContext = useUser();
-  console.log('👤 useUser in RootLayoutNav returned:', !!userContext);
+  // console.log('👤 useUser in RootLayoutNav returned:', !!userContext);
   const { user, loading } = (userContext || {}) as any;
   const segments = useSegments();
   const router = useRouter();
@@ -101,7 +101,7 @@ function RootLayoutNav() {
 
 function InnerLayout() {
   const { isDark } = useThemeContext();
-  console.log('🏠 InnerLayout rendering. Wrapping UserProvider.');
+  // console.log('🏠 InnerLayout rendering. Wrapping UserProvider.');
 
   return (
     <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
@@ -126,7 +126,7 @@ function InnerLayout() {
 }
 
 export default function RootLayout() {
-  console.log('🌳 RootLayout rendering');
+  // console.log('🌳 RootLayout rendering');
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <CustomThemeProvider>

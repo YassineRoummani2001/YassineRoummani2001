@@ -129,7 +129,7 @@ const flexibleUpload = multer({
         if (mimetype || extname) {
             return cb(null, true);
         } else {
-            console.log('❌ Rejected file:', file.originalname, file.mimetype);
+            // console.log('❌ Rejected file:', file.originalname, file.mimetype);
             cb(new Error('Invalid file type'));
         }
     }
@@ -146,7 +146,7 @@ router.post('/', protect, flexibleUpload.single('image'), (req, res) => {
         const host = req.get('host');
         const fileUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
         
-        console.log('✅ File uploaded:', fileUrl);
+        // console.log('✅ File uploaded:', fileUrl);
         
         res.json({
             success: true,

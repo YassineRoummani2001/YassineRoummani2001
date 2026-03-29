@@ -99,7 +99,7 @@ export default function PrivacyScreen() {
                         <LinkItem
                             icon={UserX}
                             title="Blocked Accounts"
-                            onPress={() => console.log('Blocked accounts')}
+                            onPress={() => { /* console.log('Blocked accounts') */ }}
                             isLast={true}
                         />
                     </View>

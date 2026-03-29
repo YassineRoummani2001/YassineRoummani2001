@@ -119,18 +119,18 @@ export default function CreateScreen() {
             const endpoint = `${API_BASE_URL}/api/posts`;
             let mediaToUpload = selectedMedia;
 
-            console.log('📤 Starting upload...');
-            console.log('📍 Endpoint:', endpoint);
-            console.log('🎬 Media type:', activeTab);
-            console.log('📝 Caption:', caption);
+            // console.log('📤 Starting upload...');
+            // console.log('📍 Endpoint:', endpoint);
+            // console.log('🎬 Media type:', activeTab);
+            // console.log('📝 Caption:', caption);
 
             if (!mediaToUpload.startsWith('http') && !mediaToUpload.startsWith('data:')) {
-                console.log("🔄 Converting video to Base64...");
+                // console.log("🔄 Converting video to Base64...");
                 mediaToUpload = await fileUriToBase64(selectedMedia);
-                console.log("✅ Base64 conversion complete");
+                // console.log("✅ Base64 conversion complete");
             }
 
-            console.log("📡 Sending request to backend...");
+            // console.log("📡 Sending request to backend...");
 
             const response = await fetch(endpoint, {
                 method: 'POST',
@@ -145,10 +145,10 @@ export default function CreateScreen() {
                 })
             });
 
-            console.log("📥 Response status:", response.status);
+            // console.log("📥 Response status:", response.status);
 
             if (response.ok) {
-                console.log("✅ Upload successful!");
+                // console.log("✅ Upload successful!");
 
                 // Navigate to home feed (index page)
                 router.replace('/(tabs)/');

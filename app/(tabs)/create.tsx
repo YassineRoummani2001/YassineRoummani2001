@@ -172,7 +172,7 @@ export default function CreateScreen() {
                     formData.append('music', music);
                 }
 
-                console.log('📤 Uploading Reel...');
+                // console.log('📤 Uploading Reel...');
                 const response = await fetch(`${API_BASE_URL}/api/posts/upload-reel`, {
                     method: 'POST',
                     headers: {
@@ -200,10 +200,10 @@ export default function CreateScreen() {
                 const endpoint = `${API_BASE_URL}/api/posts`;
                 let mediaToUpload = selectedMedia;
 
-                console.log('📤 Uploading Post...');
+                // console.log('📤 Uploading Post...');
                 if (!mediaToUpload.startsWith('http') && !mediaToUpload.startsWith('data:')) {
                     // Fallback if needed, though we try to get base64 from picker
-                    console.log("🔄 Converting to Base64...");
+                    // console.log("🔄 Converting to Base64...");
                     mediaToUpload = await fileUriToBase64(selectedMedia);
                 }
 

@@ -37,7 +37,7 @@ export default function CallScreen() {
                     setRecipient(res.data);
                 }
             } catch (e) {
-                console.log("Error fetching user for call", e);
+                // console.log("Error fetching user for call", e);
             }
         };
         fetchRecipient();

@@ -10,7 +10,7 @@ const { protect } = require('../middleware/auth');
 router.get('/', async (req, res) => {
     try {
         const { category, status, search, userId, location } = req.query;
-        console.log('🔍 Marketplace GET query:', req.query);
+        // console.log('🔍 Marketplace GET query:', req.query);
         
         let query = {};
         
@@ -46,8 +46,7 @@ router.get('/', async (req, res) => {
         
         const items = await MarketItem.find(query)
             .populate('user', 'name avatar handle')
-            .sort({ createdAt: -1 })
-            .limit(50);
+            .sort({ createdAt: -1 });
         
         res.json(items);
     } catch (err) {
@@ -159,7 +158,7 @@ router.post('/', protect, async (req, res) => {
         const populatedItem = await MarketItem.findById(savedItem._id)
             .populate('user', 'name avatar handle');
         
-        console.log(`✅ New marketplace item created: ${title} by ${req.user.name}`);
+        // console.log(`✅ New marketplace item created: ${title} by ${req.user.name}`);
         res.status(201).json(populatedItem);
     } catch (err) {
         console.error('Error creating marketplace item:', err);
@@ -222,7 +221,7 @@ router.delete('/:id', protect, async (req, res) => {
         
         await MarketItem.findByIdAndDelete(req.params.id);
         
-        console.log(`🗑️ Marketplace item deleted: ${item.title}`);
+        // console.log(`🗑️ Marketplace item deleted: ${item.title}`);
         res.json({ message: 'Item deleted successfully' });
     } catch (err) {
         console.error('Error deleting marketplace item:', err);

@@ -8,16 +8,16 @@ export const initSentry = () => {
     //   debug: true,
     // });
     if (__DEV__) {
-        console.log('[Sentry] Mock initialization');
+        // console.log('[Sentry] Mock initialization');
     }
 };
 
 export const captureException = (error: any, context?: any) => {
     // Sentry.Native.captureException(error);
     if (__DEV__) {
-        console.log('[Sentry] Mock captureException:', error);
+        // console.log('[Sentry] Mock captureException:', error);
         if (context) {
-            console.log('[Sentry] Context:', context);
+            // console.log('[Sentry] Context:', context);
         }
     }
 };

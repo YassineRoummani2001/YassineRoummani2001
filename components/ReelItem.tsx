@@ -5,17 +5,10 @@ import { Audio } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import {
-    Heart,
-    MessageCircle,
-    MoreHorizontal,
-    Music,
-    Play,
-    Plus,
-    Share2,
-    Volume2,
-    VolumeX
-} from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
+import { Heart, MessageCircle, Share2, MoreHorizontal, Music, Plus, Bookmark } from 'lucide-react-native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -101,7 +94,7 @@ export default function ReelItem({ item, active, width, height }: ReelItemProps)
                     <Image source={{ uri: videoUri }} style={{ width, height, resizeMode: 'cover' }} />
                 ) : (
                     <View style={{ alignItems: 'center', gap: 10 }}>
-                        <Music size={48} color="white" />
+                        <Ionicons name="musical-notes" size={48} color="white" />
                         <Text style={{ color: 'white' }}>Audio content</Text>
                     </View>
                 )}
@@ -110,7 +103,7 @@ export default function ReelItem({ item, active, width, height }: ReelItemProps)
                 </View>
                 {/* Still show bottom info */}
                 <View style={[styles.bottomInfo, { bottom: insets.bottom + 100 }]}>
-                    <Text style={styles.username}>@{author.name || 'Unknown'}</Text>
+                    <Text style={styles.authorName}>@{author.name || 'Unknown'}</Text>
                     <Text style={styles.caption} numberOfLines={2}>{item.caption || ''}</Text>
                 </View>
             </View>
@@ -237,7 +230,10 @@ export default function ReelItem({ item, active, width, height }: ReelItemProps)
     const [showShare, setShowShare] = useState(false);
 
     const scaleAnim = useRef(new Animated.Value(1)).current;
+    const saveScaleAnim = useRef(new Animated.Value(1)).current;
+    const bigHeartAnim = useRef(new Animated.Value(0)).current;
     const rotateAnim = useRef(new Animated.Value(0)).current;
+    const lastTap = useRef(0);
 
     useEffect(() => {
         Audio.setAudioModeAsync({
@@ -273,9 +269,11 @@ export default function ReelItem({ item, active, width, height }: ReelItemProps)
         setLiked(newState);
         setLikesCount((prev) => (newState ? prev + 1 : prev - 1));
 
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
         Animated.sequence([
-            Animated.timing(scaleAnim, { toValue: 1.3, duration: 100, useNativeDriver: true }),
-            Animated.timing(scaleAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
+            Animated.timing(scaleAnim, { toValue: 1.5, duration: 100, useNativeDriver: true }),
+            Animated.spring(scaleAnim, { toValue: 1, friction: 3, tension: 40, useNativeDriver: true }),
         ]).start();
 
         try {
@@ -293,6 +291,7 @@ export default function ReelItem({ item, active, width, height }: ReelItemProps)
         if (!user || user._id === author._id) return;
 
         setIsFollowing((prev) => !prev);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
         try {
             await fetch(`${API_BASE_URL}/api/users/${author._id}/follow`, {
@@ -312,26 +311,45 @@ export default function ReelItem({ item, active, width, height }: ReelItemProps)
     }, [player]);
 
 
+    const [isSaved, setIsSaved] = useState(() => {
+        if (!user || !user.savedPosts || !item) return false;
+        return user.savedPosts.some((p: any) => (typeof p === 'string' ? p : p._id) === (item._id || item.id));
+    });
+
+    useEffect(() => {
+        if (!user || !user.savedPosts || !item) return;
+        const saved = user.savedPosts.some((p: any) => (typeof p === 'string' ? p : p._id) === (item._id || item.id));
+        setIsSaved(saved);
+    }, [user, item._id, item.id]);
+
     const handleSaveReel = async () => {
         if (!user) return;
+        
+        const newState = !isSaved;
+        setIsSaved(newState);
+        
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        
+        Animated.sequence([
+            Animated.timing(saveScaleAnim, { toValue: 1.5, duration: 100, useNativeDriver: true }),
+            Animated.spring(saveScaleAnim, { toValue: 1, friction: 3, tension: 40, useNativeDriver: true }),
+        ]).start();
+
         try {
-            const response = await fetch(`${API_BASE_URL}/api/posts/${item._id || item.id}/save`, {
+            const response = await fetch(`${API_BASE_URL}/api/auth/save/${item._id || item.id}`, {
                 method: 'PUT',
-                headers: { Authorization: `Bearer ${user.token}` },
+                headers: { 
+                    Authorization: `Bearer ${user.token}`,
+                    'Content-Type': 'application/json'
+                },
             });
 
-            if (response.ok) {
-                const data = await response.json();
-                // We could use Toast here if available, but alert is fine for now
-                alert(data.isSaved ? 'Reel saved to collection!' : 'Reel removed from collection.');
-            } else {
-                alert('Failed to save reel.');
+            if (!response.ok) {
+                setIsSaved(!newState);
             }
-            setShowOptions(false);
         } catch (error) {
             console.error('Failed to save reel', error);
-            alert('Error saving reel');
-            setShowOptions(false);
+            setIsSaved(!newState);
         }
     };
 
@@ -379,17 +397,39 @@ export default function ReelItem({ item, active, width, height }: ReelItemProps)
                     />
                 )}
 
-                {/* PLAY/PAUSE BUTTON */}
+                {/* PLAY/PAUSE BUTTON + DOUBLE TAP TO LIKE */}
                 <TouchableOpacity
                     activeOpacity={1}
-                    onPress={() => setPaused(!paused)}
+                    onPress={() => {
+                        const now = Date.now();
+                        const DOUBLE_TAP_DELAY = 300;
+                        if (lastTap.current && (now - lastTap.current) < DOUBLE_TAP_DELAY) {
+                            // Double tap detected
+                            if (!liked) toggleLike();
+                            
+                            // Animate big heart
+                            bigHeartAnim.setValue(0);
+                            Animated.sequence([
+                                Animated.spring(bigHeartAnim, { toValue: 1, useNativeDriver: true, friction: 3 }),
+                                Animated.timing(bigHeartAnim, { toValue: 0, duration: 500, delay: 200, useNativeDriver: true })
+                            ]).start();
+                        } else {
+                            setPaused(!paused);
+                        }
+                        lastTap.current = now;
+                    }}
                     style={styles.playPauseOverlay}
                 >
                     {paused && (
                         <View style={styles.pauseIconContainer}>
-                            <Play size={64} color="white" fill="white" strokeWidth={1.5} />
+                            <Ionicons name="play" size={64} color="white" />
                         </View>
                     )}
+                    
+                    {/* Big Heart Overlay */}
+                    <Animated.View style={[styles.bigHeartContainer, { opacity: bigHeartAnim, transform: [{ scale: bigHeartAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.5] }) }] }]}>
+                        <Heart size={100} color="#ff2d55" fill="#ff2d55" />
+                    </Animated.View>
                 </TouchableOpacity>
             </View>
 
@@ -412,11 +452,17 @@ export default function ReelItem({ item, active, width, height }: ReelItemProps)
             {/* MUTE BUTTON */}
             {active && isLoaded && !hasError && (
                 <TouchableOpacity
-                    style={styles.muteButton}
+                    style={[styles.headerButton, { top: insets.top + (Platform.OS === 'ios' ? 80 : 90), right: 16 }]}
                     onPress={() => setMuted(!muted)}
                     activeOpacity={0.7}
                 >
-                    {muted ? <VolumeX size={20} color="white" strokeWidth={2.5} /> : <Volume2 size={20} color="white" strokeWidth={2.5} />}
+                    <BlurView intensity={30} tint="dark" style={styles.headerButtonBlur}>
+                        <Ionicons 
+                            name={muted ? "volume-mute" : "volume-high"} 
+                            size={22} 
+                            color="white" 
+                        />
+                    </BlurView>
                 </TouchableOpacity>
             )}
 
@@ -425,69 +471,71 @@ export default function ReelItem({ item, active, width, height }: ReelItemProps)
 
             {/* RIGHT ACTIONS */}
             <View style={styles.rightActions}>
-                <View style={{ marginBottom: 8, alignItems: 'center' }}>
-                    <TouchableOpacity onPress={() => router.push(`/user/${author._id}`)}>
-                        <View style={styles.avatar}>
-                            {avatarUri ? (
-                                Platform.OS === 'web' ? (
-                                    <img
-                                        src={avatarUri}
-                                        alt={author.name}
-                                        style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
-                                    />
-                                ) : (
-                                    <Image
-                                        source={{ uri: avatarUri }}
-                                        style={styles.avatarImage}
-                                    />
-                                )
-                            ) : (
-                                <Text style={styles.avatarText}>{author.name?.charAt(0)?.toUpperCase() || '?'}</Text>
-                            )}
-                        </View>
-                    </TouchableOpacity>
-                    {!isFollowing && user?._id !== author._id && (
-                        <TouchableOpacity style={styles.followBadge} onPress={toggleFollow} activeOpacity={0.8}>
-                            <Plus size={14} color="white" strokeWidth={3} />
-                        </TouchableOpacity>
-                    )}
-                </View>
-
-                <TouchableOpacity onPress={toggleLike} style={styles.actionButton}>
+                <TouchableOpacity onPress={toggleLike} style={styles.actionButton} activeOpacity={0.7}>
                     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                        <Heart size={32} color={liked ? '#ff2d55' : 'white'} fill={liked ? '#ff2d55' : 'transparent'} strokeWidth={2} />
+                        <Heart size={32} color={liked ? '#ff2d55' : 'white'} fill={liked ? '#ff2d55' : 'transparent'} strokeWidth={2.5} />
                     </Animated.View>
-                    <Text style={styles.actionText}>{likesCount}</Text>
+                    <Text style={styles.actionText}>{likesCount > 1000 ? `${(likesCount / 1000).toFixed(1)}k` : likesCount}</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity onPress={() => setShowComments(true)} style={styles.actionButton}>
-                    <MessageCircle size={32} color="white" strokeWidth={2} />
-                    <Text style={styles.actionText}>{commentsCount}</Text>
+                <TouchableOpacity onPress={() => setShowComments(true)} style={styles.actionButton} activeOpacity={0.7}>
+                    <MessageCircle size={32} color="white" strokeWidth={2.5} />
+                    <Text style={styles.actionText}>{commentsCount > 1000 ? `${(commentsCount / 1000).toFixed(1)}k` : commentsCount}</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity onPress={() => setShowShare(true)} style={styles.actionButton}>
-                    <Share2 size={32} color="white" strokeWidth={2} />
+                <TouchableOpacity onPress={handleSaveReel} style={styles.actionButton} activeOpacity={0.7}>
+                    <Animated.View style={{ transform: [{ scale: saveScaleAnim }] }}>
+                        <Bookmark size={32} color={isSaved ? '#FACD00' : 'white'} fill={isSaved ? '#FACD00' : 'transparent'} strokeWidth={isSaved ? 0 : 2.5} />
+                    </Animated.View>
                 </TouchableOpacity>
 
-                <TouchableOpacity onPress={() => setShowOptions(true)} style={styles.actionButton}>
-                    <MoreHorizontal size={32} color="white" strokeWidth={2} />
+                <TouchableOpacity onPress={() => setShowShare(true)} style={styles.actionButton} activeOpacity={0.7}>
+                    <Share2 size={30} color="white" strokeWidth={2.5} />
                 </TouchableOpacity>
 
-                <Animated.View style={[styles.musicDisc, { transform: [{ rotate: spin }] }]}>
+                <TouchableOpacity onPress={() => setShowOptions(true)} style={styles.actionButton} activeOpacity={0.7}>
+                    <MoreHorizontal size={30} color="white" strokeWidth={2.5} />
+                </TouchableOpacity>
+
+                <Animated.View style={[styles.musicDiscWrapper, { transform: [{ rotate: spin }] }]}>
                     <View style={styles.musicDiscInner}>
-                        <Music size={14} color="white" />
+                        {avatarUri ? (
+                            <Image source={{ uri: avatarUri }} style={styles.musicDiscThumb} />
+                        ) : (
+                            <Music size={14} color="white" />
+                        )}
                     </View>
                 </Animated.View>
             </View>
 
-            {/* BOTTOM INFO */}
-            <View style={[styles.bottomInfo, { bottom: insets.bottom + 100 }]}>
-                <Text style={styles.username}>@{author.name || 'Unknown'}</Text>
+            {/* BOTTOM INFO & USER PROFILE */}
+            <View style={[styles.bottomInfo, { bottom: insets.bottom + (Platform.OS === 'ios' ? 70 : 80) }]}>
+                <View style={styles.userInfoRow}>
+                    <TouchableOpacity onPress={() => router.push(`/user/${author._id || author.id}`)} activeOpacity={0.8}>
+                        <Image source={{ uri: avatarUri || 'https://via.placeholder.com/150' }} style={styles.profileAvatar} />
+                    </TouchableOpacity>
+
+                    <View style={{ marginLeft: 12, flex: 1 }}>
+                        <View style={styles.nameRow}>
+                            <TouchableOpacity onPress={() => router.push(`/user/${author._id || author.id}`)}>
+                                <Text style={styles.authorName}>{author.name || 'User'}</Text>
+                            </TouchableOpacity>
+                            {!isFollowing && user?._id !== (author._id || author.id) && (
+                                <TouchableOpacity style={styles.followButtonInline} onPress={toggleFollow} activeOpacity={0.7}>
+                                    <Text style={styles.followButtonText}>Follow</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                        <Text style={styles.timeAgo}>Active now</Text>
+                    </View>
+                </View>
+
                 <Text style={styles.caption} numberOfLines={2}>{item.caption || ''}</Text>
+
                 {item.music && (
-                    <View style={styles.musicInfo}>
-                        <Music size={12} color="white" />
-                        <Text style={styles.musicText} numberOfLines={1}>{item.music}</Text>
+                    <View style={styles.musicRow}>
+                        <Music size={14} color="white" />
+                        <Text style={styles.musicLabel} numberOfLines={1}>{item.music}</Text>
                     </View>
                 )}
             </View>
@@ -506,25 +554,51 @@ export default function ReelItem({ item, active, width, height }: ReelItemProps)
 const styles = StyleSheet.create({
     container: { backgroundColor: '#000' },
     center: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: 10 },
-    gradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%' },
-    rightActions: { position: 'absolute', right: 12, bottom: 180, alignItems: 'center', gap: 24, zIndex: 20 },
-    avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#333', borderWidth: 2, borderColor: 'white', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
-    followBadge: { position: 'absolute', bottom: -8, width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.light.primary, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'white' },
-    avatarImage: { width: '100%', height: '100%', borderRadius: 24 },
-    avatarText: { color: 'white', fontSize: 20, fontWeight: 'bold' },
+    gradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '45%' },
+    rightActions: { position: 'absolute', right: 12, bottom: 120, alignItems: 'center', gap: 24, zIndex: 20 },
     actionButton: { alignItems: 'center', gap: 4 },
-    actionText: { color: 'white', fontSize: 12, fontWeight: '600', textShadow: '1 1 3 rgba(0, 0, 0, 0.5)' },
-    musicDisc: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#1a1a1a', borderWidth: 2, borderColor: 'white', justifyContent: 'center', alignItems: 'center', marginTop: 8 },
-    musicDiscInner: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#333', justifyContent: 'center', alignItems: 'center' },
+    actionText: { color: 'white', fontSize: 13, fontWeight: '700', marginTop: 2, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 3 },
+    musicDiscWrapper: { width: 48, height: 48, borderRadius: 24, overflow: 'hidden', borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)', marginTop: 8 },
+    musicDiscInner: { width: '100%', height: '100%', backgroundColor: '#111', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+    musicDiscThumb: { width: '100%', height: '100%', opacity: 0.8 },
     bottomInfo: { position: 'absolute', left: 16, right: 80, zIndex: 20 },
-    username: { color: 'white', fontSize: 16, fontWeight: '700', marginBottom: 4, textShadow: '1 1 3 rgba(0, 0, 0, 0.5)' },
-    caption: { color: 'white', fontSize: 14, lineHeight: 18, textShadow: '1 1 3 rgba(0, 0, 0, 0.5)' },
-    musicInfo: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
-    musicText: { color: 'white', fontSize: 12, fontStyle: 'italic', flex: 1 },
+    userInfoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+    profileAvatar: { width: 40, height: 40, borderRadius: 20, borderWidth: 1.5, borderColor: '#fff' },
+    nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    authorName: { color: 'white', fontSize: 16, fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 3 },
+    timeAgo: { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 1 },
+    followButtonInline: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#fff', backgroundColor: 'transparent' },
+    followButtonText: { color: 'white', fontSize: 13, fontWeight: '700' },
+    caption: { color: 'white', fontSize: 14, lineHeight: 18, fontWeight: '400', marginBottom: 12, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 3 },
+    musicRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    musicLabel: { color: 'white', fontSize: 13, fontWeight: '400' },
     errorText: { fontSize: 48, marginBottom: 12 },
     errorMessage: { color: 'white', fontSize: 18, fontWeight: '600', marginBottom: 8, textAlign: 'center' },
     errorHint: { color: 'rgba(255,255,255,0.7)', fontSize: 14, textAlign: 'center' },
-    muteButton: { position: 'absolute', bottom: 140, right: 16, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', zIndex: 10 },
+    headerButton: {
+        position: 'absolute',
+        borderRadius: 22,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.15)',
+        zIndex: 100,
+    },
+    headerButtonBlur: {
+        width: 44,
+        height: 44,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.1)',
+    },
+    bigHeartContainer: {
+        position: 'absolute',
+        alignSelf: 'center',
+        top: '40%',
+        zIndex: 100,
+        textShadowColor: 'rgba(0,0,0,0.3)',
+        textShadowOffset: { width: 0, height: 10 },
+        textShadowRadius: 20,
+    },
     playPauseOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: 10 },
-    pauseIconContainer: { backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 50, padding: 20 },
+    pauseIconContainer: { backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 50, padding: 24 },
 });

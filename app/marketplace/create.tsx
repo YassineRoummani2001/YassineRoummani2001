@@ -134,7 +134,7 @@ export default function CreateMarketItemScreen() {
                     } as any);
                 }
 
-                console.log(`Uploading ${filename} to ${API_BASE_URL}/api/upload`);
+                // console.log(`Uploading ${filename} to ${API_BASE_URL}/api/upload`);
 
                 const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, {
                     method: 'POST',
@@ -148,7 +148,7 @@ export default function CreateMarketItemScreen() {
                 if (uploadRes.ok) {
                     const uploadData = await uploadRes.json();
                     uploadedUrls.push(uploadData.url);
-                    console.log(`Successfully uploaded: ${uploadData.url}`);
+                    // console.log(`Successfully uploaded: ${uploadData.url}`);
                 } else {
                     const errorText = await uploadRes.text();
                     console.error('Upload failed response:', errorText);

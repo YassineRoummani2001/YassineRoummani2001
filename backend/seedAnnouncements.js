@@ -6,11 +6,11 @@ const Announcement = require('./models/Announcement');
 const seedAnnouncements = async () => {
     try {
         await mongoose.connect(process.env.MONGODB_URI);
-        console.log('✅ Connected to MongoDB');
+        // console.log('✅ Connected to MongoDB');
 
         // Clear existing announcements
         await Announcement.deleteMany({});
-        console.log('🗑️ Cleared existing announcements');
+        // console.log('🗑️ Cleared existing announcements');
 
         const samples = [
             {
@@ -40,10 +40,10 @@ const seedAnnouncements = async () => {
         ];
 
         await Announcement.insertMany(samples);
-        console.log('✅ Seeded sample announcements');
+        // console.log('✅ Seeded sample announcements');
 
         await mongoose.disconnect();
-        console.log('👋 Disconnected');
+        // console.log('👋 Disconnected');
     } catch (err) {
         console.error('❌ Error seeding announcements:', err);
     }

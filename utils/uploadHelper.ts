@@ -13,8 +13,8 @@ export const uploadFile = async (
     type: 'image' | 'video' = 'image'
 ): Promise<string> => {
     try {
-        console.log('📤 Starting file upload...');
-        console.log('📍 File URI:', fileUri);
+        // console.log('📤 Starting file upload...');
+        // console.log('📍 File URI:', fileUri);
 
         // Create FormData
         const formData = new FormData();
@@ -38,7 +38,7 @@ export const uploadFile = async (
             name: `upload.${fileExtension}`,
         } as any);
 
-        console.log('📡 Uploading to:', `${API_BASE_URL}/api/upload/single`);
+        // console.log('📡 Uploading to:', `${API_BASE_URL}/api/upload/single`);
 
         // Upload file
         const response = await fetch(`${API_BASE_URL}/api/upload/single`, {
@@ -50,7 +50,7 @@ export const uploadFile = async (
             body: formData,
         });
 
-        console.log('📥 Upload response status:', response.status);
+        // console.log('📥 Upload response status:', response.status);
 
         if (!response.ok) {
             const errorText = await response.text();
@@ -59,8 +59,8 @@ export const uploadFile = async (
         }
 
         const data = await response.json();
-        console.log('✅ Upload successful!');
-        console.log('📎 File URL:', data.url);
+        // console.log('✅ Upload successful!');
+        // console.log('📎 File URL:', data.url);
 
         // Return full URL
         return `${API_BASE_URL}${data.url}`;
@@ -83,8 +83,8 @@ export const uploadMultipleFiles = async (
     type: 'image' | 'video' = 'image'
 ): Promise<string[]> => {
     try {
-        console.log('📤 Starting multiple file upload...');
-        console.log('📍 Files count:', fileUris.length);
+        // console.log('📤 Starting multiple file upload...');
+        // console.log('📍 Files count:', fileUris.length);
 
         const formData = new FormData();
 
@@ -120,7 +120,7 @@ export const uploadMultipleFiles = async (
         }
 
         const data = await response.json();
-        console.log('✅ Multiple upload successful!');
+        // console.log('✅ Multiple upload successful!');
 
         // Return full URLs
         return data.files.map((file: any) => `${API_BASE_URL}${file.url}`);
@@ -148,7 +148,7 @@ export const deleteFile = async (filename: string, token: string): Promise<void>
             throw new Error(`Delete failed: ${response.status}`);
         }
 
-        console.log('✅ File deleted:', filename);
+        // console.log('✅ File deleted:', filename);
     } catch (error: any) {
         console.error('❌ Delete error:', error);
         throw error;

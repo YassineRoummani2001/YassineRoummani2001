@@ -150,19 +150,19 @@ async function seedMarketplace() {
     try {
         // Connect to MongoDB
         await mongoose.connect(process.env.MONGODB_URI);
-        console.log('✅ Connected to MongoDB');
+        // console.log('✅ Connected to MongoDB');
 
         // Clear existing items (optional)
         await MarketItem.deleteMany({});
-        console.log('🗑️  Cleared existing marketplace items');
+        // console.log('🗑️  Cleared existing marketplace items');
 
         // Insert sample items
         const inserted = await MarketItem.insertMany(sampleItems);
-        console.log(`✅ Inserted ${inserted.length} marketplace items`);
+        // console.log(`✅ Inserted ${inserted.length} marketplace items`);
 
-        console.log('\n📦 Sample items added:');
+        // console.log('\n📦 Sample items added:');
         inserted.forEach((item, index) => {
-            console.log(`${index + 1}. ${item.title} - ${item.price} ${item.currency}`);
+            // console.log(`${index + 1}. ${item.title} - ${item.price} ${item.currency}`);
         });
 
         process.exit(0);

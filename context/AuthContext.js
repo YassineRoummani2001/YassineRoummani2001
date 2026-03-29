@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { UserContext } from './UserContext';
-console.log('📦 AuthContext Module Evaluated.');
+// console.log('📦 AuthContext Module Evaluated.');
 
 const TOKEN_KEY = 'vibe_auth_token';
 const USER_KEY = 'vibe_user_data';
@@ -52,9 +52,9 @@ export const UserProvider = ({ children }) => {
                 if (token && userJson) {
                     const userData = JSON.parse(userJson);
                     setUser({ ...userData, token });
-                    console.log('✅ User restored from storage');
+                    // console.log('✅ User restored from storage');
                 } else {
-                    console.log('ℹ️ No user session found');
+                    // console.log('ℹ️ No user session found');
                 }
             } catch (error) {
                 console.error('❌ Error loading user execution:', error);
@@ -67,13 +67,13 @@ export const UserProvider = ({ children }) => {
 
     const logout = useCallback(async () => {
         try {
-            console.log('🚪 Logging out...');
+            // console.log('🚪 Logging out...');
             setUser(null);
             await Promise.all([
                 AsyncStorage.removeItem(USER_KEY),
                 safeTokenStorage.remove()
             ]);
-            console.log('✅ Logout successful - user cleared');
+            // console.log('✅ Logout successful - user cleared');
         } catch (error) {
             console.error('❌ Logout error:', error);
             setUser(null);
@@ -274,7 +274,7 @@ export const UserProvider = ({ children }) => {
         };
     }, [user, login, logout, addStory, updateProfile, followUser, refreshUser, deleteAccount, loading]);
 
-    console.log('🛡️ UserProvider Rendering. Children:', !!children);
+    // console.log('🛡️ UserProvider Rendering. Children:', !!children);
 
     return (
         <UserContext.Provider value={contextValue}>

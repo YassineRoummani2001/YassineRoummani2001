@@ -119,7 +119,7 @@ export default function SignupScreen() {
             });
 
             if (response.success) {
-                console.log('User registered:', response.data);
+                // console.log('User registered:', response.data);
                 Toast.show({
                     type: 'success',
                     text1: 'Account Created! 🎉',

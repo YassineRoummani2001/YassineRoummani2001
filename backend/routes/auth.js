@@ -268,7 +268,7 @@ router.post('/stories', protect, async (req, res) => {
             });
             await storyDoc.save();
 
-            console.log(`✅ Story added for user ${user.name} to Story collection`);
+            // console.log(`✅ Story added for user ${user.name} to Story collection`);
 
             // 2. Fetch and return updated active stories list to maintain frontend compatibility
             // which expects the updated list of stories
@@ -298,17 +298,17 @@ router.get('/user/:id/stories', async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
         
-        console.log('📖 User:', user.name);
+        // console.log('📖 User:', user.name);
 
         const stories = await Story.find({ user: user._id }).sort({ createdAt: -1 });
 
-        console.log('📚 Total stories:', stories.length);
+        // console.log('📚 Total stories:', stories.length);
         stories.forEach((story, i) => {
-            console.log(`  Story ${i + 1}:`, {
+            /* console.log(`  Story ${i + 1}:`, {
                 type: story.type,
                 createdAt: story.createdAt,
                 age: Math.round((Date.now() - new Date(story.createdAt)) / (1000 * 60 * 60)) + 'h'
-            });
+            }); */
         });
         
         res.json({
@@ -751,8 +751,9 @@ router.get('/users', async (req, res) => {
     try {
         const users = await User.find()
             .select('-password')
-            .limit(50)
             .sort({ createdAt: -1 });
+
+        console.log(`[DEBUG] Fetched ${users.length} total users for discovery`);
 
         const usersWithStats = users.map(user => ({
             _id: user._id,
@@ -915,7 +916,7 @@ router.delete('/profile', protect, async (req, res) => {
         const Chat = require('../models/Chat');
         // Notification and User are already available globally in this file
 
-        console.log(`Starting account deletion for ${user.email} (${userId})...`);
+        // console.log(`Starting account deletion for ${user.email} (${userId})...`);
 
         // 1. Delete User Content (Parallel)
         await Promise.all([
@@ -960,7 +961,7 @@ router.delete('/profile', protect, async (req, res) => {
         // 5. Finally, Delete the User
         await User.findByIdAndDelete(userId);
 
-        console.log(`User ${userId} and all associated data deleted.`);
+        // console.log(`User ${userId} and all associated data deleted.`);
 
         res.json({ message: 'User and all associated data deleted successfully' });
     } catch (error) {

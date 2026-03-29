@@ -73,7 +73,7 @@ class ErrorHandler {
         }
 
         this.isInitialized = true;
-        console.log('✅ Global Error Handling Initialized');
+        // console.log('✅ Global Error Handling Initialized');
     }
 
     /**
@@ -81,7 +81,7 @@ class ErrorHandler {
      */
     static log(message: string, error?: any) {
         if (__DEV__) {
-            console.log(`[Vibe API] ${message}`, error || '');
+            // console.log(`[Vibe API] ${message}`, error || '');
         } else {
             // Production: Send to Sentry
             if (error) captureException(error, { message });

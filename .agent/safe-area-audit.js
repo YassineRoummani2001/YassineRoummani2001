@@ -48,12 +48,12 @@ function scanDirectory(dir) {
 scanDirectory(appDir);
 
 // Print results
-console.log('\n📋 Pages that need Safe Area Insets:\n');
+// console.log('\n📋 Pages that need Safe Area Insets:\n');
 pagesToFix.forEach((page, index) => {
-    console.log(`${index + 1}. ${page}`);
+    // console.log(`${index + 1}. ${page}`);
 });
 
-console.log(`\n✅ Total: ${pagesToFix.length} pages\n`);
+// console.log(`\n✅ Total: ${pagesToFix.length} pages\n`);
 
 // Write to file
 fs.writeFileSync(
@@ -61,4 +61,4 @@ fs.writeFileSync(
     pagesToFix.join('\n')
 );
 
-console.log('📝 Results saved to: .agent/safe-area-audit-results.txt\n');
+// console.log('📝 Results saved to: .agent/safe-area-audit-results.txt\n');

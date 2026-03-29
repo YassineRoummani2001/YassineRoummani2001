@@ -4,7 +4,7 @@ const User = require('./models/User');
 require('dotenv').config();
 
 mongoose.connect(process.env.MONGODB_URI)
-    .then(() => console.log('✅ MongoDB connected'))
+    .then(() => { /* console.log('✅ MongoDB connected') */ })
     .catch(err => console.error('❌ MongoDB connection error:', err));
 
 async function createSampleReels() {
@@ -13,7 +13,7 @@ async function createSampleReels() {
         let user = await User.findOne();
         
         if (!user) {
-            console.log('No users found. Creating a sample user...');
+            // console.log('No users found. Creating a sample user...');
             user = await User.create({
                 name: 'Demo User',
                 email: 'demo@vibe.com',
@@ -22,11 +22,11 @@ async function createSampleReels() {
             });
         }
 
-        console.log('Using user:', user.name);
+        // console.log('Using user:', user.name);
 
         // Delete existing reels
         await Post.deleteMany({ type: { $in: ['reel', 'video'] } });
-        console.log('Deleted existing reels');
+        // console.log('Deleted existing reels');
 
         // Sample reels with publicly accessible video URLs
         const sampleReels = [
@@ -131,11 +131,11 @@ async function createSampleReels() {
         // Create the reels
         const createdReels = await Post.insertMany(sampleReels);
         
-        console.log(`\n✅ Created ${createdReels.length} sample reels!`);
-        console.log('\nSample reels:');
+        // console.log(`\n✅ Created ${createdReels.length} sample reels!`);
+        // console.log('\nSample reels:');
         createdReels.forEach((reel, i) => {
-            console.log(`${i + 1}. ${reel.caption}`);
-            console.log(`   Video: ${reel.videoUri}`);
+            // console.log(`${i + 1}. ${reel.caption}`);
+            // console.log(`   Video: ${reel.videoUri}`);
         });
 
         process.exit(0);

@@ -178,7 +178,60 @@ const styles = StyleSheet.create({
         width: 60,
         height: 40,
         borderRadius: 8,
-    }
+    },
+    // Post Skeleton
+    postContainer: {
+        marginBottom: 20,
+        backgroundColor: '#fff',
+    },
+    postHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+    },
+    postAvatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+    },
+    postHeaderText: {
+        marginLeft: 12,
+        flex: 1,
+        gap: 6,
+    },
+    postTitle: {
+        width: '40%',
+        height: 14,
+        borderRadius: 4,
+    },
+    postSubtitle: {
+        width: '20%',
+        height: 10,
+        borderRadius: 4,
+    },
+    postMedia: {
+        width: '100%',
+        height: width,
+    },
+    postFooter: {
+        padding: 12,
+    },
+    postActionsSkeleton: {
+        flexDirection: 'row',
+        gap: 16,
+        marginBottom: 12,
+    },
+    postActionIcon: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+    },
+    postCaptionLine: {
+        width: '80%',
+        height: 12,
+        borderRadius: 4,
+        marginBottom: 6,
+    },
 });
 
 export function SkeletonProfile() {
@@ -203,6 +256,29 @@ export function SkeletonProfile() {
                     <AnimatedView style={styles.profileStat} />
                     <AnimatedView style={styles.profileStat} />
                 </View>
+            </View>
+        </View>
+    );
+}
+export function SkeletonPost() {
+    return (
+        <View style={styles.postContainer}>
+            <View style={styles.postHeader}>
+                <AnimatedView style={styles.postAvatar} />
+                <View style={styles.postHeaderText}>
+                    <AnimatedView style={styles.postTitle} />
+                    <AnimatedView style={styles.postSubtitle} />
+                </View>
+            </View>
+            <AnimatedView style={styles.postMedia} />
+            <View style={styles.postFooter}>
+                <View style={styles.postActionsSkeleton}>
+                    <AnimatedView style={styles.postActionIcon} />
+                    <AnimatedView style={styles.postActionIcon} />
+                    <AnimatedView style={styles.postActionIcon} />
+                </View>
+                <AnimatedView style={styles.postCaptionLine} />
+                <AnimatedView style={[styles.postCaptionLine, { width: '40%' }]} />
             </View>
         </View>
     );

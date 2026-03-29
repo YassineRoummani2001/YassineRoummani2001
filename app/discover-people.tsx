@@ -1,28 +1,22 @@
 import { Colors } from '@/constants/Colors';
 import { API_BASE_URL } from '@/constants/Config';
-import { USERS } from '@/constants/MockData';
 import { useUser } from '@/context/UserContext';
+import { useThemeContext } from '@/context/ThemeContext';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Search } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import { ArrowLeft, Search, UserPlus2, UserCheck2 } from 'lucide-react-native';
+import { SkeletonRow } from '@/components/Skeletons';
+import React, { useEffect, useState, useMemo } from 'react';
 import { ActivityIndicator, FlatList, Image, Platform, RefreshControl, SafeAreaView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-
-// Mock more users for discovery
-const DISCOVER_USERS = [
-    ...USERS.filter(u => !u.isMe),
-    ...USERS.filter(u => !u.isMe).map(u => ({ ...u, id: `d-${u.id}`, name: u.name + ' 2' })),
-    ...USERS.filter(u => !u.isMe).map(u => ({ ...u, id: `d2-${u.id}`, name: u.name + ' 3' })),
-];
+import { BlurView } from 'expo-blur';
 
 export default function DiscoverPeopleScreen() {
     const router = useRouter();
     const { user: currentUser, followUser } = (useUser() || {}) as any;
+    const { colors, isDark } = useThemeContext();
     const [searchQuery, setSearchQuery] = useState('');
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-
-    const themeColors = Colors.light; // fallback
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -63,72 +57,106 @@ export default function DiscoverPeopleScreen() {
         const result = await followUser(userId);
         if (result.success) {
             // Update local state
-            setUsers(users.map(u => {
+            setUsers(prev => prev.map(u => {
                 if (u.id === userId || u._id === userId) {
-                    return { ...u, isFollowing: result.data.isFollowing };
+                    return { ...u, isFollowing: result.data.status === 'followed' || result.data.isFollowing };
                 }
                 return u;
             }));
         }
     };
 
-    const filteredUsers = users.filter(user =>
-        user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.handle?.toLowerCase().includes(searchQuery.toLowerCase())
+    const filteredUsers = useMemo(() => 
+        users.filter(user =>
+            user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            user.handle?.toLowerCase().includes(searchQuery.toLowerCase())
+        ),
+        [users, searchQuery]
     );
 
-    const renderItem = ({ item }: any) => {
+    const renderItem = ({ item }: { item: any }) => {
         const isFollowing = item.isFollowing;
 
         return (
-            <View style={styles.userRow}>
-                <Image source={{ uri: item.avatar }} style={styles.avatar} />
+            <TouchableOpacity 
+                style={[styles.userRow, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.01)' }]}
+                onPress={() => router.push({ pathname: '/user/[id]', params: { id: item.id || item._id } })}
+                activeOpacity={0.7}
+            >
+                <View style={styles.avatarContainer}>
+                    <Image 
+                        source={{ uri: item.avatar || 'https://i.pravatar.cc/150' }} 
+                        style={styles.avatar} 
+                    />
+                    {item.isOnline && <View style={[styles.onlineBadge, { borderColor: colors.background }]} />}
+                </View>
+
+                <View style={styles.userInfo}>
+                    <Text style={[styles.username, { color: colors.text }]}>{item.name}</Text>
+                    <Text style={[styles.handle, { color: colors.textSecondary }]}>{item.handle}</Text>
+                    {item.bio && <Text style={[styles.bio, { color: colors.textSecondary }]} numberOfLines={1}>{item.bio}</Text>}
+                </View>
+
                 <TouchableOpacity
-                    style={styles.userInfo}
-                    onPress={() => router.push({ pathname: '/user/[id]', params: { id: item.id || item._id } })}
-                >
-                    <Text style={styles.username}>{item.name}</Text>
-                    <Text style={styles.subtext}>{item.handle}</Text>
-                    {item.bio && <Text style={styles.bio} numberOfLines={1}>{item.bio}</Text>}
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.followButton, isFollowing && styles.followingButton]}
+                    style={[
+                        styles.followButton, 
+                        isFollowing ? styles.followingButton : { backgroundColor: colors.primary },
+                        isFollowing && { borderColor: isDark ? '#333' : '#E0E0E0' }
+                    ]}
                     onPress={() => toggleFollow(item.id || item._id)}
+                    activeOpacity={0.8}
                 >
-                    <Text style={[styles.followButtonText, isFollowing && styles.followingButtonText]}>
+                    {isFollowing ? (
+                        <UserCheck2 size={18} color={isDark ? '#AAA' : '#666'} />
+                    ) : (
+                        <UserPlus2 size={18} color="white" />
+                    )}
+                    <Text style={[
+                        styles.followButtonText, 
+                        isFollowing && { color: isDark ? '#AAA' : '#666' }
+                    ]}>
                         {isFollowing ? 'Following' : 'Follow'}
                     </Text>
                 </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
         );
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <ArrowLeft size={24} color="black" />
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+            <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+            
+            {/* Header */}
+            <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
+                <TouchableOpacity onPress={() => router.back()} style={[styles.iconButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
+                    <ArrowLeft size={22} color={colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Discover People</Text>
-                <View style={{ width: 24 }} />
+                <Text style={[styles.headerTitle, { color: colors.text }]}>Discover All People</Text>
+                <View style={{ width: 40 }} />
             </View>
 
+            {/* Search */}
             <View style={styles.searchContainer}>
-                <View style={styles.searchBar}>
-                    <Search size={20} color="#999" />
+                <BlurView intensity={isDark ? 20 : 40} tint={isDark ? "dark" : "light"} style={styles.searchBar}>
+                    <Search size={20} color={isDark ? "#888" : "#999"} />
                     <TextInput
-                        style={styles.searchInput}
-                        placeholder="Search"
-                        placeholderTextColor="#999"
+                        style={[styles.searchInput, { color: colors.text }]}
+                        placeholder="Search for people..."
+                        placeholderTextColor={isDark ? "#666" : "#999"}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
+                        autoCapitalize="none"
                     />
-                </View>
+                </BlurView>
             </View>
 
             {loading ? (
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={themeColors.primary} />
+                <View style={{ padding: 16 }}>
+                    {[1, 2, 3, 4, 5, 6].map(i => (
+                        <View key={i} style={{ backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF', marginBottom: 12, borderRadius: 16 }}>
+                            <SkeletonRow />
+                        </View>
+                    ))}
                 </View>
             ) : (
                 <FlatList
@@ -141,13 +169,26 @@ export default function DiscoverPeopleScreen() {
                         <RefreshControl
                             refreshing={refreshing}
                             onRefresh={onRefresh}
-                            colors={[themeColors.primary]}
-                            tintColor={themeColors.primary}
+                            colors={[colors.primary]}
+                            tintColor={colors.primary}
                         />
+                    }
+                    ListHeaderComponent={
+                        filteredUsers.length > 0 ? (
+                            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+                                ALL USERS IN VIBE ({filteredUsers.length})
+                            </Text>
+                        ) : null
                     }
                     ListEmptyComponent={
                         <View style={styles.emptyContainer}>
-                            <Text style={styles.emptyText}>No users found</Text>
+                            <View style={[styles.emptyIconContainer, { backgroundColor: isDark ? '#1A1A1A' : '#F5F5F5' }]}>
+                                <Search size={40} color={isDark ? '#333' : '#DDD'} />
+                            </View>
+                            <Text style={[styles.emptyText, { color: colors.text }]}>No users found</Text>
+                            <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+                                Try searching for a different name or handle
+                            </Text>
                         </View>
                     }
                 />
@@ -159,8 +200,6 @@ export default function DiscoverPeopleScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: 'white',
-        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
     },
     header: {
         flexDirection: 'row',
@@ -169,90 +208,137 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
     },
-    backButton: {
-        padding: 4,
+    iconButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     headerTitle: {
         fontSize: 18,
-        fontWeight: 'bold',
-        color: 'black',
+        fontWeight: '800',
+        letterSpacing: -0.5,
     },
     searchContainer: {
-        padding: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
     },
     searchBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#f5f5f5',
-        borderRadius: 12,
-        paddingHorizontal: 12,
-        height: 44,
-        gap: 8,
+        borderRadius: 16,
+        paddingHorizontal: 14,
+        height: 48,
+        gap: 10,
+        overflow: 'hidden',
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: 'rgba(255,255,255,0.1)',
     },
     searchInput: {
         flex: 1,
-        fontSize: 16,
-        color: 'black',
+        fontSize: 15,
+        fontWeight: '500',
     },
     listContent: {
         paddingHorizontal: 16,
-        paddingBottom: 20,
+        paddingBottom: 40,
+    },
+    sectionTitle: {
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 1.2,
+        marginTop: 8,
+        marginBottom: 16,
     },
     userRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 20,
+        padding: 12,
+        borderRadius: 20,
+        marginBottom: 12,
+    },
+    avatarContainer: {
+        position: 'relative',
+        marginRight: 14,
     },
     avatar: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        marginRight: 12,
-        backgroundColor: '#eee',
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: '#2C2C2E',
+    },
+    onlineBadge: {
+        position: 'absolute',
+        bottom: 2,
+        right: 2,
+        width: 14,
+        height: 14,
+        borderRadius: 7,
+        backgroundColor: '#4CD964',
+        borderWidth: 2,
     },
     userInfo: {
         flex: 1,
     },
     username: {
         fontSize: 16,
-        fontWeight: '600',
-        color: 'black',
+        fontWeight: '700',
+        letterSpacing: -0.3,
     },
-    subtext: {
+    handle: {
         fontSize: 13,
-        color: '#666',
-        marginTop: 2,
+        fontWeight: '500',
+        marginTop: 1,
     },
     bio: {
         fontSize: 12,
-        color: '#999',
         marginTop: 4,
+        opacity: 0.8,
     },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        paddingTop: 100,
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 14,
+        fontWeight: '500',
     },
     emptyContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        paddingTop: 100,
+        paddingTop: 80,
+    },
+    emptyIconContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
     },
     emptyText: {
-        fontSize: 16,
-        color: '#999',
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    emptySubtext: {
+        fontSize: 14,
+        marginTop: 8,
+        textAlign: 'center',
+        maxWidth: 240,
     },
     followButton: {
-        backgroundColor: Colors.light.primary,
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-        minWidth: 80,
+        flexDirection: 'row',
         alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 18,
+        minWidth: 100,
         justifyContent: 'center',
     },
     followButtonText: {
@@ -263,9 +349,5 @@ const styles = StyleSheet.create({
     followingButton: {
         backgroundColor: 'transparent',
         borderWidth: 1,
-        borderColor: '#ddd',
-    },
-    followingButtonText: {
-        color: '#666',
     }
 });

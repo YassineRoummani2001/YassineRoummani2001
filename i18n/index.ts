@@ -61,7 +61,7 @@ const hydrateLanguage = async () => {
             }
         }
     } catch (e) {
-        console.log('Failed to hydrate language preference:', e);
+        // console.log('Failed to hydrate language preference:', e);
     }
 };
 

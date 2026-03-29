@@ -441,7 +441,7 @@ export default function StoryViewScreen() {
                         style={StyleSheet.absoluteFill}
                         resizeMode="contain"
                         onError={(e) => {
-                            console.log('Story image load error:', e.nativeEvent.error);
+                            // console.log('Story image load error:', e.nativeEvent.error);
                             setMediaError(true);
                         }}
                     />

@@ -25,17 +25,17 @@ const componentsToCheck = [
     'components/ConfirmationModal.tsx',
 ];
 
-console.log('🔍 iOS Overflow Fix - Audit Report\n');
-console.log('=' .repeat(60));
+// console.log('🔍 iOS Overflow Fix - Audit Report\n');
+// console.log('=' .repeat(60));
 
 componentsToCheck.forEach((file, index) => {
-    console.log(`\n${index + 1}. ${file}`);
-    console.log('-'.repeat(60));
+    // console.log(`\n${index + 1}. ${file}`);
+    // console.log('-'.repeat(60));
     
     const filePath = path.join(__dirname, '..', file);
     
     if (!fs.existsSync(filePath)) {
-        console.log('   ❌ File not found');
+        // console.log('   ❌ File not found');
         return;
     }
     
@@ -53,20 +53,20 @@ componentsToCheck.forEach((file, index) => {
         // Check if it has borderRadius but no overflow
         if (styleContent.includes('borderRadius') && !styleContent.includes('overflow')) {
             issuesFound++;
-            console.log(`   ⚠️  ${styleName}: has borderRadius but missing overflow`);
+            // console.log(`   ⚠️  ${styleName}: has borderRadius but missing overflow`);
         }
     }
     
     if (issuesFound === 0) {
-        console.log('   ✅ No issues found');
+        // console.log('   ✅ No issues found');
     } else {
-        console.log(`   📊 Total issues: ${issuesFound}`);
+        // console.log(`   📊 Total issues: ${issuesFound}`);
     }
 });
 
-console.log('\n' + '='.repeat(60));
-console.log('\n📋 Summary:');
-console.log('   - Run this script to identify components needing fixes');
-console.log('   - Add overflow: "hidden" to styles with borderRadius + Image/Video');
-console.log('   - Test on iOS device after fixes');
-console.log('\n✅ Audit complete!\n');
+// console.log('\n' + '='.repeat(60));
+// console.log('\n📋 Summary:');
+// console.log('   - Run this script to identify components needing fixes');
+// console.log('   - Add overflow: "hidden" to styles with borderRadius + Image/Video');
+// console.log('   - Test on iOS device after fixes');
+// console.log('\n✅ Audit complete!\n');

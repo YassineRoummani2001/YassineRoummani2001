@@ -23,11 +23,11 @@ async function seedData() {
             useNewUrlParser: true,
             useUnifiedTopology: true,
         });
-        console.log('✅ Connected to MongoDB');
+        // console.log('✅ Connected to MongoDB');
 
         const hashedPassword = await bcrypt.hash('password123', 10);
 
-        console.log('⏳ Creating 1000 users... This might take a few seconds.');
+        // console.log('⏳ Creating 1000 users... This might take a few seconds.');
         const users = [];
         for (let i = 0; i < 1000; i++) {
             users.push({
@@ -42,11 +42,11 @@ async function seedData() {
         
         // We do insertMany for performance
         const insertedUsers = await User.insertMany(users);
-        console.log(`✅ Successfully created ${insertedUsers.length} users.`);
+        // console.log(`✅ Successfully created ${insertedUsers.length} users.`);
 
         const userIds = insertedUsers.map(u => u._id);
 
-        console.log('⏳ Creating 100 image posts...');
+        // console.log('⏳ Creating 100 image posts...');
         const posts = [];
         for (let i = 0; i < 100; i++) {
             const randomUserId = userIds[Math.floor(Math.random() * userIds.length)];
@@ -62,9 +62,9 @@ async function seedData() {
         }
         
         const insertedPosts = await Post.insertMany(posts);
-        console.log(`✅ Successfully created ${insertedPosts.length} posts.`);
+        // console.log(`✅ Successfully created ${insertedPosts.length} posts.`);
 
-        console.log('⏳ Creating 100 video reels...');
+        // console.log('⏳ Creating 100 video reels...');
         const reels = [];
         for (let i = 0; i < 100; i++) {
             const randomUserId = userIds[Math.floor(Math.random() * userIds.length)];
@@ -83,9 +83,9 @@ async function seedData() {
         }
 
         const insertedReels = await Post.insertMany(reels);
-        console.log(`✅ Successfully created ${insertedReels.length} reels.`);
+        // console.log(`✅ Successfully created ${insertedReels.length} reels.`);
 
-        console.log('🚀 Bulk seeding completed successfully!');
+        // console.log('🚀 Bulk seeding completed successfully!');
         process.exit(0);
     } catch (error) {
         console.error('❌ Error during seeding:', error);

@@ -43,14 +43,14 @@ export default function MarketItemDetailScreen() {
     const fetchItemDetails = async () => {
         try {
             setLoading(true);
-            console.log('Fetching item details for ID:', id);
+            // console.log('Fetching item details for ID:', id);
             const res = await fetch(`${API_BASE_URL}/api/marketplace/${id}`);
 
-            console.log('Response status:', res.status);
+            // console.log('Response status:', res.status);
 
             if (res.ok) {
                 const data = await res.json();
-                console.log('Item data:', data);
+                // console.log('Item data:', data);
                 setItem(data);
                 setIsSaved(data.savedBy?.includes(user?._id));
             } else {

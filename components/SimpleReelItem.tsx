@@ -2,9 +2,9 @@ import { API_BASE_URL } from '@/constants/Config';
 import { useUser } from '@/context/UserContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { Heart, MessageCircle, MoreVertical, Send, Volume2, VolumeX } from 'lucide-react-native';
+import { Heart, MessageCircle, MoreVertical, Send, Volume2, VolumeX, Bookmark } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { Dimensions, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Dimensions, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -24,22 +24,34 @@ interface SimpleReelItemProps {
 export default function SimpleReelItem({ item, active, index }: SimpleReelItemProps) {
     const insets = useSafeAreaInsets();
     const router = useRouter();
-    const { user } = useUser() || {};
+    const { user } = (useUser() || {}) as any;
     const videoRef = useRef<HTMLVideoElement>(null);
 
-    const [isMuted, setIsMuted] = useState(true);
+    const [isMuted, setIsMuted] = useState(false);
     const [isLiked, setIsLiked] = useState(false);
+    const [isSaved, setIsSaved] = useState(false);
     const [likesCount, setLikesCount] = useState(item.likes?.length || 0);
+    const saveScale = useRef(new Animated.Value(1)).current;
 
     const videoUri = item.videoUri || item.uri;
     const author = item.user || { name: 'Unknown', avatar: '' };
     const caption = item.caption || '';
 
+    const handleSave = () => {
+        const newState = !isSaved;
+        setIsSaved(newState);
+        
+        Animated.sequence([
+            Animated.timing(saveScale, { toValue: 1.3, duration: 100, useNativeDriver: true }),
+            Animated.spring(saveScale, { toValue: 1, friction: 3, useNativeDriver: true }),
+        ]).start();
+    };
+
     // Auto-play when active
     useEffect(() => {
         if (Platform.OS === 'web' && videoRef.current) {
             if (active) {
-                videoRef.current.play().catch(e => console.log('Play error:', e));
+                videoRef.current.play().catch(e => { /* console.log('Play error:', e) */ });
             } else {
                 videoRef.current.pause();
             }
@@ -55,7 +67,7 @@ export default function SimpleReelItem({ item, active, index }: SimpleReelItemPr
 
     const handleLike = () => {
         setIsLiked(!isLiked);
-        setLikesCount(prev => isLiked ? prev - 1 : prev + 1);
+        setLikesCount((prev: number) => isLiked ? prev - 1 : prev + 1);
     };
 
     return (
@@ -127,6 +139,18 @@ export default function SimpleReelItem({ item, active, index }: SimpleReelItemPr
                 <TouchableOpacity style={styles.actionButton}>
                     <Send size={32} color="white" />
                     <Text style={styles.actionText}>{item.shares || 0}</Text>
+                </TouchableOpacity>
+
+                {/* Save */}
+                <TouchableOpacity style={styles.actionButton} onPress={handleSave}>
+                    <Animated.View style={{ transform: [{ scale: saveScale }] }}>
+                        <Bookmark 
+                            size={30} 
+                            color={isSaved ? '#FACD00' : 'white'} 
+                            fill={isSaved ? '#FACD00' : 'transparent'} 
+                            strokeWidth={2.5}
+                        />
+                    </Animated.View>
                 </TouchableOpacity>
 
                 {/* More */}

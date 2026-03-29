@@ -7,7 +7,7 @@ const sendPushNotification = async (pushToken, message, data = {}) => {
 
     // Basic validation for Expo Push Token
     if (!pushToken.startsWith('ExponentPushToken[') && !pushToken.startsWith('ExpoPushToken[')) {
-        console.log(`⚠️ Invalid Expo Push Token format: ${pushToken}`);
+        // console.log(`⚠️ Invalid Expo Push Token format: ${pushToken}`);
         // Continue anyway in case of new formats, but log warning
     }
 

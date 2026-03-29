@@ -103,12 +103,12 @@ export default function ChatScreen() {
             if (chatRes.ok) setChats(await chatRes.json());
             if (followRes.ok) setFollowingUsers(await followRes.json());
 
-            console.log('📝 Notes API Response:', notesRes);
+            // console.log('📝 Notes API Response:', notesRes);
             if (notesRes.success && notesRes.data) {
-                console.log('✅ Notes data:', notesRes.data);
+                // console.log('✅ Notes data:', notesRes.data);
                 setNotes(notesRes.data);
             } else {
-                console.log('❌ No notes data or failed:', notesRes);
+                // console.log('❌ No notes data or failed:', notesRes);
             }
         } catch (error) {
             console.error('🔴 Error fetching data:', error);
@@ -335,7 +335,7 @@ export default function ChatScreen() {
                         } : null;
 
                         if (noteData) {
-                            console.log(`💬 Note for ${other.name}:`, noteData);
+                            // console.log(`💬 Note for ${other.name}:`, noteData);
                         }
 
                         return (

@@ -6,7 +6,7 @@ const app = express();
 const postsRouter = require('./routes/posts');
 
 // Check if upload-reel route exists
-console.log('\n🔍 Checking routes...\n');
+// console.log('\n🔍 Checking routes...\n');
 
 // Get all routes
 function getRoutes(stack, basePath = '') {
@@ -31,9 +31,9 @@ function getRoutes(stack, basePath = '') {
 }
 
 // This won't work perfectly without mounting, but let's try
-console.log('Posts router loaded:', !!postsRouter);
-console.log('\n✅ If you see this, the routes file loads without errors.\n');
-console.log('📋 To verify the endpoint works:');
-console.log('   1. Restart backend: npm run dev');
-console.log('   2. Check logs for "Server running"');
-console.log('   3. Try uploading a reel\n');
+// console.log('Posts router loaded:', !!postsRouter);
+// console.log('\n✅ If you see this, the routes file loads without errors.\n');
+// console.log('📋 To verify the endpoint works:');
+// console.log('   1. Restart backend: npm run dev');
+// console.log('   2. Check logs for "Server running"');
+// console.log('   3. Try uploading a reel\n');

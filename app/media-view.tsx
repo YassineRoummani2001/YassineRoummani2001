@@ -9,7 +9,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { Download, Heart, MessageCircle, MoreHorizontal, Play, Send, Volume2, VolumeX, X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, Image, Platform, Share, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Dimensions, Image, Platform, Share, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
@@ -34,6 +35,10 @@ export default function MediaViewScreen() {
     const [isEditing, setIsEditing] = useState(false);
     const [editedCaption, setEditedCaption] = useState('');
     const isOwner = user && post?.user && (user._id === post.user._id || user._id === post.user.id);
+
+    // Animations
+    const bigHeartAnim = React.useRef(new Animated.Value(0)).current;
+    const lastTap = React.useRef(0);
 
     useEffect(() => {
         if (post) setEditedCaption(post.caption || '');
@@ -99,6 +104,8 @@ export default function MediaViewScreen() {
         setIsLiked(newLiked);
         setLikesCount(prev => newLiked ? prev + 1 : prev - 1);
 
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
         try {
             await fetch(`${API_BASE_URL}/api/posts/${postId}/like`, {
                 method: 'PUT',
@@ -119,7 +126,7 @@ export default function MediaViewScreen() {
                 message: `Check out this post! ${post?.caption || ''}`,
             });
         } catch (error) {
-            console.log(error);
+            // console.log(error);
         }
     };
 
@@ -323,7 +330,24 @@ export default function MediaViewScreen() {
     return (
         <View style={styles.container}>
             {isVideo && activeUri ? (
-                <TouchableWithoutFeedback onPress={togglePlay}>
+                <TouchableWithoutFeedback onPress={() => {
+                    const now = Date.now();
+                    const DOUBLE_TAP_DELAY = 300;
+                    if (lastTap.current && (now - lastTap.current) < DOUBLE_TAP_DELAY) {
+                        // Double tap detected
+                        if (!isLiked) handleLike();
+                        
+                        // Animate heart
+                        bigHeartAnim.setValue(0);
+                        Animated.sequence([
+                            Animated.spring(bigHeartAnim, { toValue: 1, useNativeDriver: true, friction: 3 }),
+                            Animated.timing(bigHeartAnim, { toValue: 0, duration: 500, delay: 200, useNativeDriver: true })
+                        ]).start();
+                    } else {
+                        togglePlay();
+                    }
+                    lastTap.current = now;
+                }}>
                     <View style={styles.videoWrapper}>
                         <VideoView
                             player={player}
@@ -336,14 +360,52 @@ export default function MediaViewScreen() {
                                 <Play size={64} color="rgba(255,255,255,0.7)" fill="rgba(255,255,255,0.7)" />
                             </View>
                         )}
+                        <Animated.View style={[
+                            styles.bigHeartOverlay, 
+                            { 
+                                opacity: bigHeartAnim,
+                                transform: [
+                                    { scale: bigHeartAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.5] }) }
+                                ]
+                            }
+                        ]}>
+                            <Heart size={100} color="#ff2d55" fill="#ff2d55" />
+                        </Animated.View>
                     </View>
                 </TouchableWithoutFeedback>
             ) : activeUri ? (
-                <Image
-                    source={{ uri: activeUri }}
-                    style={styles.media}
-                    resizeMode="contain"
-                />
+                <TouchableWithoutFeedback onPress={() => {
+                    const now = Date.now();
+                    const DOUBLE_TAP_DELAY = 300;
+                    if (lastTap.current && (now - lastTap.current) < DOUBLE_TAP_DELAY) {
+                        if (!isLiked) handleLike();
+                        bigHeartAnim.setValue(0);
+                        Animated.sequence([
+                            Animated.spring(bigHeartAnim, { toValue: 1, useNativeDriver: true, friction: 3 }),
+                            Animated.timing(bigHeartAnim, { toValue: 0, duration: 500, delay: 200, useNativeDriver: true })
+                        ]).start();
+                    }
+                    lastTap.current = now;
+                }}>
+                    <View style={styles.container}>
+                        <Image
+                            source={{ uri: activeUri }}
+                            style={styles.media}
+                            resizeMode="contain"
+                        />
+                        <Animated.View style={[
+                            styles.bigHeartOverlay, 
+                            { 
+                                opacity: bigHeartAnim,
+                                transform: [
+                                    { scale: bigHeartAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.5] }) }
+                                ]
+                            }
+                        ]}>
+                            <Heart size={100} color="#ff2d55" fill="#ff2d55" />
+                        </Animated.View>
+                    </View>
+                </TouchableWithoutFeedback>
             ) : null}
 
             <View style={[styles.overlay, { paddingTop: insets.top, paddingBottom: insets.bottom }]} pointerEvents="box-none">
@@ -576,5 +638,14 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    bigHeartOverlay: {
+        position: 'absolute',
+        alignSelf: 'center',
+        top: '40%',
+        zIndex: 100,
+        textShadowColor: 'rgba(0,0,0,0.3)',
+        textShadowOffset: { width: 0, height: 10 },
+        textShadowRadius: 20,
     }
 });

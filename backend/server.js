@@ -8,7 +8,7 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    // console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
     next();
 });
 
@@ -24,7 +24,7 @@ app.use('/uploads', express.static('uploads')); // Serve uploaded files correctl
 
 // Database Connection
 mongoose.connect(process.env.MONGODB_URI)
-    .then(() => console.log('✅ MongoDB "vibe" database connected successfully'))
+    .then(() => { /* console.log('✅ MongoDB "vibe" database connected successfully') */ })
     .catch(err => console.error('❌ MongoDB connection error:', err));
 
 // Routes
@@ -78,12 +78,12 @@ const io = new Server(server, {
 const onlineUsers = new Map(); // userId -> socketId
 
 io.on('connection', (socket) => {
-    console.log('🔌 User connected:', socket.id);
+    // console.log('🔌 User connected:', socket.id);
 
     // User joins with their ID
     socket.on('user:online', (userId) => {
         onlineUsers.set(userId, socket.id);
-        console.log(`✅ User ${userId} is online`);
+        // console.log(`✅ User ${userId} is online`);
         
         // Broadcast to all clients that this user is online
         io.emit('user:status', { userId, isOnline: true });
@@ -92,7 +92,7 @@ io.on('connection', (socket) => {
     // User joins a chat room
     socket.on('chat:join', (chatId) => {
         socket.join(chatId);
-        console.log(`📨 Socket ${socket.id} joined chat ${chatId}`);
+        // console.log(`📨 Socket ${socket.id} joined chat ${chatId}`);
     });
 
     // User sends a message
@@ -100,7 +100,7 @@ io.on('connection', (socket) => {
         const { chatId, message } = data;
         // Broadcast to all users in this chat room
         io.to(chatId).emit('message:new', message);
-        console.log(`💬 Message sent to chat ${chatId}`);
+        // console.log(`💬 Message sent to chat ${chatId}`);
     });
 
     // User is typing
@@ -127,11 +127,11 @@ io.on('connection', (socket) => {
             if (socketId === socket.id) {
                 onlineUsers.delete(userId);
                 io.emit('user:status', { userId, isOnline: false });
-                console.log(`❌ User ${userId} went offline`);
+                // console.log(`❌ User ${userId} went offline`);
                 break;
             }
         }
-        console.log('🔌 User disconnected:', socket.id);
+        // console.log('🔌 User disconnected:', socket.id);
     });
 });
 
@@ -148,8 +148,8 @@ app.use((err, req, res, next) => {
 });
 
 server.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`🔌 Socket.IO ready for real-time messaging`);
+    /* console.log(`🚀 Server running on http://localhost:${PORT}`); */
+    /* console.log(`🔌 Socket.IO ready for real-time messaging`); */
 });
 
 // Real-time messaging enabled
