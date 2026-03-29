@@ -354,7 +354,7 @@ export default function ReelItem({ item, active, width, height }: ReelItemProps)
                                 }
                             }}
                             src={webVideoUrl}
-                            style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#000' }}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#000' }}
                             loop
                             playsInline
                             muted={muted}
@@ -374,7 +374,7 @@ export default function ReelItem({ item, active, width, height }: ReelItemProps)
                     <VideoView
                         player={player}
                         style={StyleSheet.absoluteFill}
-                        contentFit="contain"
+                        contentFit="cover"
                         nativeControls={false}
                     />
                 )}

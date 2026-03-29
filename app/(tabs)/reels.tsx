@@ -32,6 +32,7 @@ const MemoizedReelItem = memo(
 
 export default function ReelsScreen() {
     const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+    const reelHeight = screenHeight * 0.98; // Reduce height by 2%
     const colors = useTheme();
     const router = useRouter();
     const isFocused = useIsFocused();
@@ -105,20 +106,20 @@ export default function ReelsScreen() {
                 item={item}
                 active={isFocused && activeIndex === index}
                 width={screenWidth}
-                height={screenHeight}
+                height={reelHeight}
             />
         ),
-        [activeIndex, screenWidth, screenHeight, isFocused]
+        [activeIndex, screenWidth, reelHeight, isFocused]
     );
 
     // 📐 Get Item Layout (for performance)
     const getItemLayout = useCallback(
         (_: any, index: number) => ({
-            length: screenHeight,
-            offset: screenHeight * index,
+            length: reelHeight,
+            offset: reelHeight * index,
             index,
         }),
-        [screenHeight]
+        [reelHeight]
     );
 
     // 🎨 Render
@@ -166,8 +167,7 @@ export default function ReelsScreen() {
                     keyExtractor={keyExtractor}
                     renderItem={renderItem}
                     // 📱 Paging Configuration
-                    pagingEnabled
-                    snapToInterval={screenHeight}
+                    snapToInterval={reelHeight}
                     snapToAlignment="start"
                     decelerationRate="fast"
                     disableIntervalMomentum
