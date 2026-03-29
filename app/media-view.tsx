@@ -8,7 +8,7 @@ import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { Download, Heart, MessageCircle, MoreHorizontal, Play, Send, Volume2, VolumeX, X } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { ActivityIndicator, Alert, Animated, Dimensions, Image, Platform, Share, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

@@ -11,10 +11,16 @@ const sendPushNotification = require('../utils/sendPushNotification');
 // @access  Public (or Private)
 router.get('/', async (req, res) => {
     try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
         const posts = await Post.find()
             .populate('user', 'name handle avatar') // Populate user details
             .populate('comments.user', 'name handle avatar') // Populate comment authors
-            .sort({ createdAt: -1 }); // Newest first
+            .sort({ createdAt: -1 }) // Newest first
+            .skip(skip)
+            .limit(limit);
 
         res.json(posts);
     } catch (err) {

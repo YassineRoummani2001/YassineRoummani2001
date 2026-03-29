@@ -4,9 +4,11 @@ import { useUser } from '@/context/UserContext';
 import { useThemeContext } from '@/context/ThemeContext';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Search, UserPlus2, UserCheck2 } from 'lucide-react-native';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { SkeletonRow } from '@/components/Skeletons';
-import React, { useEffect, useState, useMemo } from 'react';
 import { ActivityIndicator, FlatList, Image, Platform, RefreshControl, SafeAreaView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming, withSequence } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
 
 export default function DiscoverPeopleScreen() {
@@ -17,6 +19,25 @@ export default function DiscoverPeopleScreen() {
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    
+    // Animation for refresh icon
+    const refreshRotation = useSharedValue(0);
+    const refreshAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ rotate: `${refreshRotation.value}deg` }],
+        opacity: withTiming(refreshing ? 1 : 0, { duration: 200 })
+    }));
+
+    useEffect(() => {
+        if (refreshing) {
+            refreshRotation.value = withRepeat(
+                withTiming(360, { duration: 1000 }),
+                -1,
+                false
+            );
+        } else {
+            refreshRotation.value = 0;
+        }
+    }, [refreshing]);
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -103,7 +124,10 @@ export default function DiscoverPeopleScreen() {
                         isFollowing ? styles.followingButton : { backgroundColor: colors.primary },
                         isFollowing && { borderColor: isDark ? '#333' : '#E0E0E0' }
                     ]}
-                    onPress={() => toggleFollow(item.id || item._id)}
+                    onPress={() => {
+                        toggleFollow(item.id || item._id);
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    }}
                     activeOpacity={0.8}
                 >
                     {isFollowing ? (
@@ -128,10 +152,23 @@ export default function DiscoverPeopleScreen() {
             
             {/* Header */}
             <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
-                <TouchableOpacity onPress={() => router.back()} style={[styles.iconButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
+                <TouchableOpacity onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    router.back();
+                }} style={[styles.iconButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
                     <ArrowLeft size={22} color={colors.text} />
                 </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: colors.text }]}>Discover All People</Text>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={[styles.headerTitle, { color: colors.text }]}>Discover All People</Text>
+                    {refreshing && (
+                        <Animated.View style={refreshAnimatedStyle}>
+                            <RefreshControl style={{ display: 'none' }} refreshing={refreshing} />
+                            <Search size={16} color={colors.primary} />
+                        </Animated.View>
+                    )}
+                </View>
+
                 <View style={{ width: 40 }} />
             </View>
 

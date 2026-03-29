@@ -5,12 +5,11 @@ import { useThemeContext } from '@/context/ThemeContext';
 import { useUser } from '@/context/UserContext';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Dimensions, Image, Platform, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Dimensions, Image, Platform, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width } = Dimensions.get('window');
-const COLUMN_WIDTH = width / 3;
+// Grid width is now calculated dynamically in the component
 
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -69,7 +68,10 @@ export default function ProfileScreen() {
     const insets = useSafeAreaInsets();
 
     const { colors, isDark } = useThemeContext();
-    const styles = useMemo(() => createStyles(colors, isDark, insets), [colors, isDark, insets]);
+    const { width } = useWindowDimensions();
+    const isDesktop = Platform.OS === 'web' && width > 768;
+    const COLUMN_WIDTH = isDesktop ? 300 : width / 3; // Fixed width items on desktop or fluid on mobile
+    const styles = useMemo(() => createStyles(colors, isDark, insets, width, COLUMN_WIDTH), [colors, isDark, insets, width, COLUMN_WIDTH]);
 
     // Fetch profile user if userId is provided
     useEffect(() => {
@@ -424,7 +426,7 @@ export default function ProfileScreen() {
     );
 }
 
-const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.create({
+const createStyles = (colors: any, isDark: boolean, insets: any, screenWidth: number, COLUMN_WIDTH: number) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background,
@@ -633,7 +635,7 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
         position: 'absolute',
         bottom: 0,
         height: 2,
-        width: width / 3,
+        width: '33.33%',
         backgroundColor: colors.text,
         zIndex: 10,
     },

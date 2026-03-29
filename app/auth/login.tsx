@@ -7,7 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import { ArrowRight, Eye, EyeOff, Lock, Mail } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Dimensions, I18nManager, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Dimensions, I18nManager, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
@@ -74,95 +74,123 @@ export default function LoginScreen() {
         }
     };
 
+    const { width } = useWindowDimensions();
+    const isDesktop = Platform.OS === 'web' && width > 768;
+
     return (
-        <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
             <StatusBar style={isDark ? "light" : "dark"} />
-            <LinearGradient
-                colors={isDark ? ['#6200EE', '#3700B3', '#000000'] : ['#E3F2FD', '#E1BEE7', '#FFFFFF']}
-                style={styles.background}
-            />
+            {!isDesktop && (
+                <LinearGradient
+                    colors={isDark ? ['#6200EE', '#3700B3', '#000000'] : ['#E3F2FD', '#E1BEE7', '#FFFFFF']}
+                    style={styles.background}
+                />
+            )}
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.keyboardView}
             >
-                <View style={styles.contentContainer}>
-                    <View style={styles.headerContainer}>
-                        <View style={[styles.logoContainer, { boxShadow: isDark ? `0px 8px 20px ${colors.primary}60` : `0px 8px 20px ${colors.primary}30` }]}>
-                            <Image
-                                source={require('@/assets/images/vibe-logo.png')}
-                                style={styles.logoImage}
+                <View style={[styles.contentContainer, isDesktop && styles.desktopContent]}>
+                    {isDesktop && (
+                        <View style={styles.brandingSection}>
+                             <LinearGradient
+                                colors={isDark ? ['#6200EE', '#3700B3'] : ['#E3F2FD', '#E1BEE7']}
+                                style={StyleSheet.absoluteFill}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
                             />
+                            <View style={styles.brandingContent}>
+                                <Image
+                                    source={require('@/assets/images/vibe-logo.png')}
+                                    style={{ width: 120, height: 120, borderRadius: 30 }}
+                                />
+                                <Text style={styles.brandingTitle}>Vibe</Text>
+                                <Text style={styles.brandingSubtitle}>The next generation of social interaction.</Text>
+                            </View>
                         </View>
-                        <Text style={[styles.appName, { color: isDark ? '#fff' : '#333' }]}>Vibe</Text>
-                        <Text style={[styles.tagline, { color: isDark ? '#ccc' : '#666' }]}>{t('auth.login_subtitle')}</Text>
-                    </View>
+                    )}
 
-                    <View style={styles.formContainer}>
-                        <View style={[styles.inputContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
-                            <Mail size={20} color={isDark ? "#ccc" : "#666"} style={styles.inputIcon} />
-                            <TextInput
-                                style={[styles.input, { color: isDark ? '#fff' : '#333' }, I18nManager.isRTL && { textAlign: 'right' }]}
-                                placeholder={t('auth.email_placeholder')}
-                                placeholderTextColor={isDark ? "#aaa" : "#888"}
-                                value={email}
-                                onChangeText={setEmail}
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                            />
-                        </View>
-
-                        <View style={[styles.inputContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
-                            <Lock size={20} color={isDark ? "#ccc" : "#666"} style={styles.inputIcon} />
-                            <TextInput
-                                style={[styles.input, { color: isDark ? '#fff' : '#333' }, I18nManager.isRTL && { textAlign: 'right' }]}
-                                placeholder={t('auth.password_placeholder')}
-                                placeholderTextColor={isDark ? "#aaa" : "#888"}
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry={!showPassword}
-                            />
-                            <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
-                                {showPassword ? <EyeOff size={20} color={isDark ? "#ccc" : "#666"} /> : <Eye size={20} color={isDark ? "#ccc" : "#666"} />}
-                            </TouchableOpacity>
-                        </View>
-
-                        <TouchableOpacity style={styles.forgotPassword} onPress={() => router.push('/auth/forgot-password')}>
-                            <Text style={[styles.forgotPasswordText, { color: isDark ? '#ccc' : '#666' }]}>{t('auth.forgot_password')}</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={styles.loginButton} onPress={handleLogin} disabled={loading}>
-                            {loading ? (
-                                <Text style={styles.loginButtonText}>{t('common.loading')}</Text>
-                            ) : (
-                                <View style={styles.loginContent}>
-                                    <Text style={styles.loginButtonText}>{t('auth.login_button')}</Text>
-                                    <ArrowRight size={20} color="white" style={{ transform: [{ scaleX: I18nManager.isRTL ? -1 : 1 }] }} />
+                    <View style={[styles.formWrapper, isDesktop && { flex: 1, paddingHorizontal: 60 }]}>
+                        <View style={styles.headerContainer}>
+                            {!isDesktop && (
+                                <View style={[styles.logoContainer, { boxShadow: isDark ? `0px 8px 20px ${colors.primary}60` : `0px 8px 20px ${colors.primary}30` }]}>
+                                    <Image
+                                        source={require('@/assets/images/vibe-logo.png')}
+                                        style={styles.logoImage}
+                                    />
                                 </View>
                             )}
-                        </TouchableOpacity>
-
-                        <View style={styles.dividerContainer}>
-                            <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)' }]} />
-                            <Text style={[styles.dividerText, { color: isDark ? '#aaa' : '#888' }]}>{t('common.ok') === 'OK' ? 'OR' : 'OU'}</Text>
-                            <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)' }]} />
+                            <Text style={[styles.appName, { color: isDark ? '#fff' : '#333' }]}>{isDesktop ? 'Welcome back' : 'Vibe'}</Text>
+                            <Text style={[styles.tagline, { color: isDark ? '#ccc' : '#666' }]}>{t('auth.login_subtitle')}</Text>
                         </View>
 
-                        <View style={styles.socialRow}>
-                            <TouchableOpacity style={[styles.socialButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
-                                <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/300/300221.png' }} style={styles.socialIconBase} tintColor={isDark ? "#fff" : "#333"} />
+                        <View style={styles.formContainer}>
+                            <View style={[styles.inputContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
+                                <Mail size={20} color={isDark ? "#ccc" : "#666"} style={styles.inputIcon} />
+                                <TextInput
+                                    style={[styles.input, { color: isDark ? '#fff' : '#333' }]}
+                                    placeholder={t('auth.email_placeholder')}
+                                    placeholderTextColor={isDark ? "#aaa" : "#888"}
+                                    value={email}
+                                    onChangeText={setEmail}
+                                    keyboardType="email-address"
+                                    autoCapitalize="none"
+                                />
+                            </View>
+
+                            <View style={[styles.inputContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
+                                <Lock size={20} color={isDark ? "#ccc" : "#666"} style={styles.inputIcon} />
+                                <TextInput
+                                    style={[styles.input, { color: isDark ? '#fff' : '#333' }]}
+                                    placeholder={t('auth.password_placeholder')}
+                                    placeholderTextColor={isDark ? "#aaa" : "#888"}
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    secureTextEntry={!showPassword}
+                                />
+                                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                                    {showPassword ? <EyeOff size={20} color={isDark ? "#ccc" : "#666"} /> : <Eye size={20} color={isDark ? "#ccc" : "#666"} />}
+                                </TouchableOpacity>
+                            </View>
+
+                            <TouchableOpacity style={styles.forgotPassword} onPress={() => router.push('/auth/forgot-password')}>
+                                <Text style={[styles.forgotPasswordText, { color: isDark ? '#ccc' : '#666' }]}>{t('auth.forgot_password')}</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={[styles.socialButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
-                                <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/0/747.png' }} style={styles.socialIconBase} tintColor={isDark ? "#fff" : "#333"} />
+
+                            <TouchableOpacity style={[styles.loginButton, { backgroundColor: colors.primary }]} onPress={handleLogin} disabled={loading}>
+                                {loading ? (
+                                    <ActivityIndicator color="white" />
+                                ) : (
+                                    <View style={styles.loginContent}>
+                                        <Text style={styles.loginButtonText}>{t('auth.login_button')}</Text>
+                                        <ArrowRight size={20} color="white" />
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+
+                            <View style={styles.dividerContainer}>
+                                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                                <Text style={[styles.dividerText, { color: colors.textSecondary }]}>OR</Text>
+                                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                            </View>
+
+                            <View style={styles.socialRow}>
+                                <TouchableOpacity style={[styles.socialButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderColor: colors.border }]}>
+                                    <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/300/300221.png' }} style={styles.socialIconBase} />
+                                </TouchableOpacity>
+                                <TouchableOpacity style={[styles.socialButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderColor: colors.border }]}>
+                                    <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/0/747.png' }} style={styles.socialIconBase} tintColor={isDark ? "#fff" : "#333"} />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        <View style={styles.footer}>
+                            <Text style={[styles.footerText, { color: colors.textSecondary }]}>{t('auth.no_account')} </Text>
+                            <TouchableOpacity onPress={() => router.push('/auth/signup')}>
+                                <Text style={[styles.signupText, { color: colors.primary }]}>{t('auth.signup_button')}</Text>
                             </TouchableOpacity>
                         </View>
-                    </View>
-
-                    <View style={styles.footer}>
-                        <Text style={[styles.footerText, { color: isDark ? '#ccc' : '#666' }]}>{t('auth.no_account')} </Text>
-                        <TouchableOpacity onPress={() => router.push('/auth/signup')}>
-                            <Text style={styles.signupText}>{t('auth.signup_button')}</Text>
-                        </TouchableOpacity>
                     </View>
                 </View>
             </KeyboardAvoidingView>
@@ -290,16 +318,46 @@ const styles = StyleSheet.create({
         height: 24,
         resizeMode: 'contain',
     },
-    footer: {
+    desktopContent: {
         flexDirection: 'row',
-        justifyContent: 'center',
-        marginTop: 40,
+        paddingHorizontal: 0,
+        maxWidth: 1000,
+        height: 600,
+        alignSelf: 'center',
+        backgroundColor: '#fff',
+        borderRadius: 24,
+        overflow: 'hidden',
+        boxShadow: '0px 20px 40px rgba(0,0,0,0.1)',
     },
-    footerText: {
-        fontSize: 15,
+    brandingSection: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: Colors.light.primary,
+    },
+    brandingContent: {
+        alignItems: 'center',
+        padding: 40,
+    },
+    brandingTitle: {
+        fontSize: 48,
+        fontWeight: '900',
+        color: 'white',
+        marginTop: 20,
+        letterSpacing: -1,
+    },
+    brandingSubtitle: {
+        fontSize: 18,
+        color: 'rgba(255,255,255,0.8)',
+        textAlign: 'center',
+        marginTop: 10,
+        lineHeight: 26,
+    },
+    formWrapper: {
+        justifyContent: 'center',
+        paddingVertical: 40,
     },
     signupText: {
-        color: Colors.light.primary,
         fontSize: 15,
         fontWeight: 'bold',
     },

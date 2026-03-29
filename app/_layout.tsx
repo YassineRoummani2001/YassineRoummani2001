@@ -11,6 +11,7 @@ import 'react-native-reanimated';
 
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { NetworkBanner } from '@/components/NetworkBanner';
+import { WebLayout } from '@/components/WebLayout';
 import { UserProvider, useUser } from '@/context/AuthContext';
 import { MessagesProvider } from '@/context/MessagesContext';
 import { NetworkProvider } from '@/context/NetworkContext';
@@ -112,7 +113,9 @@ function InnerLayout() {
               <MessagesProvider>
                 <ReelProvider>
                   <NetworkBanner />
-                  <RootLayoutNav />
+                  <WebLayout>
+                    <RootLayoutNav />
+                  </WebLayout>
                   <StatusBar style={isDark ? "light" : "dark"} />
                   <Toast />
                 </ReelProvider>

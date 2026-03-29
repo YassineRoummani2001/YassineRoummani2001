@@ -3,7 +3,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { Image, Platform, StyleSheet, View } from 'react-native';
+import { Image, Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 export default function TabLayout() {
   const { user } = (useUser() || {}) as any;
@@ -11,27 +11,30 @@ export default function TabLayout() {
   const strokeWidth = 1.8;
   const activeSize = 26;
 
-  return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: colors.background, // Dynamic background
-          borderTopWidth: 0,
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          elevation: 0,
-          height: Platform.OS === 'ios' ? 85 : 70,
-          paddingBottom: Platform.OS === 'ios' ? 30 : 15,
-          paddingTop: 10,
-        },
-        tabBarShowLabel: false,
-        tabBarActiveTintColor: colors.tint,
-        tabBarInactiveTintColor: colors.tabIconDefault || '#999',
-      }}
-    >
+    const { width } = useWindowDimensions();
+    const isDesktop = Platform.OS === 'web' && width > 768;
+
+    return (
+        <Tabs
+            screenOptions={{
+                headerShown: false,
+                tabBarStyle: isDesktop ? { display: 'none' } : {
+                    backgroundColor: colors.background, // Dynamic background
+                    borderTopWidth: 0,
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    elevation: 0,
+                    height: Platform.OS === 'ios' ? 85 : 70,
+                    paddingBottom: Platform.OS === 'ios' ? 30 : 15,
+                    paddingTop: 10,
+                },
+                tabBarShowLabel: false,
+                tabBarActiveTintColor: colors.tint,
+                tabBarInactiveTintColor: colors.tabIconDefault || '#999',
+            }}
+        >
       <Tabs.Screen
         name="index"
         options={{

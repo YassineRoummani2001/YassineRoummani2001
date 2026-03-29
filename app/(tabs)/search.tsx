@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { Search as SearchIcon, TrendingUp, X, Clock, User as UserIcon, Hash } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Image, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Platform } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const RECENT_SEARCHES_KEY = 'vibe_recent_searches';
@@ -138,7 +139,10 @@ export default function SearchScreen() {
                         autoCorrect={false}
                     />
                     {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => setSearchQuery('')}>
+                        <TouchableOpacity onPress={() => {
+                            setSearchQuery('');
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        }}>
                             <X size={18} color={colors.textSecondary} />
                         </TouchableOpacity>
                     )}
@@ -200,7 +204,10 @@ export default function SearchScreen() {
                                     <TouchableOpacity 
                                         key={index} 
                                         style={styles.tag}
-                                        onPress={() => setSearchQuery(`#${topic}`)}
+                                        onPress={() => {
+                                            setSearchQuery(`#${topic}`);
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                        }}
                                     >
                                         <Text style={styles.tagText}>#{topic}</Text>
                                     </TouchableOpacity>

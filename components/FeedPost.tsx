@@ -5,7 +5,8 @@ import { useRouter } from 'expo-router';
 
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Dimensions, Image, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Dimensions, Image, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { State, TapGestureHandler } from 'react-native-gesture-handler';
 import CommentsModal from './CommentsModal';
 import ConfirmationModal from './ConfirmationModal';
@@ -400,6 +401,7 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
             if (!isLiked) {
                 handleLike();
             }
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
             likeScale.setValue(0);
             Animated.sequence([
                 Animated.spring(likeScale, {
@@ -517,6 +519,7 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
         // Optimistic update
         setIsLiked(newIsLiked);
         setLikesCount((prev: number) => newIsLiked ? prev + 1 : prev - 1);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
         try {
             const res = await fetch(`${API_BASE_URL}/api/posts/${post.id || post._id}/like`, {
@@ -689,6 +692,7 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
         const wasSaved = isSaved;
         const newIsSaved = !wasSaved;
         setIsSaved(newIsSaved);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
         // Animate
         Animated.sequence([
@@ -836,8 +840,22 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
     const isLongCaption = caption.length > 100;
     const paddingTime = post.createdAt ? formatDate(post.createdAt) : post.timeAgo;
 
+    const { width } = useWindowDimensions();
+    const isDesktop = Platform.OS === 'web' && width > 768;
+
     return (
-        <View style={styles.container}>
+        <View style={[
+            styles.container,
+            isDesktop && {
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 16,
+                marginBottom: 24,
+                overflow: 'hidden',
+                backgroundColor: colors.background,
+                boxShadow: isDark ? 'none' : '0px 4px 12px rgba(0,0,0,0.05)'
+            }
+        ]}>
             <View style={styles.header}>
                 {/* ... (user info part) ... */}
                 <TouchableOpacity

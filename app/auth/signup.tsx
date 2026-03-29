@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ArrowRight, Lock, Mail, User } from 'lucide-react-native';
 import { useState } from 'react';
-import { Dimensions, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Dimensions, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
@@ -151,142 +151,158 @@ export default function SignupScreen() {
         }
     };
 
+    const { width } = useWindowDimensions();
+    const isDesktop = Platform.OS === 'web' && width > 768;
+
     return (
-        <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
             <StatusBar style={isDark ? "light" : "dark"} />
-            <LinearGradient
-                colors={isDark ? ['#000000', '#1A1A1A', '#3700B3'] : ['#E3F2FD', '#E1BEE7', '#FFFFFF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.background}
-            />
+            {!isDesktop && (
+                <LinearGradient
+                    colors={isDark ? ['#000000', '#1A1A1A', '#3700B3'] : ['#E3F2FD', '#E1BEE7', '#FFFFFF']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.background}
+                />
+            )}
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.keyboardView}
             >
-                <View style={styles.contentContainer}>
-                    <View style={styles.headerContainer}>
-                        <View style={[styles.logoContainer, { boxShadow: isDark ? `0px 8px 20px ${Colors.light.primary}60` : `0px 8px 20px ${Colors.light.primary}30` }]}>
-                            <Image
-                                source={require('@/assets/images/vibe-logo.png')}
-                                style={styles.logoImage}
+                <View style={[styles.contentContainer, isDesktop && styles.desktopContent]}>
+                    {isDesktop && (
+                        <View style={styles.brandingSection}>
+                             <LinearGradient
+                                colors={isDark ? ['#3700B3', '#000000'] : ['#E1BEE7', '#E3F2FD']}
+                                style={StyleSheet.absoluteFill}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
                             />
-                        </View>
-                        <Text style={[styles.title, { color: isDark ? '#fff' : '#333' }]}>Create Account</Text>
-                        <Text style={[styles.subtitle, { color: isDark ? '#ccc' : '#666' }]}>Join Vibe and start sharing your moments.</Text>
-                    </View>
-
-                    <View style={styles.formContainer}>
-                        {/* Name Input */}
-                        <View>
-                            <View style={[
-                                styles.inputContainer,
-                                {
-                                    backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                                    borderColor: nameError
-                                        ? '#FF3B30'
-                                        : isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-                                    borderWidth: nameError ? 2 : 1
-                                }
-                            ]}>
-                                <User size={20} color={nameError ? '#FF3B30' : isDark ? "#ccc" : "#666"} style={styles.inputIcon} />
-                                <TextInput
-                                    style={[styles.input, { color: isDark ? '#fff' : '#333' }]}
-                                    placeholder="Full Name"
-                                    placeholderTextColor={isDark ? "#aaa" : "#888"}
-                                    value={name}
-                                    onChangeText={handleNameChange}
-                                    editable={!loading}
+                            <View style={styles.brandingContent}>
+                                <Image
+                                    source={require('@/assets/images/vibe-logo.png')}
+                                    style={{ width: 120, height: 120, borderRadius: 30 }}
                                 />
+                                <Text style={styles.brandingTitle}>Join Vibe</Text>
+                                <Text style={styles.brandingSubtitle}>Create an account to start sharing your world with others.</Text>
                             </View>
-                            {nameError ? (
-                                <Text style={styles.errorText}>{nameError}</Text>
-                            ) : null}
                         </View>
+                    )}
 
-                        {/* Email Input */}
-                        <View>
-                            <View style={[
-                                styles.inputContainer,
-                                {
-                                    backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                                    borderColor: emailError
-                                        ? '#FF3B30'
-                                        : isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-                                    borderWidth: emailError ? 2 : 1
-                                }
-                            ]}>
-                                <Mail size={20} color={emailError ? '#FF3B30' : isDark ? "#ccc" : "#666"} style={styles.inputIcon} />
-                                <TextInput
-                                    style={[styles.input, { color: isDark ? '#fff' : '#333' }]}
-                                    placeholder="Email"
-                                    placeholderTextColor={isDark ? "#aaa" : "#888"}
-                                    value={email}
-                                    onChangeText={handleEmailChange}
-                                    keyboardType="email-address"
-                                    autoCapitalize="none"
-                                    editable={!loading}
-                                />
-                            </View>
-                            {emailError ? (
-                                <Text style={styles.errorText}>{emailError}</Text>
-                            ) : null}
-                        </View>
-
-                        {/* Password Input */}
-                        <View>
-                            <View style={[
-                                styles.inputContainer,
-                                {
-                                    backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                                    borderColor: passwordError
-                                        ? '#FF3B30'
-                                        : isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-                                    borderWidth: passwordError ? 2 : 1
-                                }
-                            ]}>
-                                <Lock size={20} color={passwordError ? '#FF3B30' : isDark ? "#ccc" : "#666"} style={styles.inputIcon} />
-                                <TextInput
-                                    style={[styles.input, { color: isDark ? '#fff' : '#333' }]}
-                                    placeholder="Password"
-                                    placeholderTextColor={isDark ? "#aaa" : "#888"}
-                                    value={password}
-                                    onChangeText={handlePasswordChange}
-                                    secureTextEntry
-                                    editable={!loading}
-                                />
-                            </View>
-                            {passwordError ? (
-                                <Text style={styles.errorText}>{passwordError}</Text>
-                            ) : null}
-                        </View>
-
-                        <TouchableOpacity
-                            style={[
-                                styles.signupButton,
-                                loading && styles.signupButtonDisabled
-                            ]}
-                            onPress={handleSignup}
-                            disabled={loading}
-                            activeOpacity={loading ? 1 : 0.7}
-                        >
-                            {loading ? (
-                                <Text style={styles.signupButtonText}>Creating account...</Text>
-                            ) : (
-                                <View style={styles.signupContent}>
-                                    <Text style={styles.signupButtonText}>Sign Up</Text>
-                                    <ArrowRight size={20} color="white" />
+                    <View style={[styles.formWrapper, isDesktop && { flex: 1, paddingHorizontal: 60 }]}>
+                        <View style={styles.headerContainer}>
+                            {!isDesktop && (
+                                <View style={[styles.logoContainer, { boxShadow: isDark ? `0px 8px 20px ${colors.primary}60` : `0px 8px 20px ${colors.primary}30` }]}>
+                                    <Image
+                                        source={require('@/assets/images/vibe-logo.png')}
+                                        style={styles.logoImage}
+                                    />
                                 </View>
                             )}
-                        </TouchableOpacity>
-                    </View>
+                            <Text style={[styles.title, { color: colors.text }]}>Create Account</Text>
+                            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Join Vibe and start sharing your moments.</Text>
+                        </View>
 
-                    <View style={styles.footer}>
-                        <Text style={[styles.footerText, { color: isDark ? '#ccc' : '#666' }]}>Already have an account? </Text>
-                        <TouchableOpacity onPress={() => router.push('/auth/login')}>
-                            <Text style={styles.loginText}>Sign In</Text>
-                        </TouchableOpacity>
+                        <View style={styles.formContainer}>
+                            {/* Name Input */}
+                            <View>
+                                <View style={[
+                                    styles.inputContainer,
+                                    {
+                                        backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                                        borderColor: nameError ? '#FF3B30' : colors.border,
+                                        borderWidth: nameError ? 2 : 1
+                                    }
+                                ]}>
+                                    <User size={20} color={nameError ? '#FF3B30' : colors.textSecondary} style={styles.inputIcon} />
+                                    <TextInput
+                                        style={[styles.input, { color: colors.text }]}
+                                        placeholder="Full Name"
+                                        placeholderTextColor={colors.textSecondary}
+                                        value={name}
+                                        onChangeText={handleNameChange}
+                                        editable={!loading}
+                                    />
+                                </View>
+                                {nameError ? <Text style={styles.errorText}>{nameError}</Text> : null}
+                            </View>
+
+                            {/* Email Input */}
+                            <View>
+                                <View style={[
+                                    styles.inputContainer,
+                                    {
+                                        backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                                        borderColor: emailError ? '#FF3B30' : colors.border,
+                                        borderWidth: emailError ? 2 : 1
+                                    }
+                                ]}>
+                                    <Mail size={20} color={emailError ? '#FF3B30' : colors.textSecondary} style={styles.inputIcon} />
+                                    <TextInput
+                                        style={[styles.input, { color: colors.text }]}
+                                        placeholder="Email"
+                                        placeholderTextColor={colors.textSecondary}
+                                        value={email}
+                                        onChangeText={handleEmailChange}
+                                        keyboardType="email-address"
+                                        autoCapitalize="none"
+                                        editable={!loading}
+                                    />
+                                </View>
+                                {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
+                            </View>
+
+                            {/* Password Input */}
+                            <View>
+                                <View style={[
+                                    styles.inputContainer,
+                                    {
+                                        backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                                        borderColor: passwordError ? '#FF3B30' : colors.border,
+                                        borderWidth: passwordError ? 2 : 1
+                                    }
+                                ]}>
+                                    <Lock size={20} color={passwordError ? '#FF3B30' : colors.textSecondary} style={styles.inputIcon} />
+                                    <TextInput
+                                        style={[styles.input, { color: colors.text }]}
+                                        placeholder="Password"
+                                        placeholderTextColor={colors.textSecondary}
+                                        value={password}
+                                        onChangeText={handlePasswordChange}
+                                        secureTextEntry
+                                        editable={!loading}
+                                    />
+                                </View>
+                                {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
+                            </View>
+
+                            <TouchableOpacity
+                                style={[
+                                    styles.signupButton,
+                                    { backgroundColor: colors.primary },
+                                    loading && styles.signupButtonDisabled
+                                ]}
+                                onPress={handleSignup}
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator color="white" />
+                                ) : (
+                                    <View style={styles.signupContent}>
+                                        <Text style={styles.signupButtonText}>Sign Up</Text>
+                                        <ArrowRight size={20} color="white" />
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.footer}>
+                            <Text style={[styles.footerText, { color: colors.textSecondary }]}>Already have an account? </Text>
+                            <TouchableOpacity onPress={() => router.push('/auth/login')}>
+                                <Text style={[styles.loginText, { color: colors.primary }]}>Sign In</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </KeyboardAvoidingView>
@@ -384,16 +400,46 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
     },
-    footer: {
+    desktopContent: {
         flexDirection: 'row',
-        justifyContent: 'center',
-        marginTop: 40,
+        paddingHorizontal: 0,
+        maxWidth: 1000,
+        height: 650,
+        alignSelf: 'center',
+        backgroundColor: '#fff',
+        borderRadius: 24,
+        overflow: 'hidden',
+        boxShadow: '0px 20px 40px rgba(0,0,0,0.1)',
     },
-    footerText: {
-        fontSize: 15,
+    brandingSection: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: Colors.light.primary,
+    },
+    brandingContent: {
+        alignItems: 'center',
+        padding: 40,
+    },
+    brandingTitle: {
+        fontSize: 48,
+        fontWeight: '900',
+        color: 'white',
+        marginTop: 20,
+        letterSpacing: -1,
+    },
+    brandingSubtitle: {
+        fontSize: 18,
+        color: 'rgba(255,255,255,0.8)',
+        textAlign: 'center',
+        marginTop: 10,
+        lineHeight: 26,
+    },
+    formWrapper: {
+        justifyContent: 'center',
+        paddingVertical: 40,
     },
     loginText: {
-        color: Colors.light.primary,
         fontSize: 15,
         fontWeight: 'bold',
     },

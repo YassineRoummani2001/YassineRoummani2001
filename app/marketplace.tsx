@@ -4,7 +4,7 @@ import { useThemeContext } from '@/context/ThemeContext';
 import { Stack, useRouter } from 'expo-router';
 import { ArrowLeft, MapPin, Plus, Search, Settings, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const CATEGORIES = ['All', 'Electronics', 'Vehicles', 'Clothing', 'Home', 'Sports', 'Other'];
@@ -23,6 +23,8 @@ export default function MarketplaceScreen() {
     const { colors, isDark } = useThemeContext();
     const { user } = (useUser() || {}) as any;
     const insets = useSafeAreaInsets();
+    const { width } = useWindowDimensions();
+    const isDesktop = Platform.OS === 'web' && width > 768;
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
     const [items, setItems] = useState<any[]>([]);
@@ -110,7 +112,10 @@ export default function MarketplaceScreen() {
     return (
         <>
             <Stack.Screen options={{ headerShown: false }} />
-            <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+            <View style={[
+                styles.container, 
+                { backgroundColor: colors.background, paddingTop: insets.top }
+            ]}>
                 {/* Header */}
                 <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
                     <View style={styles.headerLeft}>
@@ -208,7 +213,8 @@ export default function MarketplaceScreen() {
                         data={items}
                         renderItem={renderItem}
                         keyExtractor={(item) => item._id}
-                        numColumns={2}
+                        key={isDesktop ? 'desktop-grid' : 'mobile-grid'}
+                        numColumns={isDesktop ? 4 : 2}
                         contentContainerStyle={styles.gridContent}
                         showsVerticalScrollIndicator={false}
                         ListEmptyComponent={

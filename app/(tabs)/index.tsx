@@ -6,8 +6,8 @@ import { lazyLoad, MinimalLoader } from '@/utils/lazyLoad';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Platform, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Platform, RefreshControl, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SkeletonPost } from '@/components/Skeletons';
@@ -202,9 +202,14 @@ export default function HomeScreen() {
   }));
 
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isDesktop = Platform.OS === 'web' && width > 768;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background }]}>
+    <View style={[
+      styles.container, 
+      { paddingTop: insets.top, backgroundColor: colors.background }
+    ]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderBottomWidth: 1 }]}>
         <View style={styles.logoContainer}>
@@ -261,6 +266,13 @@ export default function HomeScreen() {
         keyExtractor={(item) => item._id}
         renderItem={renderItem}
         ListHeaderComponent={<StoryList />}
+        ListFooterComponent={
+          isFetchingMore ? (
+            <View style={{ backgroundColor: isDark ? '#000' : '#fff', paddingBottom: 40 }}>
+              <SkeletonPost />
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           loading ? (
             <View style={{ flex: 1 }}>
@@ -275,7 +287,7 @@ export default function HomeScreen() {
               <Text style={{ fontSize: 48, marginBottom: 16 }}>📭</Text>
               <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text, marginBottom: 8 }}>No posts yet</Text>
               <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: 20 }}>
-                Pull down to refresh or check your connection
+                {Platform.OS === 'web' ? 'Refresh or check your connection' : 'Pull down to refresh or check your connection'}
               </Text>
               <TouchableOpacity
                 style={{
@@ -291,7 +303,6 @@ export default function HomeScreen() {
             </View>
           )
         }
-        ListFooterComponent={isFetchingMore ? <ActivityIndicator size="small" color={colors.primary} style={{ margin: 20 }} /> : <View style={{ height: 40 }} />}
         onRefresh={onRefresh}
         refreshing={refreshing}
         refreshControl={
