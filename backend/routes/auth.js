@@ -770,6 +770,51 @@ router.get('/users', async (req, res) => {
     }
 });
 
+// @desc    Global Search (Users or Hashtags)
+// @route   GET /api/auth/search
+// @access  Public
+router.get('/search', async (req, res) => {
+    const { q } = req.query;
+    if (!q) return res.json({ users: [], posts: [] });
+
+    try {
+        const isHashtag = q.startsWith('#');
+        const query = q.startsWith('#') ? q : `#${q}`;
+
+        let results = {
+            users: [],
+            posts: []
+        };
+
+        if (isHashtag) {
+            // Search for posts with this hashtag (case-insensitive)
+            const Post = require('../models/Post');
+            results.posts = await Post.find({
+                caption: { $regex: q.replace('#', ''), $options: 'i' }
+            }).populate('user', 'name handle avatar').limit(20);
+        } else {
+            // Search for users
+            results.users = await User.find({
+                $or: [
+                    { name: { $regex: q, $options: 'i' } },
+                    { handle: { $regex: q, $options: 'i' } }
+                ]
+            }).select('name handle avatar bio followers following').limit(20);
+            
+            // Also search for posts that might match the word as a hashtag
+            const Post = require('../models/Post');
+            results.posts = await Post.find({
+                caption: { $regex: `#${q}`, $options: 'i' }
+            }).populate('user', 'name handle avatar').limit(10);
+        }
+
+        res.json(results);
+    } catch (error) {
+        console.error('Search error:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
 // @desc    Get user's saved posts
 // @route   GET /api/auth/saved
 // @access  Private

@@ -55,8 +55,7 @@ const FeedVideo = ({ videoSource, posterSource, isMuted, setIsMuted, active, sty
             const timeout = setTimeout(() => {
                 if (Platform.OS === 'web') {
                     // Start playback and catch any abort errors (common when scrolling quickly)
-                    const playPromise = player.play();
-                    // @ts-ignore - expo-video types might not reflect web promise return
+                    const playPromise = player.play() as any;
                     if (playPromise && typeof playPromise.catch === 'function') {
                         playPromise.catch(() => { /* mute abort errors */ });
                     }
@@ -145,7 +144,10 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
         borderRadius: 24,
         padding: 12,
         // High-end modern shadow
-        boxShadow: `0 8 16 ${isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.08)'}`,
+        shadowColor: isDark ? '#000' : 'rgba(0,0,0,1)',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: isDark ? 0.3 : 0.08,
+        shadowRadius: 16,
         elevation: 6,
         borderWidth: StyleSheet.hairlineWidth,
         borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
@@ -364,7 +366,10 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
         paddingHorizontal: 20,
         paddingVertical: 8,
         borderRadius: 20,
-        boxShadow: `0 4 8 ${colors.primary}4D`, // 0.3 opacity in hex is ~4D
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
         elevation: 4,
     },
     saveEditText: {

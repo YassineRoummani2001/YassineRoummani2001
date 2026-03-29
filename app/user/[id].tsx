@@ -81,6 +81,7 @@ export default function UserProfileScreen() {
                     avatar: data.avatar || 'https://i.pravatar.cc/150?u=user',
                     coverImage: data.coverImage || 'https://dummyimage.com/800x400/333/fff.png&text=Vibe',
                     bio: data.bio || '',
+                    links: data.links || [], // Added links
                     posts: userPosts.length.toString(),
                     followers: data.followersCount?.toString() || '0',
                     following: data.followingCount?.toString() || '0',
@@ -283,7 +284,37 @@ export default function UserProfileScreen() {
                         <Text style={[styles.handle, { color: colors.textSecondary }]}>{user.handle}</Text>
                     </View>
 
-                    <Text style={[styles.bio, { color: colors.text }]}>{user.bio}</Text>
+                    {user.bio ? (
+                        <View style={styles.bioContainer}>
+                            {user.bio.split('\n').map((line: any, index: any) => (
+                                <Text key={index} style={[styles.bio, { color: colors.text }]}>{line}</Text>
+                            ))}
+                        </View>
+                    ) : null}
+
+                    {user.links && user.links.length > 0 && (
+                        <View style={styles.linksContainer}>
+                            {user.links.map((link: any, index: any) => {
+                                const url = typeof link === 'object' ? link.url : link;
+                                const title = typeof link === 'object' ? (link.title || link.url) : link;
+                                return (
+                                    <TouchableOpacity 
+                                        key={index} 
+                                        onPress={() => {
+                                            if (Platform.OS === 'web') {
+                                                window.open(url, '_blank');
+                                            } else {
+                                                // Handle native link opening if needed
+                                                console.log('Opening link:', url);
+                                            }
+                                        }}
+                                    >
+                                        <Text style={styles.link}>{title}</Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    )}
 
                     <View style={styles.actionsRow}>
                         <TouchableOpacity
@@ -410,14 +441,25 @@ const styles = StyleSheet.create({
     userInfo: { alignItems: 'center', marginBottom: 8 },
     name: { fontSize: 24, fontWeight: '900', color: '#000' },
     handle: { fontSize: 14, color: '#666', marginTop: 2 },
-    bio: { fontSize: 14, color: '#333', textAlign: 'center', marginBottom: 20, lineHeight: 20 },
-    actionsRow: { flexDirection: 'row', gap: 12, marginBottom: 24, width: '100%', paddingHorizontal: 20 },
-    followButton: { flex: 1, backgroundColor: Colors.light.primary, paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-    followingButton: { backgroundColor: Colors.light.white, borderWidth: 1, borderColor: '#ccc' },
-    followButtonText: { fontWeight: '700', fontSize: 16, color: Colors.light.white },
-    followingButtonText: { color: '#333' },
     messageButton: { flex: 1, backgroundColor: '#F0F0F0', paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
     messageButtonText: { fontWeight: '700', fontSize: 16, color: '#000' },
+    bioContainer: {
+        alignItems: 'center',
+        marginVertical: 12,
+        gap: 4,
+    },
+    bio: { fontSize: 14, color: '#333', textAlign: 'center', lineHeight: 20 },
+    linksContainer: {
+        marginTop: 4,
+        marginBottom: 16,
+        alignItems: 'center',
+        gap: 4,
+    },
+    link: {
+        fontSize: 14,
+        color: Colors.light.primary,
+        textDecorationLine: 'underline',
+    },
     statsRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', paddingHorizontal: 30, marginBottom: 20 },
     statItem: { alignItems: 'center' },
     statNumber: { fontSize: 18, fontWeight: 'bold' },

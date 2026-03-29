@@ -17,6 +17,7 @@ import {
     ViewToken,
     useWindowDimensions,
 } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 
 // 🎯 Memoized ReelItem to prevent unnecessary re-renders
 const MemoizedReelItem = memo(
@@ -33,6 +34,7 @@ export default function ReelsScreen() {
     const { height: screenHeight, width: screenWidth } = useWindowDimensions();
     const colors = useTheme();
     const router = useRouter();
+    const isFocused = useIsFocused();
 
     // Use ReelContext
     const { reels, loading, error, fetchReels } = useReels();
@@ -101,12 +103,12 @@ export default function ReelsScreen() {
         ({ item, index }: { item: any; index: number }) => (
             <MemoizedReelItem
                 item={item}
-                active={activeIndex === index}
+                active={isFocused && activeIndex === index}
                 width={screenWidth}
                 height={screenHeight}
             />
         ),
-        [activeIndex, screenWidth, screenHeight]
+        [activeIndex, screenWidth, screenHeight, isFocused]
     );
 
     // 📐 Get Item Layout (for performance)
@@ -223,7 +225,10 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 100,
-        boxShadow: '0 2 4 rgba(0,0,0,0.3)',
+        shadowColor: 'rgba(0,0,0,1)',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
         elevation: 5,
     },
     emptyState: {
@@ -261,6 +266,8 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: 28,
         fontWeight: '700',
-        textShadow: '0 2 4 rgba(0,0,0,0.75)',
+        textShadowColor: 'rgba(0,0,0,0.75)',
+        textShadowOffset: { width: 0, height: 2 },
+        textShadowRadius: 4,
     },
 });

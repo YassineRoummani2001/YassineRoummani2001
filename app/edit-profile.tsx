@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/constants/Config';
 import { COUNTRY_CODES } from '@/constants/CountryCodes';
 import { PROFILE } from '@/constants/MockData';
 import { useThemeContext } from '@/context/ThemeContext';
@@ -9,6 +10,22 @@ import React, { useEffect, useState } from 'react';
 import { FlatList, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ConfirmationModal from '../components/ConfirmationModal';
+
+// Helper to normalize URIs (Copied from ProfileScreen for consistency)
+const getCorrectUrl = (url: string) => {
+    if (!url || typeof url !== 'string') return '';
+    if (url.startsWith('blob:')) return '';
+    if (url.startsWith('data:')) return url;
+    if (url.startsWith('http')) return url;
+    
+    // Force use of current API_BASE_URL for any internal uploads
+    if (url.includes('/uploads/')) {
+        const uploadIndex = url.indexOf('/uploads/');
+        return `${API_BASE_URL}${url.substring(uploadIndex)}`;
+    }
+    
+    return `${API_BASE_URL}/uploads/${url}`;
+};
 
 export default function EditProfileScreen() {
     const router = useRouter();
@@ -25,7 +42,7 @@ export default function EditProfileScreen() {
     const [coverImage, setCoverImage] = useState(user?.coverImage || PROFILE.user.coverImage);
     const [pronouns, setPronouns] = useState(user?.pronouns || '');
     const [gender, setGender] = useState(user?.gender || '');
-    const [website, setWebsite] = useState(user?.links && user.links.length > 0 ? user.links[0].url : '');
+    const [website, setWebsite] = useState(user?.links && user.links.length > 0 ? (typeof user.links[0] === 'object' ? user.links[0].url : user.links[0]) : '');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [successModalVisible, setSuccessModalVisible] = useState(false);
@@ -216,7 +233,7 @@ export default function EditProfileScreen() {
                     {/* Visual & Avatar Section */}
                     <View style={styles.visualSection}>
                         <View style={styles.coverWrapper}>
-                            <Image source={{ uri: coverImage }} style={styles.coverImage} resizeMode="cover" />
+                            <Image source={{ uri: getCorrectUrl(coverImage) }} style={styles.coverImage} resizeMode="cover" />
                             <TouchableOpacity style={styles.changeCoverBtn} onPress={() => pickImage('cover')}>
                                 <Camera size={18} color="white" />
                                 <Text style={styles.changeCoverText}>Edit Cover</Text>
@@ -225,7 +242,7 @@ export default function EditProfileScreen() {
 
                         <View style={styles.avatarSection} pointerEvents="box-none">
                             <View style={[styles.avatarWrapper, { backgroundColor: colors.background }]}>
-                                <Image source={{ uri: avatar }} style={[styles.avatar]} />
+                                <Image source={{ uri: getCorrectUrl(avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=random` }} style={[styles.avatar]} />
                                 <TouchableOpacity
                                     style={[styles.cameraIcon, { backgroundColor: colors.primary, borderColor: colors.background }]}
                                     onPress={() => pickImage('avatar')}

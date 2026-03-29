@@ -99,6 +99,7 @@ export const UserProvider = ({ children }) => {
                 followers: userWithoutToken.followers || [],
                 sentRequests: userWithoutToken.sentRequests || [],
                 stories: userWithoutToken.stories || [],
+                links: userWithoutToken.links || [], // Added links
             };
             
             setUser(userData); 

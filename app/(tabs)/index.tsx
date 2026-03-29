@@ -4,6 +4,7 @@ import { useNotifications } from '@/context/NotificationContext';
 import { useThemeContext } from '@/context/ThemeContext';
 import { lazyLoad, MinimalLoader } from '@/utils/lazyLoad';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { Bell, MessageCircle, ShoppingBag, Zap } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -23,6 +24,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { unreadCount } = useNotifications();
   const { unreadCount: unreadMessagesCount } = useMessages();
+  const isFocused = useIsFocused();
 
   // State
   const [posts, setPosts] = useState<any[]>([]);
@@ -122,7 +124,7 @@ export default function HomeScreen() {
     return (
       <FeedPost
         onDelete={handlePostDelete}
-        active={viewableItems.includes(item._id)}
+        active={isFocused && viewableItems.includes(item._id)}
         post={{
           ...item,
           id: item._id, // Ensure ID consistency

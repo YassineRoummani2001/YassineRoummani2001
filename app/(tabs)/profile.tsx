@@ -85,6 +85,10 @@ export default function ProfileScreen() {
             if (response.ok) {
                 const data = await response.json();
                 setProfileUser(data);
+            } else {
+                console.error('Profile user not found');
+                // Don't logout here, just show an error or redirect back
+                router.back();
             }
         } catch (error) {
             console.error('Error fetching profile user:', error);
@@ -116,9 +120,11 @@ export default function ProfileScreen() {
                 setFollowersCount(data.followersCount || 0);
                 setFollowingCount(data.followingCount || 0);
             } else if (response.status === 404) {
-                console.log('User not found, logging out...');
-                logout();
-                router.replace('/auth/login');
+                console.log('User not found');
+                if (isOwnProfile) {
+                    logout();
+                    router.replace('/auth/login');
+                }
             }
         } catch (error) {
             console.error('Error fetching user stats:', error);
@@ -153,10 +159,11 @@ export default function ProfileScreen() {
     };
 
     // Handle loading state
-    if (loading) {
+    if (loading || loadingProfile) {
         return (
             <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
                 <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={{ marginTop: 12, color: colors.textSecondary }}>Loading Profile...</Text>
             </SafeAreaView>
         );
     }
@@ -358,11 +365,25 @@ export default function ProfileScreen() {
 
                     {user.links && user.links.length > 0 && (
                         <View style={styles.linksContainer}>
-                            {user.links.map((link: any, index: any) => (
-                                <TouchableOpacity key={index} onPress={() => {/* Open link */ }}>
-                                    <Text style={styles.link}>{link}</Text>
-                                </TouchableOpacity>
-                            ))}
+                            {user.links.map((link: any, index: any) => {
+                                const url = typeof link === 'object' ? link.url : link;
+                                const title = typeof link === 'object' ? (link.title || link.url) : link;
+                                return (
+                                    <TouchableOpacity 
+                                        key={index} 
+                                        onPress={() => {
+                                            if (Platform.OS === 'web') {
+                                                window.open(url, '_blank');
+                                            } else {
+                                                // Handle native link opening if needed
+                                                console.log('Opening link:', url);
+                                            }
+                                        }}
+                                    >
+                                        <Text style={styles.link}>{title}</Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
                         </View>
                     )}
 
