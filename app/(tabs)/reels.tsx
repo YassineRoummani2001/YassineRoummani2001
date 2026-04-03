@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { Camera, ChevronLeft, Search } from 'lucide-react-native';
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import * as Haptics from 'expo-haptics';
+import Toast from 'react-native-toast-message';
 import {
     FlatList,
     Platform,
@@ -28,7 +30,8 @@ const MemoizedReelItem = memo(
     (prevProps, nextProps) => {
         return (
             prevProps.active === nextProps.active &&
-            prevProps.item._id === nextProps.item._id
+            prevProps.item._id === nextProps.item._id &&
+            prevProps.isMuted === nextProps.isMuted
         );
     }
 );
@@ -42,7 +45,7 @@ export default function ReelsScreen() {
     const insets = useSafeAreaInsets();
 
     // Use ReelContext
-    const { reels, loading, error, fetchReels } = useReels();
+    const { reels, loading, error, fetchReels, isMuted, setIsMuted } = useReels();
 
     // State
     const [activeIndex, setActiveIndex] = useState(0);
@@ -103,17 +106,21 @@ export default function ReelsScreen() {
         return item._id?.toString() || `reel-${index}`;
     }, []);
 
+    const isDesktop = Platform.OS === 'web' && screenWidth > 768;
+    const ITEM_WIDTH = isDesktop ? 450 : screenWidth;
+
     // 🎨 Render Item
     const renderItem = useCallback(
         ({ item, index }: { item: any; index: number }) => (
             <MemoizedReelItem
                 item={item}
                 active={isFocused && activeIndex === index}
-                width={screenWidth}
+                isMuted={isMuted}
+                width={ITEM_WIDTH}
                 height={reelHeight}
             />
         ),
-        [activeIndex, screenWidth, reelHeight, isFocused]
+        [activeIndex, ITEM_WIDTH, reelHeight, isFocused, isMuted]
     );
 
     // 📐 Get Item Layout (for performance)
@@ -126,11 +133,9 @@ export default function ReelsScreen() {
         [reelHeight]
     );
 
-    const isDesktop = Platform.OS === 'web' && screenWidth > 768;
-
     // 🎨 Render
     return (
-        <View style={[styles.container, isDesktop && { width: 450, alignSelf: 'center', backgroundColor: '#000' }]}>
+        <View style={[styles.container, isDesktop && { width: 450, alignSelf: 'center', backgroundColor: '#000', borderRadius: 24, overflow: 'hidden', marginVertical: 20 }]}>
             <StatusBar
                 barStyle="light-content"
                 translucent
@@ -146,6 +151,26 @@ export default function ReelsScreen() {
                 >
                     <BlurView intensity={20} tint="light" style={styles.headerButtonBlur}>
                         <ChevronLeft size={24} color="#fff" strokeWidth={2.5} />
+                    </BlurView>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={styles.headerButton}
+                    onPress={() => {
+                        const newState = !isMuted;
+                        setIsMuted(newState);
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        Toast.show({
+                            type: 'info',
+                            text1: newState ? 'Audio Muted' : 'Audio Unmuted',
+                            position: 'top',
+                            visibilityTime: 1000
+                        });
+                    }}
+                    activeOpacity={0.8}
+                >
+                    <BlurView intensity={20} tint="light" style={styles.headerButtonBlur}>
+                        <Ionicons name={isMuted ? "volume-mute" : "volume-high"} size={20} color="#fff" />
                     </BlurView>
                 </TouchableOpacity>
                 
@@ -183,10 +208,13 @@ export default function ReelsScreen() {
                     keyExtractor={keyExtractor}
                     renderItem={renderItem}
                     // 📱 Paging Configuration
+                    pagingEnabled={true}
                     snapToInterval={reelHeight}
                     snapToAlignment="start"
                     decelerationRate="fast"
                     disableIntervalMomentum
+                    // Web scrolling fix (CSS injection via style for snap)
+                    style={[styles.list, isDesktop && { scrollSnapType: 'y mandatory' } as any]}
                     // 🚀 Performance Optimizations
                     getItemLayout={getItemLayout}
                     initialNumToRender={1}
@@ -201,7 +229,6 @@ export default function ReelsScreen() {
                     onEndReachedThreshold={0.5}
                     // 🎨 Styling
                     showsVerticalScrollIndicator={false}
-                    style={styles.list}
                     contentContainerStyle={styles.listContent}
                     // 🔄 Pull to Refresh
                     refreshControl={

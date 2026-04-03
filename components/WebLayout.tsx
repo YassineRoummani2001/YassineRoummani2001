@@ -17,23 +17,34 @@ export function WebLayout({ children }: { children: React.ReactNode }) {
     if (isAuthPage) return <>{children}</>;
 
     const isProfile = pathname.includes('/profile') || pathname.includes('/user/');
-    const isMarketplace = pathname.includes('/marketplace');
-    const isHome = pathname === '/' || pathname === '/(tabs)';
+    const isMarketplace = pathname.includes('/marketplace') || pathname.includes('/(tabs)/marketplace');
+    const isChat = pathname.includes('/chat') || pathname.includes('/message/');
+    const isSearch = pathname.includes('/search');
+    const isNotifications = pathname.includes('/notifications');
+    const isReels = pathname.includes('/reels');
+    const isCreate = pathname.includes('/create');
+    const isHome = (pathname === '/' || pathname === '/(tabs)' || pathname === '/index') && !isCreate;
 
-    const showRightSidebar = isLargeScreen && width > 1100 && !isProfile && !isMarketplace;
-    const sidebarWidth = 260;
+    const showRightSidebar = isLargeScreen && width > 1200 && !isChat;
+    const sidebarWidth = 280;
+    const rightSidebarWidth = 350;
 
-    // Calculate the available width after sidebar
-    const availableWidth = isLargeScreen ? width - sidebarWidth : width;
-    
-    // Main content width: feed is 630px max, right sidebar is 320px + 40px gap
-    const feedMaxWidth = 630;
-    const rightSidebarWidth = showRightSidebar ? 340 : 0;
-    const totalContentWidth = feedMaxWidth + rightSidebarWidth;
+    // Calculate dynamic widths for web
+    let feedMaxWidth = 650; // Increased base
+    if (isReels) feedMaxWidth = 450; 
+    else if (isChat) feedMaxWidth = 1000;
+    else if (isMarketplace) feedMaxWidth = 850;
+    else if (isProfile) feedMaxWidth = 800; // So Profile fits with the Right Sidebar
+
+    const totalContentWidth = feedMaxWidth + (showRightSidebar ? rightSidebarWidth + 40 : 0);
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-            {isLargeScreen && <WebSidebar />}
+            {isLargeScreen && (
+                <View style={[styles.sidebarArea, { width: sidebarWidth }]}>
+                    <WebSidebar />
+                </View>
+            )}
 
             <View style={[
                 styles.content,
@@ -45,7 +56,7 @@ export function WebLayout({ children }: { children: React.ReactNode }) {
                     styles.centerWrapper,
                     {
                         maxWidth: totalContentWidth,
-                        paddingHorizontal: 20,
+                        paddingHorizontal: isLargeScreen ? 40 : 0,
                     },
                 ]}>
                     <View style={[styles.main, { maxWidth: feedMaxWidth }]}>
@@ -53,7 +64,7 @@ export function WebLayout({ children }: { children: React.ReactNode }) {
                     </View>
 
                     {showRightSidebar && (
-                        <View style={styles.rightSidebar}>
+                        <View style={[styles.rightSidebar, { width: rightSidebarWidth }]}>
                             <DesktopRightSidebar />
                         </View>
                     )}
@@ -66,25 +77,42 @@ export function WebLayout({ children }: { children: React.ReactNode }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        minHeight: '100vh' as any,
+        height: Platform.OS === 'web' ? '100vh' as any : '100%',
+        overflow: Platform.OS === 'web' ? 'hidden' : 'visible',
+        flexDirection: 'row',
+    },
+    sidebarArea: {
+        position: 'fixed' as any,
+        left: 0,
+        top: 0,
+        bottom: 0,
+        zIndex: 100,
+        borderRightWidth: 1,
+        borderRightColor: '#eee',
     },
     content: {
         flex: 1,
         alignItems: 'center',
+        paddingTop: 0,
+        height: Platform.OS === 'web' ? '100vh' as any : '100%',
     },
     centerWrapper: {
         flexDirection: 'row',
         width: '100%',
         justifyContent: 'center',
+        height: Platform.OS === 'web' ? '100vh' as any : '100%',
     },
     main: {
         flex: 1,
         width: '100%',
+        backgroundColor: 'transparent',
+        height: Platform.OS === 'web' ? '100vh' as any : '100%',
     },
     rightSidebar: {
-        width: 320,
-        marginLeft: 24,
-        marginTop: 16,
+        marginLeft: 40,
+        paddingTop: 20,
         flexShrink: 0,
+        height: Platform.OS === 'web' ? '100vh' as any : '100%',
+        overflow: Platform.OS === 'web' ? 'auto' : 'visible',
     },
 });

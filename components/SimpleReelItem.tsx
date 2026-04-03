@@ -9,9 +9,27 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const getValidUri = (uri: string) => {
+const getValidUri = (uri?: string) => {
     if (!uri) return '';
-    if (uri.startsWith('http') || uri.startsWith('data:')) return uri;
+    if (uri.startsWith('data:') || uri.startsWith('file:')) return uri;
+    
+    // Auto-fix our backend URLs if they have the wrong IP/localhost
+    if (uri.startsWith('http') && uri.includes('/uploads/')) {
+        const parts = uri.split('/uploads/');
+        return `${API_BASE_URL}/uploads/${parts[1]}`;
+    }
+    
+    // External URLs
+    if (uri.startsWith('http')) return uri;
+
+    // Handle relative uploads
+    if (uri.startsWith('/uploads/')) return `${API_BASE_URL}${uri}`;
+    if (uri.includes('/uploads/')) {
+        const parts = uri.split('/uploads/');
+        return `${API_BASE_URL}/uploads/${parts[1]}`;
+    }
+
+    // Default fallback
     return `${API_BASE_URL}${uri.startsWith('/') ? '' : '/'}${uri}`;
 };
 

@@ -5,12 +5,10 @@ import { useThemeContext } from '@/context/ThemeContext';
 import { useUser } from '@/context/UserContext';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Dimensions, Image, Platform, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-// Grid width is now calculated dynamically in the component
-
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 // Helper to normalize URIs
@@ -70,8 +68,8 @@ export default function ProfileScreen() {
     const { colors, isDark } = useThemeContext();
     const { width } = useWindowDimensions();
     const isDesktop = Platform.OS === 'web' && width > 768;
-    const COLUMN_WIDTH = isDesktop ? 300 : width / 3; // Fixed width items on desktop or fluid on mobile
-    const styles = useMemo(() => createStyles(colors, isDark, insets, width, COLUMN_WIDTH), [colors, isDark, insets, width, COLUMN_WIDTH]);
+    const COLUMN_WIDTH = isDesktop ? Math.floor((900 - 64 - 16) / 3) : width / 3;
+    const styles = useMemo(() => createStyles(colors, isDark, insets, width, COLUMN_WIDTH, isDesktop), [colors, isDark, insets, width, COLUMN_WIDTH, isDesktop]);
 
     // Fetch profile user if userId is provided
     useEffect(() => {
@@ -278,455 +276,381 @@ export default function ProfileScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <View style={{ width: 40 }} />
-                <View style={{ flexDirection: 'row', gap: 12 }}>
-
-                    <TouchableOpacity
-                        style={styles.headerIcon}
-                        onPress={() => router.push('/notifications')}
-                    >
-                        <Ionicons name="notifications-outline" size={24} color="white" />
-                        {unreadCount > 0 && (
-                            <View style={styles.notificationBadge}>
-                                <Text style={styles.badgeText}>{unreadCount}</Text>
-                            </View>
-                        )}
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.headerIcon} onPress={() => router.push('/settings')}>
-                        <Ionicons name="menu-outline" size={24} color="white" />
-                    </TouchableOpacity>
+            {/* Floating header icons - only on mobile */}
+            {!isDesktop && (
+                <View style={styles.header}>
+                    <View style={{ width: 40 }} />
+                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                        <TouchableOpacity style={styles.headerIcon} onPress={() => router.push('/notifications')}>
+                            <Ionicons name="notifications-outline" size={24} color="white" />
+                            {unreadCount > 0 && (
+                                <View style={styles.notificationBadge}>
+                                    <Text style={styles.badgeText}>{unreadCount}</Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.headerIcon} onPress={() => router.push('/settings')}>
+                            <Ionicons name="menu-outline" size={24} color="white" />
+                        </TouchableOpacity>
+                    </View>
                 </View>
-            </View>
+            )}
 
             <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={isDesktop}
+                contentContainerStyle={[styles.scrollContent, isDesktop && { paddingBottom: 60 }]}
                 refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={onRefresh}
-                        tintColor={colors.primary}
-                        colors={[colors.primary]}
-                    />
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />
                 }
             >
-                {/* Cover Image */}
-                <Image source={{ uri: getCorrectUrl(user.coverImage) || 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80' }} style={styles.coverImage} resizeMode="cover" />
+                {/* ── COVER ── */}
+                <View style={{ width: '100%', height: isDesktop ? 320 : 180 }}>
+                    <Image
+                        source={{ uri: getCorrectUrl(user.coverImage) || 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=1400&q=80' }}
+                        style={[StyleSheet.absoluteFill, { backgroundColor: colors.gray }]}
+                        resizeMode="cover"
+                    />
+                    <LinearGradient colors={['transparent', 'transparent', 'rgba(0,0,0,0.7)']} style={StyleSheet.absoluteFill} />
+                </View>
 
-                <View style={styles.profileHeader}>
-                    <View style={styles.avatarBorder}>
-                        <Image source={{ uri: getCorrectUrl(user.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random` }} style={styles.avatar} />
-                    </View>
+                {/* ── PROFILE INFO CARD ── */}
+                <View style={isDesktop ? styles.desktopWrapper : undefined}>
 
-                    <View style={styles.userInfo}>
+                    {isDesktop ? (
+                        /* ── DESKTOP HEADER ROW: avatar left, buttons right ── */
+                        <View style={styles.desktopHeaderRow}>
+                            <LinearGradient colors={[colors.primary, '#8b5cf6', '#ec4899']} style={[styles.avatarGradientBorder, styles.avatarGradientBorderDesktop]}>
+                                <View style={[styles.avatarBorder, styles.avatarBorderDesktop]}>
+                                    <Image
+                                        source={{ uri: getCorrectUrl(user.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random` }}
+                                        style={[styles.avatar, styles.avatarDesktop]}
+                                    />
+                                </View>
+                            </LinearGradient>
+                            <View style={styles.desktopActionGroup}>
+                                <TouchableOpacity style={styles.btnEdit} onPress={() => router.push('/edit-profile')}>
+                                    <Ionicons name="pencil" size={14} color={colors.text} />
+                                    <Text style={[styles.btnEditText, { color: colors.text }]}>Edit Profile</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.btnIcon} onPress={() => router.push('/qr-code')}>
+                                    <Ionicons name="share-social-outline" size={18} color={colors.text} />
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.btnIcon} onPress={() => router.push('/settings')}>
+                                    <Ionicons name="settings-outline" size={18} color={colors.text} />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    ) : (
+                        /* ── MOBILE HEADER: avatar left, stats right (Instagram style) ── */
+                        <View style={styles.mobileHeaderSection}>
+                            {/* Avatar - fixed size, not stretching */}
+                            <LinearGradient colors={[colors.primary, '#8b5cf6', '#ec4899']} style={styles.avatarGradientBorder}>
+                                <View style={styles.avatarBorder}>
+                                    <Image
+                                        source={{ uri: getCorrectUrl(user.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random` }}
+                                        style={styles.avatar}
+                                    />
+                                </View>
+                            </LinearGradient>
+
+                            {/* Stats to the right of avatar */}
+                            <View style={styles.mobileStatsGroup}>
+                                <View style={styles.mobileStatItem}>
+                                    <Text style={styles.statNumber}>{userPosts.length}</Text>
+                                    <Text style={styles.statLabel}>Posts</Text>
+                                </View>
+                                <TouchableOpacity style={styles.mobileStatItem} onPress={() => router.push({ pathname: '/users-list', params: { type: 'followers', title: 'Followers', userId: user._id } })}>
+                                    <Text style={styles.statNumber}>{followersCount}</Text>
+                                    <Text style={styles.statLabel}>Followers</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.mobileStatItem} onPress={() => router.push({ pathname: '/users-list', params: { type: 'following', title: 'Following', userId: user._id } })}>
+                                    <Text style={styles.statNumber}>{followingCount}</Text>
+                                    <Text style={styles.statLabel}>Following</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    )}
+
+                    {/* ── META: name / handle / bio / links / actions ── */}
+                    <View style={isDesktop ? styles.desktopMeta : styles.mobileMeta}>
                         <Text style={styles.name}>{user.name}</Text>
-                        <View style={styles.handleRow}>
-                            <Text style={styles.handle}>{user.handle}</Text>
-                            {user.pronouns ? (
-                                <>
-                                    <Text style={[styles.handle, { marginHorizontal: 4 }]}>•</Text>
-                                    <Text style={styles.pronouns}>{user.pronouns.replace(/\//g, ' / ')}</Text>
-                                </>
-                            ) : null}
-                        </View>
+                        <Text style={styles.handle}>@{user.handle}{user.pronouns ? `  ·  ${user.pronouns.replace(/\//g, ' / ')}` : ''}</Text>
+
+                        {user.bio ? (
+                            user.bio.split('\n').map((line: any, i: any) => <Text key={i} style={styles.bio}>{line}</Text>)
+                        ) : null}
+
+                        {user.links && user.links.length > 0 && (
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                                {user.links.map((link: any, i: any) => {
+                                    const url = typeof link === 'object' ? link.url : link;
+                                    const title = typeof link === 'object' ? (link.title || link.url) : link;
+                                    return (
+                                        <TouchableOpacity key={i} onPress={() => Platform.OS === 'web' ? window.open(url, '_blank') : null} style={styles.linkChip}>
+                                            <Ionicons name="link-outline" size={13} color={colors.primary} />
+                                            <Text style={styles.link}>{title}</Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                        )}
+
+                        {/* Desktop stats row (mobile uses mobileStatsGroup above) */}
+                        {isDesktop && (
+                            <View style={styles.statsRow}>
+                                <View style={styles.statItem}>
+                                    <Text style={styles.statNumber}>{userPosts.length}</Text>
+                                    <Text style={styles.statLabel}>Posts</Text>
+                                </View>
+                                <View style={styles.vertDivider} />
+                                <TouchableOpacity style={styles.statItem} onPress={() => router.push({ pathname: '/users-list', params: { type: 'followers', title: 'Followers', userId: user._id } })}>
+                                    <Text style={styles.statNumber}>{followersCount}</Text>
+                                    <Text style={styles.statLabel}>Followers</Text>
+                                </TouchableOpacity>
+                                <View style={styles.vertDivider} />
+                                <TouchableOpacity style={styles.statItem} onPress={() => router.push({ pathname: '/users-list', params: { type: 'following', title: 'Following', userId: user._id } })}>
+                                    <Text style={styles.statNumber}>{followingCount}</Text>
+                                    <Text style={styles.statLabel}>Following</Text>
+                                </TouchableOpacity>
+                                <View style={styles.vertDivider} />
+                                <View style={styles.statItem}>
+                                    <Text style={styles.statNumber}>{likesCount}</Text>
+                                    <Text style={styles.statLabel}>Likes</Text>
+                                </View>
+                            </View>
+                        )}
+
+                        {/* Action buttons */}
+                        {!isDesktop && (
+                            <View style={styles.mobileActionsRow}>
+                                <TouchableOpacity style={styles.btnEditMobile} onPress={() => router.push('/edit-profile')}>
+                                    <Text style={[styles.btnEditText, { color: colors.text }]}>Edit Profile</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.btnShareMobile} onPress={() => router.push('/qr-code')}>
+                                    <Ionicons name="share-social-outline" size={18} color={colors.text} />
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.btnShareMobile} onPress={() => router.push('/discover-people')}>
+                                    <Ionicons name="person-add-outline" size={18} color={colors.text} />
+                                </TouchableOpacity>
+                            </View>
+                        )}
                     </View>
 
-                    {/* Stats Row */}
-                    <View style={styles.statsRow}>
-                        <View style={styles.statItem}>
-                            <Text style={styles.statNumber}>{userPosts.length}</Text>
-                            <Text style={styles.statLabel}>Post</Text>
-                        </View>
-                        <View style={styles.vertDivider} />
-                        <TouchableOpacity style={styles.statItem} onPress={() => router.push({ pathname: '/users-list', params: { type: 'followers', title: 'Followers', userId: user._id } })}>
-                            <Text style={styles.statNumber}>{followersCount}</Text>
-                            <Text style={styles.statLabel}>Followers</Text>
-                        </TouchableOpacity>
-                        <View style={styles.vertDivider} />
-                        <TouchableOpacity style={styles.statItem} onPress={() => router.push({ pathname: '/users-list', params: { type: 'following', title: 'Following', userId: user._id } })}>
-                            <Text style={styles.statNumber}>{followingCount}</Text>
-                            <Text style={styles.statLabel}>Following</Text>
-                        </TouchableOpacity>
-                        <View style={styles.vertDivider} />
-                        <View style={styles.statItem}>
-                            <Text style={styles.statNumber}>{likesCount}</Text>
-                            <Text style={styles.statLabel}>Likes</Text>
-                        </View>
-                    </View>
-
-                    {user.bio && (
-                        <View style={styles.bioContainer}>
-                            {user.bio.split('\n').map((line: any, index: any) => (
-                                <Text key={index} style={styles.bio}>{line}</Text>
+                    {/* Tabs */}
+                    <View style={styles.tabSection}>
+                        <View style={styles.tabHeader}>
+                            {[{ label: 'Posts', icon: 'grid-outline', activeIcon: 'grid' }, { label: 'Reels', icon: 'film-outline', activeIcon: 'film' }, { label: 'Videos', icon: 'play-outline', activeIcon: 'play' }].map((tab, i) => (
+                                <TouchableOpacity key={i} style={styles.tabBtn} onPress={() => setActiveTab(i)}>
+                                    <Ionicons name={(activeTab === i ? tab.activeIcon : tab.icon) as any} size={20} color={activeTab === i ? colors.text : colors.textSecondary} />
+                                    {isDesktop && <Text style={[styles.tabLabel, { color: activeTab === i ? colors.text : colors.textSecondary }]}>{tab.label}</Text>}
+                                    {activeTab === i && <View style={styles.tabIndicator} />}
+                                </TouchableOpacity>
                             ))}
                         </View>
-                    )}
-
-                    {user.links && user.links.length > 0 && (
-                        <View style={styles.linksContainer}>
-                            {user.links.map((link: any, index: any) => {
-                                const url = typeof link === 'object' ? link.url : link;
-                                const title = typeof link === 'object' ? (link.title || link.url) : link;
-                                return (
-                                    <TouchableOpacity 
-                                        key={index} 
-                                        onPress={() => {
-                                            if (Platform.OS === 'web') {
-                                                window.open(url, '_blank');
-                                            } else {
-                                                // Handle native link opening if needed
-                                                // console.log('Opening link:', url);
-                                            }
-                                        }}
-                                    >
-                                        <Text style={styles.link}>{title}</Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-                    )}
-
-                    {/* Modern Action Buttons */}
-                    <View style={styles.actionsRow}>
-                        <TouchableOpacity style={[styles.actionButtonPrimary, { backgroundColor: isDark ? '#2C2C2E' : colors.gray }]} onPress={() => router.push('/edit-profile')}>
-                            <Text style={[styles.actionButtonText, { color: colors.text }]}>Edit Profile</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={[styles.actionButtonPrimary, { backgroundColor: isDark ? '#2C2C2E' : colors.gray }]} onPress={() => router.push('/qr-code')}>
-                            <Text style={[styles.actionButtonText, { color: colors.text }]}>Share Profile</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={[styles.actionIconButton, { width: 48, backgroundColor: isDark ? '#2C2C2E' : colors.gray }]} onPress={() => router.push('/discover-people')}>
-                            <Ionicons name="person-add-outline" size={20} color={colors.text} />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                <View style={styles.tabSection}>
-                    <View style={styles.tabHeader}>
-                        <TouchableOpacity style={styles.tabIcon} onPress={() => setActiveTab(0)}>
-                            <Ionicons name={activeTab === 0 ? "grid" : "grid-outline"} color={activeTab === 0 ? colors.text : colors.textSecondary} size={24} />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.tabIcon} onPress={() => setActiveTab(1)}>
-                            <Ionicons name={activeTab === 1 ? "film" : "film-outline"} color={activeTab === 1 ? colors.text : colors.textSecondary} size={24} />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.tabIcon} onPress={() => setActiveTab(2)}>
-                            <Ionicons name={activeTab === 2 ? "play" : "play-outline"} color={activeTab === 2 ? colors.text : colors.textSecondary} size={24} />
-                        </TouchableOpacity>
-
-                        {/* Animated indicator position based on activeTab */}
-                        <View style={[styles.tabIndicator, { left: (width / 3) * activeTab }]} />
+                        {renderContent()}
                     </View>
 
-                    {renderContent()}
                 </View>
             </ScrollView>
-        </SafeAreaView >
+        </SafeAreaView>
     );
 }
 
-const createStyles = (colors: any, isDark: boolean, insets: any, screenWidth: number, COLUMN_WIDTH: number) => StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: colors.background,
-    },
+const createStyles = (colors: any, isDark: boolean, insets: any, width: number, COLUMN_WIDTH: number, isDesktop: boolean) => StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+
+    // ── HEADER (mobile only) ──────────────────────────────
     header: {
-        position: 'absolute',
-        top: insets.top,
-        left: 0,
-        right: 0,
-        height: 56,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        zIndex: 10,
-        backgroundColor: 'transparent',
+        position: 'absolute', top: insets.top, left: 0, right: 0,
+        height: 56, flexDirection: 'row', alignItems: 'center',
+        justifyContent: 'space-between', paddingHorizontal: 16,
+        zIndex: 10, backgroundColor: 'transparent',
     },
-    headerIcon: {
-        padding: 8,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        borderRadius: 20,
-    },
+    headerIcon: { padding: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20 },
     notificationBadge: {
-        position: 'absolute',
-        top: 4,
-        right: 4,
-        backgroundColor: colors.primary,
-        borderRadius: 10,
-        minWidth: 18,
-        height: 18,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 4,
+        position: 'absolute', top: 4, right: 4, backgroundColor: colors.primary,
+        borderRadius: 10, minWidth: 18, height: 18,
+        alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4,
     },
-    badgeText: {
-        color: 'white',
-        fontSize: 10,
-        fontWeight: '700',
-    },
-    scrollContent: {
-        paddingBottom: 100,
-    },
-    coverImage: {
+    badgeText: { color: 'white', fontSize: 10, fontWeight: '700' },
+    scrollContent: { paddingBottom: 100 },
+
+    // ── WEB WRAPPER ────────────────────────────────────────
+    desktopWrapper: {
+        maxWidth: 900,
+        alignSelf: 'center',
         width: '100%',
-        height: 180,
+        paddingHorizontal: 0,
     },
-    profileHeader: {
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        marginTop: -50, // Overlap cover
-    },
-    avatarBorder: {
-        padding: 4,
-        borderRadius: 60,
-        backgroundColor: colors.background,
-        marginBottom: 12,
-    },
-    avatar: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-    },
-    userInfo: {
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    name: {
-        fontSize: 24, // Larger name
-        fontWeight: '900', // Matches Header
-        marginBottom: 2,
-        letterSpacing: -0.5,
-        color: colors.text,
-    },
-    handleRow: {
+
+    // ── AVATAR OVERLAP ROW (web) ───────────────────────────
+    desktopHeaderRow: {
         flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        backgroundColor: isDark ? '#2C2C2E' : colors.gray,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 12,
-        marginTop: 4,
-    },
-    handle: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: colors.textSecondary,
-    },
-    bioContainer: {
-        alignItems: 'flex-start',
-        marginVertical: 12,
-        gap: 6,
-    },
-    bio: {
-        fontSize: 15,
-        color: colors.text,
-        lineHeight: 22,
-    },
-    actionsRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        width: '100%',
-        marginTop: 12,
-        justifyContent: 'center',
-    },
-    actionIconButton: {
-        padding: 12,
-        borderRadius: 12,
-        backgroundColor: isDark ? '#2C2C2E' : colors.gray,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: colors.border,
-    },
-    actionButtonPrimary: {
-        flex: 1,
-        paddingVertical: 12,
-        borderRadius: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: isDark ? '#2C2C2E' : colors.gray,
-    },
-    actionButtonText: {
-        fontWeight: '600',
-        fontSize: 14,
-    },
-    vertDivider: {
-        width: 1,
-        height: 24,
-        backgroundColor: colors.border,
-    },
-    followButton: {
-        backgroundColor: colors.primary,
-        paddingVertical: 12,
-        paddingHorizontal: 32,
-        borderRadius: 16,
-        flex: 1,
-        maxWidth: 200,
-        alignItems: 'center',
-        ...Platform.select({
-            ios: {
-                shadowColor: colors.primary,
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.5,
-                shadowRadius: 8,
-            },
-            android: {
-                elevation: 4,
-                shadowColor: colors.primary,
-            },
-            web: {
-                boxShadow: `0px 4px 8px ${colors.primary}80`,
-            }
-        })
-    },
-    followButtonText: {
-        fontWeight: '800',
-        fontSize: 16,
-        color: colors.white,
-    },
-    iconButton: {
-        padding: 10,
-        borderRadius: 30,
-        backgroundColor: colors.gray,
-    },
-    statsRow: {
-        flexDirection: 'row',
+        alignItems: 'flex-end',
         justifyContent: 'space-between',
-        width: '100%',
-        paddingHorizontal: 16, // More breathing room
-        marginTop: 24,
-        marginBottom: 24,
+        paddingHorizontal: 32,
+        marginTop: -56,
+        marginBottom: 12,
+        zIndex: 10,
     },
-    statItem: {
+    // Mobile: avatar on left, stats on right (Instagram style)
+    mobileHeaderSection: {
+        flexDirection: 'row',
         alignItems: 'center',
+        paddingHorizontal: 16,
+        marginTop: -36,
+        marginBottom: 12,
+        gap: 20,
     },
-    statNumber: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginBottom: 4,
-        color: colors.text,
-    },
-    statLabel: {
-        fontSize: 12,
-        color: colors.textSecondary,
-    },
-    tabSection: {
+    // Stats group shown to the right of avatar on mobile
+    mobileStatsGroup: {
         flex: 1,
-    },
-    tabHeader: {
         flexDirection: 'row',
         justifyContent: 'space-around',
-        paddingBottom: 12,
+        alignItems: 'center',
+        paddingTop: 36, // offset to align with bottom of avatar
+    },
+    mobileStatItem: {
+        alignItems: 'center',
+        gap: 2,
+    },
+
+    // ── AVATAR ─────────────────────────────────────────────
+    // alignSelf: 'flex-start' prevents gradient from stretching full width
+    avatarGradientBorder: { padding: 3, borderRadius: 68, alignSelf: 'flex-start' },
+    avatarGradientBorderDesktop: { borderRadius: 96, alignSelf: 'auto' },
+    avatarBorder: {
+        padding: 4, borderRadius: 65, backgroundColor: colors.background,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25, shadowRadius: 12,
+    },
+    avatarBorderDesktop: { borderRadius: 93 },
+    avatar: { width: 110, height: 110, borderRadius: 55, backgroundColor: colors.gray },
+    avatarDesktop: { width: 170, height: 170, borderRadius: 85 },
+
+    // ── DESKTOP ACTION BUTTONS ─────────────────────────────
+    desktopActionGroup: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 8 },
+    btnEdit: {
+        flexDirection: 'row', alignItems: 'center', gap: 6,
+        paddingHorizontal: 18, paddingVertical: 9,
+        borderRadius: 24, borderWidth: 1.5,
+        borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)',
+        backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+    },
+    btnEditText: { fontSize: 14, fontWeight: '700' },
+    btnIcon: {
+        width: 40, height: 40, borderRadius: 20,
+        alignItems: 'center', justifyContent: 'center',
+        borderWidth: 1.5,
+        borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)',
+        backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+    },
+
+    // ── MOBILE ACTION BUTTONS ──────────────────────────────
+    mobileActionsRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
+    btnEditMobile: {
+        flex: 1, paddingVertical: 10, borderRadius: 24, alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)',
+        backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+    },
+    btnShareMobile: {
+        width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center',
+        borderWidth: 1.5,
+        borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)',
+        backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+    },
+
+    // ── META SECTION ───────────────────────────────────────
+    desktopMeta: { paddingHorizontal: 32, paddingBottom: 8 },
+    mobileMeta: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
+    name: {
+        fontSize: isDesktop ? 28 : 22, fontWeight: '900',
+        color: colors.text, letterSpacing: -0.5, marginBottom: 2,
+    },
+    handle: { fontSize: 14, fontWeight: '500', color: colors.textSecondary, marginBottom: 10 },
+    bio: { fontSize: 15, color: colors.text, lineHeight: 22, marginBottom: 2 },
+    linkChip: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    link: { fontSize: 14, color: colors.primary, textDecorationLine: 'underline' },
+    pronouns: { fontSize: 14, color: colors.textSecondary },
+
+    // ── STATS ──────────────────────────────────────────────
+    statsRow: {
+        flexDirection: 'row', alignItems: 'center',
+        gap: 0, marginTop: 20, marginBottom: 8,
+    },
+    statItem: { flex: 1, alignItems: 'center' },
+    statNumber: {
+        fontSize: 20, fontWeight: '900', color: colors.text,
+        letterSpacing: -0.5, marginBottom: 2,
+    },
+    statLabel: {
+        fontSize: 11, fontWeight: '600', color: colors.textSecondary,
+        textTransform: 'uppercase', letterSpacing: 0.5, opacity: 0.7,
+    },
+    vertDivider: { width: 1, height: 30, backgroundColor: colors.border },
+
+    // ── LEGACY MOBILE STYLES (kept for fallback) ───────────
+    profileHeader: { paddingHorizontal: 20, paddingBottom: 20, backgroundColor: 'transparent' },
+    profileHeaderDesktop: {
+        flexDirection: 'row', paddingHorizontal: 40,
+        marginTop: -60, alignItems: 'flex-end',
+        gap: 30, backgroundColor: 'transparent', zIndex: 10,
+    },
+    avatarWrap: { marginTop: isDesktop ? -90 : -60, marginBottom: 10 },
+    profileInfo: { marginTop: 4 },
+    profileInfoDesktop: { flex: 1, marginTop: 65, paddingBottom: 10 },
+    nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+    nameRowDesktop: { justifyContent: 'flex-start', gap: 20, marginBottom: 20 },
+    desktopStatItem: { flexDirection: 'row', alignItems: 'center' },
+    desktopActions: { flexDirection: 'row', alignItems: 'center', gap: 12, marginLeft: 'auto' },
+    desktopStatsRow: { flexDirection: 'row', alignItems: 'center', gap: 24, marginBottom: 16 },
+    handleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingHorizontal: isDesktop ? 0 : 8, backgroundColor: 'transparent', paddingVertical: 0, borderRadius: 20 },
+    bioContainer: { alignItems: 'center', marginVertical: 12, gap: 6 },
+    bioContainerDesktop: { alignItems: 'flex-start', marginTop: 0 },
+    actionsRow: { flexDirection: 'row', alignItems: 'center', gap: 12, width: '100%', marginTop: 20, justifyContent: 'center' },
+    actionIconButton: { padding: 12, borderRadius: 20, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' },
+    actionButtonPrimary: { flex: 1, paddingVertical: 14, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, borderWidth: 0, maxWidth: isDesktop ? 400 : '100%' },
+    actionButtonText: { fontWeight: '800', fontSize: 14, color: 'white' },
+    followButton: { backgroundColor: colors.primary, paddingVertical: 12, paddingHorizontal: 32, borderRadius: 16, flex: 1, maxWidth: 200, alignItems: 'center' },
+    followButtonText: { fontWeight: '800', fontSize: 16, color: colors.white },
+    iconButton: { padding: 10, borderRadius: 30, backgroundColor: colors.gray },
+    userInfo: { alignItems: 'center', marginBottom: 8 },
+    linksContainer: { marginTop: 8, gap: 4 },
+    separator: { fontSize: 14, color: '#999' },
+
+    // ── TABS ───────────────────────────────────────────────
+    tabSection: { flex: 1 },
+    tabHeader: {
+        flexDirection: 'row',
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
-        marginBottom: 1, // gap
-        position: 'relative',
+        paddingHorizontal: isDesktop ? 32 : 0,
     },
-    tabIcon: {
-        padding: 8,
+    tabBtn: {
+        flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        gap: 8, paddingVertical: 14, position: 'relative',
     },
+    tabLabel: { fontSize: 14, fontWeight: '700' },
     tabIndicator: {
-        position: 'absolute',
-        bottom: 0,
-        height: 2,
-        width: '33.33%',
-        backgroundColor: colors.text,
-        zIndex: 10,
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        height: 2.5, backgroundColor: colors.text, borderRadius: 2,
     },
-    grid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-    },
-    gridItem: {
-        width: COLUMN_WIDTH,
-        height: COLUMN_WIDTH * 1.3, // Rectangular usually
-        padding: 1, // Gap
-        position: 'relative'
-    },
-    gridImage: {
-        width: '100%',
-        height: '100%',
-        borderRadius: 4, // slight round
-        backgroundColor: colors.gray,
-    },
-    viewsOverlay: {
-        position: 'absolute',
-        bottom: 8,
-        left: 8,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    viewsText: {
-        color: 'white',
-        fontSize: 12,
-        fontWeight: '600',
-        // @ts-ignore
-        textShadow: '0px 1px 2px rgba(0,0,0,0.5)',
-    },
-    videoIconOverlay: {
-        position: 'absolute',
-        top: 8,
-        right: 8,
-        backgroundColor: 'rgba(0,0,0,0.3)',
-        borderRadius: 4,
-        padding: 4,
-    },
-    reelItem: {
-        width: COLUMN_WIDTH,
-        height: COLUMN_WIDTH * 1.6, // Taller for reels
-        padding: 1,
-        position: 'relative',
-    },
-    reelIconOverlay: {
-        position: 'absolute',
-        bottom: 8,
-        left: 8,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    reelViews: {
-        color: 'white',
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    emptyState: {
-        padding: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 12,
-    },
-    emptyStateText: {
-        color: colors.textSecondary,
-        fontSize: 16,
-    },
-    separator: {
-        fontSize: 14,
-        color: '#999',
-    },
-    pronouns: {
-        fontSize: 14,
-        color: colors.textSecondary,
-    },
-    linksContainer: {
-        marginTop: 8,
-        gap: 4,
-    },
-    link: {
-        fontSize: 14,
-        color: colors.primary,
-        textDecorationLine: 'underline',
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingTop: 100,
-    }
+    tabIcon: { padding: 8 },
+
+    // ── POST GRID ──────────────────────────────────────────
+    grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: isDesktop ? 32 : 0, paddingTop: isDesktop ? 16 : 0, gap: isDesktop ? 8 : 0 },
+    gridItem: { width: isDesktop ? COLUMN_WIDTH - 6 : COLUMN_WIDTH, height: (isDesktop ? COLUMN_WIDTH - 6 : COLUMN_WIDTH) * 1.25, padding: isDesktop ? 0 : 1, position: 'relative' },
+    gridImage: { width: '100%', height: '100%', borderRadius: isDesktop ? 16 : 0, backgroundColor: isDark ? '#111' : '#f0f0f0' },
+    videoIconOverlay: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 4, padding: 4 },
+    reelItem: { width: isDesktop ? COLUMN_WIDTH - 6 : COLUMN_WIDTH, height: (isDesktop ? COLUMN_WIDTH - 6 : COLUMN_WIDTH) * 1.6, padding: isDesktop ? 0 : 1, position: 'relative' },
+    reelIconOverlay: { position: 'absolute', bottom: 8, left: 8, flexDirection: 'row', alignItems: 'center', gap: 4 },
+    reelViews: { color: 'white', fontSize: 12, fontWeight: '600' },
+    viewsOverlay: { position: 'absolute', bottom: 8, left: 8, flexDirection: 'row', alignItems: 'center' },
+    viewsText: { color: 'white', fontSize: 12, fontWeight: '600' },
+
+    // ── EMPTY / LOADING ────────────────────────────────────
+    emptyState: { padding: 60, alignItems: 'center', justifyContent: 'center', gap: 12 },
+    emptyStateText: { color: colors.textSecondary, fontSize: 16 },
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 100 },
 });

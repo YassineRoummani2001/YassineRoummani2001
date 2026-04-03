@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { Search as SearchIcon, TrendingUp, X, Clock, User as UserIcon, Hash } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Platform } from 'react-native';
+import { ActivityIndicator, Image, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Platform, useWindowDimensions } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -25,7 +25,9 @@ export default function SearchScreen() {
     const colors = useTheme();
     const insets = useSafeAreaInsets();
     const router = useRouter();
-    const styles = useMemo(() => createStyles(colors, insets), [colors, insets]);
+    const { width } = useWindowDimensions();
+    const isDesktop = Platform.OS === 'web' && width > 768;
+    const styles = useMemo(() => createStyles(colors, insets, isDesktop), [colors, insets, isDesktop]);
 
     // Load recent searches
     useEffect(() => {
@@ -109,7 +111,6 @@ export default function SearchScreen() {
         if (type === 'user') {
             router.push(`/user/${value._id}`);
         } else {
-            // Future: navigate to hashtag results page if implemented
             setSearchQuery(value);
         }
     };
@@ -122,19 +123,27 @@ export default function SearchScreen() {
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Search</Text>
-            </View>
+            {/* Header */}
+            {!isDesktop && (
+                <View style={styles.header}>
+                    <Text style={styles.headerTitle}>Search</Text>
+                </View>
+            )}
 
-            <View style={styles.searchContainer}>
-                <View style={styles.searchBar}>
+            {/* Search Bar */}
+            <View style={[styles.searchBarWrapper, isDesktop && { paddingTop: 24, paddingBottom: 16 }]}>
+                <View style={[styles.searchBar, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
                     <SearchIcon size={20} color={colors.textSecondary} />
                     <TextInput
-                        placeholder="Search for users or #hashtags"
+                        placeholder="Search users or posts..."
                         placeholderTextColor={colors.textSecondary}
-                        style={styles.input}
+                        style={[styles.searchInput, { color: colors.text }]}
                         value={searchQuery}
-                        onChangeText={setSearchQuery}
+                        onChangeText={(txt) => {
+                            setSearchQuery(txt);
+                            if (txt.length > 0) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        }}
+                        autoFocus={isDesktop}
                         autoCapitalize="none"
                         autoCorrect={false}
                     />
@@ -143,7 +152,7 @@ export default function SearchScreen() {
                             setSearchQuery('');
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         }}>
-                            <X size={18} color={colors.textSecondary} />
+                            <X size={20} color={colors.textSecondary} />
                         </TouchableOpacity>
                     )}
                 </View>
@@ -162,13 +171,13 @@ export default function SearchScreen() {
             >
                 {searchQuery.length === 0 ? (
                     <>
-                        {/* Recent Searches Section */}
+                        {/* Recent Searches */}
                         {recentSearches.length > 0 && (
-                            <View style={[styles.section, { marginBottom: 24 }]}>
-                                <View style={styles.sectionHeader}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-                                        <Clock size={18} color={colors.textSecondary} />
-                                        <Text style={styles.sectionTitle}>Recent Searches</Text>
+                            <View style={styles.section}>
+                                <View style={styles.sectionTitleContainer}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                        <Clock size={20} color={colors.textSecondary} />
+                                        <Text style={styles.sectionTitle}>Recent</Text>
                                     </View>
                                     <TouchableOpacity onPress={clearAllRecent}>
                                         <Text style={{ color: colors.primary, fontWeight: '600' }}>Clear All</Text>
@@ -193,11 +202,13 @@ export default function SearchScreen() {
                             </View>
                         )}
 
-                        {/* Trending Section */}
+                        {/* Trending Topics */}
                         <View style={styles.section}>
-                            <View style={styles.sectionHeader}>
-                                <TrendingUp size={20} color={colors.primary} />
-                                <Text style={styles.sectionTitle}>Trending Now</Text>
+                            <View style={styles.sectionTitleContainer}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <TrendingUp size={20} color={colors.textSecondary} />
+                                    <Text style={styles.sectionTitle}>Trending</Text>
+                                </View>
                             </View>
                             <View style={styles.tagsContainer}>
                                 {TRENDING_TOPICS.map((topic, index) => (
@@ -287,15 +298,16 @@ export default function SearchScreen() {
     );
 }
 
-const createStyles = (colors: any, insets: any) => StyleSheet.create({
+const createStyles = (colors: any, insets: any, isDesktop: boolean) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background,
-        paddingTop: insets.top,
+        paddingTop: Platform.OS === 'web' ? 0 : insets.top,
     },
     header: {
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingHorizontal: 20,
+        paddingBottom: 20,
+        backgroundColor: colors.background,
     },
     headerTitle: {
         fontSize: 28,
@@ -303,43 +315,46 @@ const createStyles = (colors: any, insets: any) => StyleSheet.create({
         color: colors.text,
         letterSpacing: -0.5,
     },
-    searchContainer: {
+    searchBarWrapper: {
         paddingHorizontal: 16,
         marginBottom: 8,
     },
     searchBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.gray,
-        borderRadius: 16,
         paddingHorizontal: 16,
-        height: 50,
-        gap: 12,
+        height: 52,
+        borderRadius: 30,
+        marginTop: 20,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: colors.isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
     },
-    input: {
+    searchInput: {
         flex: 1,
+        height: '100%',
+        marginLeft: 12,
         fontSize: 16,
         color: colors.text,
-        height: '100%',
+        fontWeight: '500',
     },
     content: {
-        padding: 16,
+        flex: 1,
+        paddingHorizontal: 20,
     },
     section: {
-        gap: 12,
+        marginBottom: 32,
     },
-    sectionHeader: {
+    sectionTitleContainer: {
         flexDirection: 'row',
-        alignItems: 'center',
         justifyContent: 'space-between',
-        gap: 8,
+        alignItems: 'center',
+        marginBottom: 16,
     },
     sectionTitle: {
         fontSize: 18,
-        fontWeight: '700',
+        fontWeight: '900',
         color: colors.text,
+        letterSpacing: -0.5,
     },
     recentList: {
         gap: 4,
@@ -359,17 +374,18 @@ const createStyles = (colors: any, insets: any) => StyleSheet.create({
         gap: 10,
     },
     tag: {
-        paddingHorizontal: 16,
+        paddingHorizontal: 18,
         paddingVertical: 10,
-        backgroundColor: colors.gray,
-        borderRadius: 12,
+        backgroundColor: colors.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+        borderRadius: 20,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: colors.isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
     },
     tagText: {
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: 13,
+        fontWeight: '700',
         color: colors.textSecondary,
+        letterSpacing: 0.2,
     },
     resultsContainer: {
         flex: 1,
@@ -411,12 +427,13 @@ const createStyles = (colors: any, insets: any) => StyleSheet.create({
     postsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 8,
+        gap: 12,
+        justifyContent: 'flex-start',
     },
     postResult: {
-        width: '31.5%',
+        width: isDesktop ? '18%' : '30.5%',
         aspectRatio: 1,
-        borderRadius: 8,
+        borderRadius: 16,
         backgroundColor: colors.gray,
         overflow: 'hidden',
     },

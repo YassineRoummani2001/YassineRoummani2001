@@ -25,6 +25,8 @@ interface ReelContextType {
     updateReel: (reelId: string, updates: Partial<Reel>) => void;
     deleteReel: (reelId: string) => void;
     clearReels: () => void;
+    isMuted: boolean;
+    setIsMuted: (muted: boolean) => void;
 }
 
 const ReelContext = createContext<ReelContextType | undefined>(undefined);
@@ -106,6 +108,8 @@ export const ReelProvider = ({ children }: ReelProviderProps) => {
         setReels([]);
     }, []);
 
+    const [isMuted, setIsMuted] = useState(false);
+
     const value: ReelContextType = {
         reels,
         loading,
@@ -115,6 +119,8 @@ export const ReelProvider = ({ children }: ReelProviderProps) => {
         updateReel,
         deleteReel,
         clearReels,
+        isMuted,
+        setIsMuted,
     };
 
     return <ReelContext.Provider value={value}>{children}</ReelContext.Provider>;

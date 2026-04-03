@@ -170,7 +170,11 @@ export default function SignupScreen() {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.keyboardView}
             >
-                <View style={[styles.contentContainer, isDesktop && styles.desktopContent]}>
+                <View style={[
+                    styles.contentContainer, 
+                    isDesktop && styles.desktopContent,
+                    isDesktop && { backgroundColor: isDark ? '#1A1A1A' : '#fff' }
+                ]}>
                     {isDesktop && (
                         <View style={styles.brandingSection}>
                              <LinearGradient
@@ -359,7 +363,7 @@ const styles = StyleSheet.create({
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderRadius: 16,
+        borderRadius: 24,
         paddingHorizontal: 16,
         paddingVertical: 14,
         borderWidth: 1,
@@ -370,6 +374,7 @@ const styles = StyleSheet.create({
     input: {
         flex: 1,
         fontSize: 16,
+        outlineStyle: 'none' as any,
     },
     errorText: {
         color: '#FF3B30',
@@ -380,12 +385,15 @@ const styles = StyleSheet.create({
     },
     signupButton: {
         backgroundColor: Colors.light.primary,
-        borderRadius: 16,
+        borderRadius: 30,
         paddingVertical: 16,
         alignItems: 'center',
         justifyContent: 'center',
         marginTop: 10,
-        boxShadow: `0px 4px 8px ${Colors.light.primary}4D`,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 16,
+        elevation: 8,
     },
     signupButtonDisabled: {
         opacity: 0.6,
@@ -406,10 +414,12 @@ const styles = StyleSheet.create({
         maxWidth: 1000,
         height: 650,
         alignSelf: 'center',
-        backgroundColor: '#fff',
         borderRadius: 24,
         overflow: 'hidden',
-        boxShadow: '0px 20px 40px rgba(0,0,0,0.1)',
+        shadowOffset: { width: 0, height: 20 },
+        shadowOpacity: 0.1,
+        shadowRadius: 40,
+        elevation: 10,
     },
     brandingSection: {
         flex: 1,
@@ -442,5 +452,13 @@ const styles = StyleSheet.create({
     loginText: {
         fontSize: 15,
         fontWeight: 'bold',
+    },
+    footer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginTop: 40,
+    },
+    footerText: {
+        fontSize: 15,
     },
 });

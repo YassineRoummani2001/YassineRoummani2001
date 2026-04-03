@@ -17,14 +17,27 @@ import ShareToUsersModal from './ShareToUsersModal';
 const { width } = Dimensions.get('window');
 
 // Helper to normalize URIs
-const getValidUri = (uri: string) => {
+const getValidUri = (uri?: string) => {
     if (!uri) return '';
+    if (uri.startsWith('data:') || uri.startsWith('file:')) return uri;
+    
+    // Auto-fix our backend URLs if they have the wrong IP/localhost
+    if (uri.startsWith('http') && uri.includes('/uploads/')) {
+        const parts = uri.split('/uploads/');
+        return `${API_BASE_URL}/uploads/${parts[1]}`;
+    }
+    
+    // External URLs
+    if (uri.startsWith('http')) return uri;
+
+    // Handle relative uploads
     if (uri.startsWith('/uploads/')) return `${API_BASE_URL}${uri}`;
     if (uri.includes('/uploads/')) {
         const parts = uri.split('/uploads/');
         return `${API_BASE_URL}/uploads/${parts[1]}`;
     }
-    if (uri.startsWith('http') || uri.startsWith('data:')) return uri;
+
+    // Default fallback
     return `${API_BASE_URL}${uri.startsWith('/') ? '' : '/'}${uri}`;
 };
 
@@ -139,19 +152,19 @@ const FeedVideo = ({ videoSource, posterSource, isMuted, setIsMuted, active, sty
 // --- STYLES ---
 const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     container: {
-        backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF',
-        marginHorizontal: 16,
-        marginBottom: 24,
-        borderRadius: 24,
-        padding: 12,
+        backgroundColor: isDark ? '#0A0A0A' : '#FFFFFF',
+        marginHorizontal: Platform.OS === 'web' ? 0 : 16,
+        marginBottom: 32,
+        borderRadius: 28,
+        padding: 16,
         // High-end modern shadow
-        shadowColor: isDark ? '#000' : 'rgba(0,0,0,1)',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: isDark ? 0.3 : 0.08,
-        shadowRadius: 16,
-        elevation: 6,
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: isDark ? 0.4 : 0.06,
+        shadowRadius: 20,
+        elevation: 8,
+        borderWidth: 1,
+        borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
     },
     header: {
         flexDirection: 'row',
@@ -254,10 +267,11 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     },
     mediaContainer: {
         width: '100%',
-        aspectRatio: 4 / 5, // Modern aspect ratio
-        borderRadius: 20,
+        aspectRatio: 1,
+        maxHeight: 600,
+        borderRadius: 24,
         overflow: 'hidden',
-        backgroundColor: isDark ? '#000' : '#F9FAFB',
+        backgroundColor: isDark ? '#000' : '#f0f0f0',
         position: 'relative',
     },
     media: {

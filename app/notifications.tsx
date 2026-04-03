@@ -15,6 +15,8 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
+    useWindowDimensions,
+    Platform,
     View
 } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withSpring, withTiming } from 'react-native-reanimated';
@@ -62,6 +64,23 @@ const AnimatedNotificationIcon = ({ type, color, borderColor }: any) => {
 
 const NotificationIcon = AnimatedNotificationIcon;
 
+const AnimatedNotificationItem = ({ children, index }: any) => {
+    const opacity = useSharedValue(0);
+    const translateY = useSharedValue(20);
+
+    useEffect(() => {
+        opacity.value = withDelay(index * 50, withTiming(1, { duration: 400 }));
+        translateY.value = withDelay(index * 50, withSpring(0, { damping: 15, stiffness: 100 }));
+    }, []);
+
+    const style = useAnimatedStyle(() => ({
+        opacity: opacity.value,
+        transform: [{ translateY: translateY.value }]
+    }));
+
+    return <Animated.View style={style}>{children}</Animated.View>;
+};
+
 /* ================= COMPONENT ================= */
 export default function NotificationsScreen() {
     const router = useRouter();
@@ -69,6 +88,9 @@ export default function NotificationsScreen() {
     const { colors, isDark } = useThemeContext();
     const insets = useSafeAreaInsets();
     const { markAsRead } = useNotifications();
+
+    const { width } = useWindowDimensions();
+    const isDesktop = Platform.OS === 'web' && width > 768;
 
     const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -101,97 +123,57 @@ export default function NotificationsScreen() {
             }
         });
 
-        const result = [];
-        if (groups['Today'].length > 0) result.push({ title: 'Today', data: groups['Today'] });
-        if (groups['Yesterday'].length > 0) result.push({ title: 'Yesterday', data: groups['Yesterday'] });
-        if (groups['Last 7 Days'].length > 0) result.push({ title: 'Last 7 Days', data: groups['Last 7 Days'] });
-        if (groups['Earlier'].length > 0) result.push({ title: 'Earlier', data: groups['Earlier'] });
-
-        return result;
+        return Object.keys(groups)
+            .filter(key => groups[key].length > 0)
+            .map(key => ({ title: key, data: groups[key] }));
     };
 
     const fetchNotifications = async () => {
-        if (!user) return;
         try {
-            const res = await fetch(`${API_BASE_URL}/api/notifications`, {
+            const response = await fetch(`${API_BASE_URL}/api/auth/notifications`, {
                 headers: { 'Authorization': `Bearer ${user.token}` }
             });
-            if (res.ok) {
-                const data = await res.json();
+            if (response.ok) {
+                const data = await response.json();
                 setNotifications(data);
                 setSections(groupNotifications(data));
             }
         } catch (error) {
-            console.error("Error fetching notifications:", error);
+            console.error('Fetch notifications error:', error);
         } finally {
             setIsLoading(false);
             setRefreshing(false);
         }
     };
 
-    useEffect(() => {
-        fetchNotifications();
-    }, [user]);
+    useFocusEffect(
+        React.useCallback(() => {
+            fetchNotifications();
+            markAsRead();
+        }, [])
+    );
 
     const onRefresh = () => {
         setRefreshing(true);
         fetchNotifications();
     };
 
-    const handleFollowClick = async (senderId: string) => {
-        if (!senderId) return;
-        await followUser(senderId);
-    };
-
-    const handlePress = async (notification: any) => {
-        if (!notification.isRead) {
-            // Optimistic update
-            const newNotifs = notifications.map(n =>
-                n._id === notification._id ? { ...n, isRead: true } : n
-            );
-            setNotifications(newNotifs);
-            setSections(groupNotifications(newNotifs));
-            markAsRead(notification._id);
-        }
-
-        if (notification.post) {
-            router.push({
-                pathname: '/media-view',
-                params: {
-                    postId: notification.post._id,
-                    type: notification.post.type || 'image',
-                    uri: notification.post.uri
-                }
-            });
-        } else if (notification.type === 'follow' && notification.sender?._id) {
-            router.push(`/user/${notification.sender._id}`);
+    const handlePress = (item: any) => {
+        if (item.type === 'follow') {
+            router.push(`/user/${item.sender?._id}`);
+        } else if (item.post) {
+            router.push(`/post/${item.post._id || item.post}`);
         }
     };
 
-const AnimatedNotificationItem = ({ children, index }: { children: React.ReactNode, index: number }) => {
-    const opacity = useSharedValue(0);
-    const translateY = useSharedValue(20);
+    const handleFollow = async (userId: string) => {
+        if (!userId || !followUser) return;
+        await followUser(userId);
+        fetchNotifications(); // Refresh to update follow buttons
+    };
 
-    useEffect(() => {
-        opacity.value = withDelay(index * 50, withTiming(1, { duration: 400 }));
-        translateY.value = withDelay(index * 50, withSpring(0, { damping: 15 }));
-    }, []);
-
-    const animatedStyle = useAnimatedStyle(() => ({
-        opacity: opacity.value,
-        transform: [{ translateY: translateY.value }]
-    }));
-
-    return <Animated.View style={animatedStyle}>{children}</Animated.View>;
-};
-
-const renderSectionHeader = ({ section: { title } }: any) => (
-    <Text style={[styles.sectionHeader, { color: colors.text, backgroundColor: colors.background }]}>{title}</Text>
-);
-
-const renderItem = ({ item, index }: { item: any, index: number }) => {
-        const isFollowNotification = item.type === 'follow';
-        // Determine notification type from text if type field is missing or generic
+    const renderItem = ({ item, index }: any) => {
+        const isFollowNotification = item.type === 'follow' || item.text.includes('following');
         let type = item.type;
         if (!type) {
             if (item.text.includes('liked')) type = 'like';
@@ -205,8 +187,8 @@ const renderItem = ({ item, index }: { item: any, index: number }) => {
             <AnimatedNotificationItem index={index}>
                 <TouchableOpacity
                     style={[
-                        styles.itemContainer,
-                        !item.isRead && { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)' }
+                        styles.notificationItem,
+                        !item.isRead && styles.unreadItem
                     ]}
                     onPress={() => handlePress(item)}
                     activeOpacity={0.7}
@@ -216,7 +198,7 @@ const renderItem = ({ item, index }: { item: any, index: number }) => {
                             source={{ uri: item.sender?.avatar || 'https://i.pravatar.cc/100' }}
                             style={styles.avatar}
                         />
-                        <View style={styles.iconOverlay}>
+                        <View style={styles.iconBadge}>
                             <AnimatedNotificationIcon type={type} color={colors.primary} borderColor={colors.background} />
                         </View>
                     </View>
@@ -244,12 +226,9 @@ const renderItem = ({ item, index }: { item: any, index: number }) => {
                                 { backgroundColor: isFollowing ? (isDark ? '#333' : '#f0f0f0') : colors.primary },
                                 isFollowing && { borderWidth: 1, borderColor: colors.border }
                             ]}
-                            onPress={() => item.sender?._id && handleFollowClick(item.sender._id)}
+                            onPress={() => handleFollow(item.sender?._id)}
                         >
-                            <Text style={[
-                                styles.followBtnText,
-                                { color: isFollowing ? colors.text : 'white' }
-                            ]}>
+                            <Text style={[styles.followBtnText, { color: isFollowing ? colors.text : 'white' }]}>
                                 {isFollowing ? 'Following' : 'Follow'}
                             </Text>
                         </TouchableOpacity>
@@ -260,102 +239,61 @@ const renderItem = ({ item, index }: { item: any, index: number }) => {
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
-            <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
-
-            {/* Header */}
-            <View style={[styles.header, { borderBottomColor: colors.border }]}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                    <Ionicons name="arrow-back" size={24} color={colors.text} />
-                </TouchableOpacity>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+            <View style={[styles.header, { borderBottomColor: colors.border, paddingTop: Platform.OS === 'web' ? 20 : insets.top + 10 }]}>
                 <Text style={[styles.headerTitle, { color: colors.text }]}>Notifications</Text>
-                <View style={{ width: 40 }} />
             </View>
 
-            {isLoading ? (
-                <View style={{ padding: 16 }}>
-                    {[1, 2, 3, 4, 5, 6].map(i => <SkeletonRow key={i} />)}
-                </View>
-            ) : (
-                <SectionList
-                    sections={sections}
-                    keyExtractor={item => item._id}
-                    renderItem={renderItem}
-                    renderSectionHeader={renderSectionHeader}
-                    contentContainerStyle={styles.listContent}
-                    stickySectionHeadersEnabled={false}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={onRefresh}
-                            tintColor={colors.primary}
-                            colors={[colors.primary]}
-                        />
-                    }
-                    ListHeaderComponent={
-                        <TouchableOpacity
-                            style={styles.followRequestsRow}
-                            onPress={() => router.push('/follow-requests')}
-                            activeOpacity={0.7}
-                        >
-                            <View style={styles.followReqLeft}>
-                                <View style={styles.reqAvatarContainer}>
-                                    <View style={[styles.reqAvatar, { backgroundColor: '#333', zIndex: 2 }]} />
-                                    <View style={[styles.reqAvatar, { backgroundColor: '#666', marginLeft: -15, zIndex: 1 }]} />
-                                </View>
-                                <View>
-                                    <Text style={[styles.reqTitle, { color: colors.text }]}>Follow requests</Text>
-                                    <Text style={[styles.reqSubtitle, { color: colors.textSecondary }]}>Approve or ignore requests</Text>
-                                </View>
-                            </View>
-                            <View style={styles.unreadBadgeDot} />
-                        </TouchableOpacity>
-                    }
-                    ListEmptyComponent={
+            <SectionList
+                sections={sections}
+                keyExtractor={(item) => item._id}
+                renderItem={renderItem}
+                renderSectionHeader={({ section: { title } }) => (
+                    <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>{title}</Text>
+                )}
+                contentContainerStyle={[styles.listContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+                }
+                ListEmptyComponent={
+                    !isLoading ? (
                         <View style={styles.emptyState}>
-                            <View style={[styles.emptyIconCircle, { backgroundColor: isDark ? '#222' : '#f0f0f0' }]}>
+                            <View style={[styles.emptyIconCircle, { backgroundColor: isDark ? '#1A1A1A' : '#F2F2F7' }]}>
                                 <Ionicons name="notifications-outline" size={40} color={colors.textSecondary} />
                             </View>
-                            <Text style={[styles.emptyTitle, { color: colors.text }]}>No Notifications</Text>
-                            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                                When you get likes, comments or new followers, they'll show up here.
-                            </Text>
+                            <Text style={[styles.emptyTitle, { color: colors.text }]}>No notifications yet</Text>
+                            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>When someone likes or comments on your posts, you'll see it here.</Text>
                         </View>
-                    }
-                />
-            )}
+                    ) : (
+                        <View style={{ padding: 20 }}>
+                            {[1, 2, 3, 4, 5, 6].map(i => <SkeletonRow key={i} />)}
+                        </View>
+                    )
+                }
+            />
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-    },
+    container: { flex: 1 },
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        borderBottomWidth: 1,
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 0.5,
     },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        letterSpacing: 0.5,
-    },
-    backBtn: {
-        padding: 5,
-    },
-    listContent: {
-        paddingBottom: 20,
-    },
-    itemContainer: {
+    headerTitle: { fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
+    listContent: { paddingBottom: 20 },
+    notificationItem: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: 14,
         paddingHorizontal: 16,
+        borderRadius: 20,
+        marginHorizontal: 10,
+        marginBottom: 4,
+    },
+    unreadItem: {
+        backgroundColor: 'rgba(59, 130, 246, 0.05)',
     },
     avatarWrapper: {
         position: 'relative',
@@ -366,19 +304,16 @@ const styles = StyleSheet.create({
         height: 48,
         borderRadius: 24,
     },
-    iconOverlay: {
+    iconBadge: {
         position: 'absolute',
         bottom: -2,
         right: -2,
-    },
-    iconBadge: {
         width: 20,
         height: 20,
         borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 2,
-        borderColor: 'white', // Should adapt to dark mode ideally, but white border works for contrast often
     },
     textContainer: {
         flex: 1,
@@ -402,18 +337,17 @@ const styles = StyleSheet.create({
     postThumbnail: {
         width: 44,
         height: 44,
-        borderRadius: 6,
+        borderRadius: 8,
         backgroundColor: '#eee',
     },
     followBtn: {
         paddingHorizontal: 16,
-        paddingVertical: 6,
-        borderRadius: 8,
+        paddingVertical: 8,
+        borderRadius: 20,
     },
     followBtnText: {
-        color: 'white',
-        fontSize: 13,
-        fontWeight: '600',
+        fontSize: 12,
+        fontWeight: '700',
     },
     emptyState: {
         alignItems: 'center',
@@ -440,47 +374,13 @@ const styles = StyleSheet.create({
         lineHeight: 22,
     },
     sectionHeader: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        marginTop: 10,
-    },
-    followRequestsRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
+        fontSize: 14,
+        fontWeight: '900',
+        paddingHorizontal: 20,
         paddingVertical: 16,
-        marginBottom: 10,
-    },
-    followReqLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    reqAvatarContainer: {
-        flexDirection: 'row',
-        marginRight: 12,
-        width: 44,
-    },
-    reqAvatar: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        borderWidth: 2,
-        borderColor: 'black',
-    },
-    reqTitle: {
-        fontSize: 15,
-        fontWeight: 'bold',
-    },
-    reqSubtitle: {
-        fontSize: 13,
-    },
-    unreadBadgeDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: '#007AFF',
+        marginTop: 10,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+        opacity: 0.6,
     }
 });

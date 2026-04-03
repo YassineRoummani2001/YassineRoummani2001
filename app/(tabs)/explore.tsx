@@ -7,6 +7,8 @@ import { API_BASE_URL } from '@/constants/Config';
 import { SkeletonGridItem } from '@/components/Skeletons';
 import { Ionicons } from '@expo/vector-icons';
 
+const SPACING = 8; // Increased spacing for modern grid
+
 export default function ExploreScreen() {
     const router = useRouter();
     const { colors, isDark } = useThemeContext();
@@ -18,7 +20,7 @@ export default function ExploreScreen() {
 
     const isDesktop = Platform.OS === 'web' && width > 768;
     const NUM_COLUMNS = isDesktop ? 3 : 3;
-    const SPACING = 2;
+
     const ITEM_WIDTH = (isDesktop ? (Math.min(width - 240, 935) / NUM_COLUMNS) : width / NUM_COLUMNS) - (SPACING * 1.5);
 
     const categories = ['All', 'Travel', 'Art', 'Tech', 'Music', 'Fashion', 'Photography', 'Food'];
@@ -56,12 +58,14 @@ export default function ExploreScreen() {
                     index % NUM_COLUMNS !== 2 && { marginRight: SPACING }
                 ]}
             >
-                <Image
-                    source={{ uri: item.uri }}
-                    style={StyleSheet.absoluteFill}
-                    contentFit="cover"
-                    transition={200}
-                />
+                <View style={styles.imageWrapper}>
+                    <Image
+                        source={{ uri: item.uri }}
+                        style={StyleSheet.absoluteFill}
+                        contentFit="cover"
+                        transition={200}
+                    />
+                </View>
                 {isReel && (
                     <View style={styles.reelBadge}>
                         <Ionicons name="play" size={14} color="white" />
@@ -158,12 +162,18 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     gridContainer: {
-        paddingTop: 1,
+        paddingTop: 8,
+        paddingHorizontal: 8,
     },
     gridItem: {
-        marginBottom: 2,
-        backgroundColor: '#eee',
+        marginBottom: SPACING,
         position: 'relative',
+    },
+    imageWrapper: {
+        flex: 1,
+        borderRadius: 16,
+        overflow: 'hidden',
+        backgroundColor: '#eee',
     },
     loadingGrid: {
         flexDirection: 'row',
@@ -174,9 +184,9 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 8,
         right: 8,
-        backgroundColor: 'rgba(0,0,0,0.3)',
-        padding: 4,
-        borderRadius: 4,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        padding: 6,
+        borderRadius: 12,
     },
     statBadge: {
         position: 'absolute',
@@ -185,9 +195,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: 'rgba(0,0,0,0.5)',
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
     },
     statText: {
         color: 'white',

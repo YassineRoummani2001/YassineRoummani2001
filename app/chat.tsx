@@ -14,6 +14,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
     FlatList,
     Image,
+    Platform,
     RefreshControl,
     SafeAreaView,
     StatusBar,
@@ -21,6 +22,7 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
+    useWindowDimensions,
     View,
 } from 'react-native';
 
@@ -80,6 +82,10 @@ export default function ChatScreen() {
     const { socket } = useMessages();
     const { colors, isDark } = useThemeContext();
 
+    // Layout
+    const { width } = useWindowDimensions();
+    const isDesktop = Platform.OS === 'web' && width > 768;
+
     // State
     const [chats, setChats] = useState<any[]>([]);
     const [followingUsers, setFollowingUsers] = useState<any[]>([]);
@@ -103,12 +109,8 @@ export default function ChatScreen() {
             if (chatRes.ok) setChats(await chatRes.json());
             if (followRes.ok) setFollowingUsers(await followRes.json());
 
-            // console.log('📝 Notes API Response:', notesRes);
             if (notesRes.success && notesRes.data) {
-                // console.log('✅ Notes data:', notesRes.data);
                 setNotes(notesRes.data);
-            } else {
-                // console.log('❌ No notes data or failed:', notesRes);
             }
         } catch (error) {
             console.error('🔴 Error fetching data:', error);
@@ -173,25 +175,29 @@ export default function ChatScreen() {
             <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
             {/* Custom Header */}
-            <View style={[styles.header, { borderBottomColor: colors.border }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <TouchableOpacity onPress={() => router.back()}>
-                        <Ionicons name="arrow-back" size={24} color={colors.text} />
-                    </TouchableOpacity>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View style={[styles.header, { borderBottomColor: colors.border, height: isDesktop ? 60 : 56, paddingTop: isDesktop ? 0 : 0 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: isDesktop ? 'center' : 'flex-start' }}>
+                    {!isDesktop && router.canGoBack() && (
+                        <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
+                            <Ionicons name="arrow-back" size={24} color={colors.text} />
+                        </TouchableOpacity>
+                    )}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: (!isDesktop && router.canGoBack()) ? 0 : 16 }}>
                         <Text style={[styles.headerTitle, { color: colors.text }]}>{user?.username || 'Messages'}</Text>
                         <Ionicons name="chevron-down" size={16} color={colors.text} />
                     </View>
                 </View>
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-                    <TouchableOpacity>
-                        <Ionicons name="create-outline" size={24} color={colors.text} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => setShowNewChat(true)}>
-                        <Ionicons name="add" size={28} color={colors.text} />
-                    </TouchableOpacity>
-                </View>
+                {!isDesktop && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                        <TouchableOpacity>
+                            <Ionicons name="create-outline" size={24} color={colors.text} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setShowNewChat(true)}>
+                            <Ionicons name="add" size={28} color={colors.text} />
+                        </TouchableOpacity>
+                    </View>
+                )}
             </View>
 
             {/* Search */}
@@ -379,35 +385,69 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1 },
     header: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 20, paddingVertical: 10, marginBottom: 4
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        marginBottom: 8,
+    },
+    headerTitle: {
+        fontSize: 28,
+        fontWeight: '900',
+        letterSpacing: -1,
+    },
+    searchContainer: {
+        paddingHorizontal: 20,
+        marginBottom: 20,
     },
     searchBar: {
-        flexDirection: 'row', alignItems: 'center', height: 46,
-        borderRadius: 24, paddingHorizontal: 16, gap: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        height: 52,
+        borderRadius: 30,
+        paddingHorizontal: 16,
+        gap: 12,
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 2
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.04,
+        shadowRadius: 12,
+        elevation: 3,
+        borderWidth: 1,
     },
-    input: { flex: 1, fontSize: 16, height: '100%', fontWeight: '500' },
-    headerTitle: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
-    searchContainer: { paddingHorizontal: 16, marginBottom: 16 },
-    searchInput: { flex: 1, fontSize: 16, height: '100%', fontWeight: '500' },
+    searchInput: {
+        flex: 1,
+        fontSize: 16,
+        height: '100%',
+        fontWeight: '600',
+    },
     plusBadge: {
-        position: 'absolute', bottom: 0, right: 0, width: 24, height: 24,
-        borderRadius: 12, alignItems: 'center', justifyContent: 'center',
-        borderWidth: 2, borderColor: 'transparent'
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 3,
     },
     plusInner: {
-        width: 22, height: 22, borderRadius: 11,
-        backgroundColor: '#DDD', alignItems: 'center', justifyContent: 'center'
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     onlineBadge: {
-        position: 'absolute', bottom: 2, right: 2,
-        width: 16, height: 16, borderRadius: 8,
-        backgroundColor: '#10B981', borderWidth: 2.5
+        position: 'absolute',
+        bottom: 2,
+        right: 2,
+        width: 14,
+        height: 14,
+        borderRadius: 7,
+        backgroundColor: '#10B981',
+        borderWidth: 2,
     }
 });
 

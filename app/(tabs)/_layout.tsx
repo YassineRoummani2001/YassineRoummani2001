@@ -62,6 +62,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="reels"
         options={{
+          tabBarStyle: { display: 'none' },
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'videocam' : 'videocam-outline'} size={activeSize} color={color} />
           ),
@@ -82,6 +83,12 @@ export default function TabLayout() {
               <Ionicons name={focused ? 'person-circle' : 'person-circle-outline'} size={activeSize} color={color} />
             )
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="marketplace"
+        options={{
+          href: null,
         }}
       />
       <Tabs.Screen

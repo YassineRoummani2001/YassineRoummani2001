@@ -7,7 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { Camera, Check, ChevronDown, Pencil, Search, X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { FlatList, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ConfirmationModal from '../components/ConfirmationModal';
 
@@ -32,6 +32,8 @@ export default function EditProfileScreen() {
     const { user, updateProfile } = (useUser() || {}) as any;
     const { colors, isDark } = useThemeContext();
     const insets = useSafeAreaInsets();
+    const { width } = useWindowDimensions();
+    const isDesktop = Platform.OS === 'web' && width > 768;
     const [saving, setSaving] = useState(false);
 
     // Initialize with user data or defaults
@@ -92,6 +94,8 @@ export default function EditProfileScreen() {
         }
     };
 
+    const [isPrivate, setIsPrivate] = useState(user?.isPrivate ?? true);
+
     const handleSave = async () => {
         setSaving(true);
         // Prepare data
@@ -107,6 +111,7 @@ export default function EditProfileScreen() {
             bio,
             pronouns,
             gender,
+            isPrivate,
             phone: fullPhone,
             links: website ? [{ title: 'Website', url: website }] : [],
             avatar,
@@ -212,27 +217,31 @@ export default function EditProfileScreen() {
     );
 
     return (
-        <View style={[styles.container, { backgroundColor: colors.background, paddingBottom: insets.bottom }]}>
+        <View style={[styles.container, { backgroundColor: colors.background, paddingBottom: insets.bottom, alignItems: isDesktop ? 'center' : 'stretch' }]}>
             {/* Header */}
             <View style={[styles.header, {
                 borderBottomColor: colors.border,
                 backgroundColor: colors.background,
-                paddingTop: insets.top || 20
+                paddingTop: Platform.OS === 'web' ? 20 : (insets.top || 20),
+                width: isDesktop ? 600 : '100%',
+                maxWidth: 600,
             }]}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
-                    <X size={24} color={colors.text} />
-                </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: colors.text }]}>Edit Profile</Text>
+                {!isDesktop && (
+                    <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
+                        <X size={24} color={colors.text} />
+                    </TouchableOpacity>
+                )}
+                <Text style={[styles.headerTitle, { color: colors.text, marginLeft: isDesktop ? 0 : 8 }]}>Edit Profile</Text>
                 <TouchableOpacity onPress={handleSave} style={styles.headerBtn} disabled={saving}>
-                    {saving ? <Text style={{ color: colors.primary }}>...</Text> : <Check size={24} color={colors.primary} />}
+                    {saving ? <ActivityIndicator size="small" color={colors.primary} /> : <Check size={24} color={colors.primary} />}
                 </TouchableOpacity>
             </View>
 
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, width: isDesktop ? 600 : '100%', maxWidth: 600 }}>
                 <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
                     {/* Visual & Avatar Section */}
                     <View style={styles.visualSection}>
-                        <View style={styles.coverWrapper}>
+                        <View style={[styles.coverWrapper, isDesktop && { height: 200, borderRadius: 12, overflow: 'hidden' }]}>
                             <Image source={{ uri: getCorrectUrl(coverImage) }} style={styles.coverImage} resizeMode="cover" />
                             <TouchableOpacity style={styles.changeCoverBtn} onPress={() => pickImage('cover')}>
                                 <Camera size={18} color="white" />
@@ -240,9 +249,9 @@ export default function EditProfileScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        <View style={styles.avatarSection} pointerEvents="box-none">
+                        <View style={[styles.avatarSection, isDesktop && { marginTop: -50, marginLeft: 20, alignItems: 'flex-start' }]} pointerEvents="box-none">
                             <View style={[styles.avatarWrapper, { backgroundColor: colors.background }]}>
-                                <Image source={{ uri: getCorrectUrl(avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=random` }} style={[styles.avatar]} />
+                                <Image source={{ uri: getCorrectUrl(avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=random` }} style={[styles.avatar, isDesktop && { width: 100, height: 100, borderRadius: 50 }]} />
                                 <TouchableOpacity
                                     style={[styles.cameraIcon, { backgroundColor: colors.primary, borderColor: colors.background }]}
                                     onPress={() => pickImage('avatar')}
@@ -257,7 +266,7 @@ export default function EditProfileScreen() {
                         {/* Section: Public Info */}
                         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Public Info</Text>
 
-                        <View style={[styles.inputGroup, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF', borderColor: colors.border }]}>
+                        <View style={[styles.inputGroup, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF', borderColor: colors.border, borderRadius: 16 }]}>
                             <View style={[styles.inputContainer, { borderBottomColor: colors.border }]}>
                                 <Text style={[styles.label, { color: colors.textSecondary }]}>Name</Text>
                                 <TextInput
@@ -371,7 +380,32 @@ export default function EditProfileScreen() {
                             </View>
                         </View>
 
-                        {/* Section: Security */}
+                        {/* Section: Privacy */}
+                        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Account Privacy</Text>
+
+                        <View style={[styles.inputGroup, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF', borderColor: colors.border }]}>
+                            <TouchableOpacity 
+                                style={[styles.inputContainer, { borderBottomWidth: 0, paddingVertical: 16 }]}
+                                onPress={() => setIsPrivate(!isPrivate)}
+                            >
+                                <View style={{ flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                                        <Text style={[styles.label, { color: colors.text, width: 'auto', marginRight: 8 }]}>
+                                            {isPrivate ? 'Private Account' : 'Public Account'}
+                                        </Text>
+                                        <View style={{ width: 44, height: 24, borderRadius: 12, backgroundColor: isPrivate ? colors.primary : '#E9E9EB', padding: 2, justifyContent: 'center' }}>
+                                            <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: 'white', alignSelf: isPrivate ? 'flex-end' : 'flex-start' }} />
+                                        </View>
+                                    </View>
+                                    <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 18 }}>
+                                        {isPrivate 
+                                            ? "Only followers can see your posts and stories. People must request to follow you."
+                                            : "Anyone can see your posts and follow you without approval."
+                                        }
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+                        </View>
                         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Security</Text>
 
                         <View style={[styles.inputGroup, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF', borderColor: colors.border }]}>
@@ -499,47 +533,53 @@ const styles = StyleSheet.create({
         position: 'absolute',
         bottom: 0,
         right: 0,
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
     },
     content: {
         paddingHorizontal: 16,
         paddingTop: 10,
     },
     sectionTitle: {
-        fontSize: 13,
-        fontWeight: '600',
+        fontSize: 14,
+        fontWeight: '900',
         textTransform: 'uppercase',
         marginLeft: 16,
-        marginBottom: 8,
+        marginBottom: 12,
         marginTop: 24,
-        letterSpacing: 0.5,
+        letterSpacing: 1,
+        opacity: 0.6,
     },
     inputGroup: {
-        borderRadius: 12,
+        borderRadius: 24,
         overflow: 'hidden',
-        borderWidth: 1, // subtle border usually
+        borderWidth: 1,
     },
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 16,
-        paddingVertical: 12, // More breathing room
-        borderBottomWidth: 1, // Separator
+        paddingVertical: 16,
+        borderBottomWidth: 1,
     },
     label: {
-        width: 90, // Fixed width for alignment
-        fontSize: 15,
-        fontWeight: '500',
+        width: 90,
+        fontSize: 14,
+        fontWeight: '700',
     },
     input: {
         flex: 1,
         fontSize: 16,
-        paddingVertical: 0, // Reset default padding
+        paddingVertical: 0,
+        fontWeight: '500',
     },
     textArea: {
         minHeight: 60,

@@ -20,7 +20,22 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
-app.use('/uploads', express.static('uploads')); // Serve uploaded files correctly
+// Serve static files with proper CORS and Cache headers
+app.use('/uploads', (req, res, next) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Range');
+    res.set('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges');
+    next();
+}, express.static('uploads', {
+    setHeaders: (res, path) => {
+        if (path.endsWith('.mp4')) res.set('Content-Type', 'video/mp4');
+        if (path.endsWith('.mov')) res.set('Content-Type', 'video/quicktime');
+        if (path.endsWith('.m4v')) res.set('Content-Type', 'video/x-m4v');
+        if (path.endsWith('.webm')) res.set('Content-Type', 'video/webm');
+        res.set('Accept-Ranges', 'bytes');
+    }
+}));
 
 // Database Connection
 mongoose.connect(process.env.MONGODB_URI)

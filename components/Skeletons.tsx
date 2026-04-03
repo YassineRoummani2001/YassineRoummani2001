@@ -1,10 +1,12 @@
-import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { Animated, Dimensions, StyleSheet, View } from 'react-native';
+import { useThemeContext } from '@/context/ThemeContext';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Dimensions, StyleSheet, View, Platform } from 'react-native';
 
 const { width } = Dimensions.get('window');
 const GRID_ITEM_SIZE = width / 3 - 2;
 
 const AnimatedView = ({ style }: { style: any }) => {
+    const { isDark } = useThemeContext();
     const opacity = useRef(new Animated.Value(0.3)).current;
 
     useEffect(() => {
@@ -24,7 +26,9 @@ const AnimatedView = ({ style }: { style: any }) => {
         ).start();
     }, []);
 
-    return <Animated.View style={[style, { opacity, backgroundColor: '#E1E9EE' }]} />;
+    const backgroundColor = isDark ? '#2C2C2E' : '#E1E9EE';
+
+    return <Animated.View style={[style, { opacity, backgroundColor }]} />;
 };
 
 export function SkeletonStory() {
@@ -41,8 +45,9 @@ export function SkeletonGridItem({ style }: { style?: any }) {
 }
 
 export function SkeletonRow() {
+    const { isDark } = useThemeContext();
     return (
-        <View style={styles.rowContainer}>
+        <View style={[styles.rowContainer, { backgroundColor: isDark ? 'transparent' : '#fff' }]}>
             <AnimatedView style={styles.rowAvatar} />
             <View style={styles.rowTextContainer}>
                 <AnimatedView style={styles.rowLineLong} />
@@ -54,6 +59,76 @@ export function SkeletonRow() {
 
 export function SkeletonFullscreen({ style }: { style?: any }) {
     return <AnimatedView style={[styles.fullscreen, style]} />;
+}
+
+export function SkeletonProfile() {
+    const { isDark } = useThemeContext();
+    const bgColor = isDark ? '#121212' : '#fff';
+    return (
+        <View style={[styles.profileContainer, { backgroundColor: bgColor }]}>
+            <AnimatedView style={styles.profileCover} />
+            <View style={styles.profileHeader}>
+                <View style={[styles.profileAvatarBorder, { backgroundColor: bgColor }]}>
+                    <AnimatedView style={styles.profileAvatar} />
+                </View>
+                <AnimatedView style={styles.profileName} />
+                <AnimatedView style={styles.profileHandle} />
+                <AnimatedView style={styles.profileBio} />
+
+                <View style={styles.profileActions}>
+                    <AnimatedView style={styles.profileButton} />
+                    <AnimatedView style={styles.profileButton} />
+                </View>
+
+                <View style={styles.profileStats}>
+                    <AnimatedView style={styles.profileStat} />
+                    <AnimatedView style={styles.profileStat} />
+                    <AnimatedView style={styles.profileStat} />
+                </View>
+            </View>
+        </View>
+    );
+}
+
+export function SkeletonPost() {
+    const { isDark } = useThemeContext();
+    const bgColor = isDark ? '#000000' : '#fff';
+    return (
+        <View style={[styles.postContainer, { backgroundColor: bgColor }]}>
+            <View style={styles.postHeader}>
+                <AnimatedView style={styles.postAvatar} />
+                <View style={styles.postHeaderText}>
+                    <AnimatedView style={styles.postTitle} />
+                    <AnimatedView style={styles.postSubtitle} />
+                </View>
+            </View>
+            <AnimatedView style={styles.postMedia} />
+            <View style={styles.postFooter}>
+                <View style={styles.postActionsSkeleton}>
+                    <AnimatedView style={styles.postActionIcon} />
+                    <AnimatedView style={styles.postActionIcon} />
+                    <AnimatedView style={styles.postActionIcon} />
+                </View>
+                <AnimatedView style={styles.postCaptionLine} />
+                <AnimatedView style={[styles.postCaptionLine, { width: '40%' }]} />
+            </View>
+        </View>
+    );
+}
+
+export function SkeletonMarketItem() {
+    const { isDark } = useThemeContext();
+    const bgColor = isDark ? '#1C1C1E' : '#F9FAFB';
+    return (
+        <View style={[styles.itemCardSkeleton, { backgroundColor: bgColor }]}>
+            <AnimatedView style={styles.itemImageSkeleton} />
+            <View style={{ padding: 12, gap: 8 }}>
+                <AnimatedView style={{ width: '80%', height: 16, borderRadius: 4 }} />
+                <AnimatedView style={{ width: '40%', height: 18, borderRadius: 4 }} />
+                <AnimatedView style={{ width: '60%', height: 12, borderRadius: 4 }} />
+            </View>
+        </View>
+    );
 }
 
 const styles = StyleSheet.create({
@@ -117,7 +192,6 @@ const styles = StyleSheet.create({
     // Profile Skeleton
     profileContainer: {
         flex: 1,
-        backgroundColor: '#fff',
     },
     profileCover: {
         width: '100%',
@@ -131,7 +205,6 @@ const styles = StyleSheet.create({
     profileAvatarBorder: {
         padding: 4,
         borderRadius: 60,
-        backgroundColor: '#fff',
         marginBottom: 12,
     },
     profileAvatar: {
@@ -166,7 +239,7 @@ const styles = StyleSheet.create({
     profileButton: {
         flex: 1,
         height: 45,
-        borderRadius: 12,
+        borderRadius: 24,
     },
     profileStats: {
         flexDirection: 'row',
@@ -181,8 +254,10 @@ const styles = StyleSheet.create({
     },
     // Post Skeleton
     postContainer: {
-        marginBottom: 20,
-        backgroundColor: '#fff',
+        marginBottom: 32,
+        marginHorizontal: Platform.OS === 'web' ? 0 : 16,
+        borderRadius: 28,
+        padding: 16,
     },
     postHeader: {
         flexDirection: 'row',
@@ -232,54 +307,15 @@ const styles = StyleSheet.create({
         borderRadius: 4,
         marginBottom: 6,
     },
+    // Marketplace Skeleton
+    itemCardSkeleton: {
+        flex: 1,
+        margin: 8,
+        borderRadius: 20,
+        overflow: 'hidden',
+    },
+    itemImageSkeleton: {
+        width: '100%',
+        height: 180,
+    },
 });
-
-export function SkeletonProfile() {
-    return (
-        <View style={styles.profileContainer}>
-            <AnimatedView style={styles.profileCover} />
-            <View style={styles.profileHeader}>
-                <View style={styles.profileAvatarBorder}>
-                    <AnimatedView style={styles.profileAvatar} />
-                </View>
-                <AnimatedView style={styles.profileName} />
-                <AnimatedView style={styles.profileHandle} />
-                <AnimatedView style={styles.profileBio} />
-
-                <View style={styles.profileActions}>
-                    <AnimatedView style={styles.profileButton} />
-                    <AnimatedView style={styles.profileButton} />
-                </View>
-
-                <View style={styles.profileStats}>
-                    <AnimatedView style={styles.profileStat} />
-                    <AnimatedView style={styles.profileStat} />
-                    <AnimatedView style={styles.profileStat} />
-                </View>
-            </View>
-        </View>
-    );
-}
-export function SkeletonPost() {
-    return (
-        <View style={styles.postContainer}>
-            <View style={styles.postHeader}>
-                <AnimatedView style={styles.postAvatar} />
-                <View style={styles.postHeaderText}>
-                    <AnimatedView style={styles.postTitle} />
-                    <AnimatedView style={styles.postSubtitle} />
-                </View>
-            </View>
-            <AnimatedView style={styles.postMedia} />
-            <View style={styles.postFooter}>
-                <View style={styles.postActionsSkeleton}>
-                    <AnimatedView style={styles.postActionIcon} />
-                    <AnimatedView style={styles.postActionIcon} />
-                    <AnimatedView style={styles.postActionIcon} />
-                </View>
-                <AnimatedView style={styles.postCaptionLine} />
-                <AnimatedView style={[styles.postCaptionLine, { width: '40%' }]} />
-            </View>
-        </View>
-    );
-}

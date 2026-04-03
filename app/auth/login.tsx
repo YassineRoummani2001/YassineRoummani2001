@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderRadius: 16,
+        borderRadius: 24,
         paddingHorizontal: 16,
         paddingVertical: 14,
         marginBottom: 16,
@@ -262,6 +262,7 @@ const styles = StyleSheet.create({
     input: {
         flex: 1,
         fontSize: 16,
+        outlineStyle: 'none' as any,
     },
     eyeIcon: {
         padding: 4,
@@ -275,11 +276,14 @@ const styles = StyleSheet.create({
     },
     loginButton: {
         backgroundColor: Colors.light.primary,
-        borderRadius: 16,
+        borderRadius: 30,
         paddingVertical: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        boxShadow: `0px 4px 8px ${Colors.light.primary}4D`,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 16,
+        elevation: 8,
     },
     loginContent: {
         flexDirection: 'row',
@@ -330,7 +334,10 @@ const styles = StyleSheet.create({
         alignSelf: 'center',
         borderRadius: 24,
         overflow: 'hidden',
-        boxShadow: '0px 20px 40px rgba(0,0,0,0.1)',
+        shadowOffset: { width: 0, height: 20 },
+        shadowOpacity: 0.1,
+        shadowRadius: 40,
+        elevation: 10,
     },
     brandingSection: {
         flex: 1,

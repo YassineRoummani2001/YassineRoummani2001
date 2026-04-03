@@ -184,6 +184,9 @@ router.put('/profile', protect, async (req, res) => {
             user.phone = req.body.phone || user.phone;
             user.coverImage = req.body.coverImage || user.coverImage;
             user.avatar = req.body.avatar || user.avatar;
+            if (req.body.isPrivate !== undefined) {
+                user.isPrivate = req.body.isPrivate;
+            }
             
             if (req.body.password) {
                 user.password = req.body.password;
@@ -203,6 +206,7 @@ router.put('/profile', protect, async (req, res) => {
                 links: updatedUser.links,
                 phone: updatedUser.phone,
                 coverImage: updatedUser.coverImage,
+                isPrivate: updatedUser.isPrivate,
                 token: generateToken(updatedUser._id),
                 followers: updatedUser.followers || [],
                 following: updatedUser.following || [],

@@ -5,45 +5,35 @@ import { useThemeContext } from '@/context/ThemeContext';
 import { useUser } from '@/context/UserContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { Ban, ChevronLeft, Clapperboard, Flag, Grid3X3, MonitorPlay, MoreHorizontal, Share2, X } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, Image, Modal, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ban, Flag, Share2, X } from 'lucide-react-native';
+import { useEffect, useState, useMemo } from 'react';
+import { ActivityIndicator, Alert, Image, Modal, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
-const { width } = Dimensions.get('window');
-const COLUMN_WIDTH = width / 3;
-
-// Helper to normalize URIs
 const getCorrectUrl = (url: string) => {
     if (!url || typeof url !== 'string') return '';
     if (url.startsWith('blob:')) return '';
-
-    // Force use of current API_BASE_URL for any internal uploads
     if (url.includes('/uploads/')) {
         const uploadIndex = url.indexOf('/uploads/');
         return `${API_BASE_URL}${url.substring(uploadIndex)}`;
     }
-
     if (url.startsWith('data:')) return url;
     if (url.startsWith('http')) return url;
     return `${API_BASE_URL}/uploads/${url}`;
 };
 
-const GridVideoItem = ({ uri }: { uri: string }) => {
+function GridVideoItem({ uri, style }: { uri: string, style: any }) {
     const player = useVideoPlayer(getCorrectUrl(uri), player => {
+        player.loop = true;
         player.muted = true;
     });
-
     return (
-        <View style={styles.gridImage}>
-            <VideoView
-                player={player}
-                style={{ width: '100%', height: '100%' }}
-                contentFit="cover"
-                nativeControls={false}
-            />
+        <View style={[style, { overflow: 'hidden', backgroundColor: 'black' }]}>
+            <VideoView player={player} style={{ width: '100%', height: '100%' }} contentFit="cover" nativeControls={false} />
         </View>
     );
-};
+}
 
 export default function UserProfileScreen() {
     const router = useRouter();
@@ -58,357 +48,289 @@ export default function UserProfileScreen() {
     const [userPosts, setUserPosts] = useState<any[]>([]);
     const [postsLoading, setPostsLoading] = useState(true);
     const [userData, setUserData] = useState<any>(null);
+    const [isRequested, setIsRequested] = useState(false);
     const [userLoading, setUserLoading] = useState(true);
 
-    // Fetch user data
-    useEffect(() => {
-        if (!id) return;
-        fetchUserData();
-    }, [id]);
+    const { colors, isDark } = useThemeContext();
+    const { width } = useWindowDimensions();
+    const isDesktop = Platform.OS === 'web' && width > 768;
+    const COLUMN_WIDTH = isDesktop ? Math.floor((900 - 64 - 16) / 3) : width / 3;
+    const styles = useMemo(() => createStyles(colors, isDark, width, COLUMN_WIDTH, isDesktop), [colors, isDark, width, COLUMN_WIDTH, isDesktop]);
 
-    const user = userData; // Don't use fallback here, handle null in render
+    useEffect(() => { if (id) fetchUserData(); }, [id]);
+    useEffect(() => { fetchUserPosts(); }, [id]);
+    useEffect(() => {
+        if (currentUser) {
+            const uid = id?.toString();
+            setIsFollowing(!!currentUser.following?.some((f: any) => (typeof f === 'string' ? f : f._id) === uid));
+            setIsRequested(!!currentUser.sentRequests?.some((r: any) => (typeof r === 'string' ? r : r._id) === uid));
+        }
+    }, [currentUser, id]);
 
     const fetchUserData = async () => {
         setUserLoading(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/api/auth/user/${id}`);
-
-            if (response.ok) {
-                const data = await response.json();
-                setUserData({
-                    name: data.name,
-                    handle: data.handle,
-                    avatar: data.avatar || 'https://i.pravatar.cc/150?u=user',
-                    coverImage: data.coverImage || 'https://dummyimage.com/800x400/333/fff.png&text=Vibe',
-                    bio: data.bio || '',
-                    links: data.links || [], // Added links
-                    posts: userPosts.length.toString(),
-                    followers: data.followersCount?.toString() || '0',
-                    following: data.followingCount?.toString() || '0',
-                    likes: '0',
-                });
+            const res = await fetch(`${API_BASE_URL}/api/auth/user/${id}`);
+            if (res.ok) {
+                const data = await res.json();
+                setUserData(data);
                 setFollowersCount(data.followersCount || 0);
                 setFollowingCount(data.followingCount || 0);
             }
-        } catch (error) {
-            console.error('Error fetching user data:', error);
-        } finally {
-            setUserLoading(false);
-        }
+        } catch (e) { console.error(e); }
+        finally { setUserLoading(false); }
     };
-
-    // Fetch user posts
-    useEffect(() => {
-        fetchUserPosts();
-    }, [id]);
 
     const fetchUserPosts = async () => {
         setPostsLoading(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/api/auth/posts/${id}`);
-
-            if (response.ok) {
-                const data = await response.json();
-                setUserPosts(data);
-            }
-        } catch (error) {
-            console.error('Error fetching posts:', error);
-        } finally {
-            setPostsLoading(false);
-        }
+            const res = await fetch(`${API_BASE_URL}/api/auth/posts/${id}`);
+            if (res.ok) setUserPosts(await res.json());
+        } catch (e) { console.error(e); }
+        finally { setPostsLoading(false); }
     };
 
-    // Check if current user is following this profile
-    useEffect(() => {
-        if (currentUser && currentUser.following) {
-            const following = currentUser.following.some((f: any) =>
-                (typeof f === 'string' ? f : f._id) === id
-            );
-            setIsFollowing(following);
-        }
-    }, [currentUser, id]);
-
     const handleFollow = async () => {
-        if (!currentUser || followLoading) return;
+        if (!currentUser || !id || followLoading) return;
+        const performFollow = async () => {
+            setFollowLoading(true);
+            try {
+                const result = await followUser(id);
+                if (result.success) {
+                    const s = result.data.status;
+                    if (s === 'followed') { setIsFollowing(true); setIsRequested(false); }
+                    else if (s === 'unfollowed' || s === 'cancelled') { setIsFollowing(false); setIsRequested(false); }
+                    else if (s === 'requested') { setIsFollowing(false); setIsRequested(true); }
+                    if (result.data.followersCount !== undefined) setFollowersCount(result.data.followersCount);
+                    if (result.data.followingCount !== undefined) setFollowingCount(result.data.followingCount);
+                }
+            } catch (e) { console.error(e); }
+            finally { setFollowLoading(false); }
+        };
 
-        setFollowLoading(true);
-        const result = await followUser(id);
-
-        if (result.success) {
-            setIsFollowing(result.data.isFollowing);
-            setFollowersCount(result.data.followersCount);
-        } else {
-            alert(result.message || 'Failed to follow/unfollow');
-        }
-
-        setFollowLoading(false);
+        if (isFollowing || isRequested) {
+            const msg = isFollowing ? `Unfollow ${userData?.name}?` : `Cancel request to ${userData?.name}?`;
+            if (Platform.OS === 'web') { if (confirm(msg)) performFollow(); }
+            else Alert.alert(isFollowing ? 'Unfollow?' : 'Cancel?', msg, [{ text: 'No', style: 'cancel' }, { text: 'Yes', onPress: performFollow }]);
+        } else performFollow();
     };
 
     const handleBlockUser = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/auth/block/${id}`, {
-                method: 'PUT',
-                headers: { 'Authorization': `Bearer ${currentUser?.token}` }
-            });
-
-            if (response.ok) {
-                alert('User blocked successfully');
-                router.replace('/'); // Go back to feed after blocking
-            } else {
-                alert('Failed to block user');
-            }
-        } catch (error) {
-            console.error('Error blocking user:', error);
-        }
+            const res = await fetch(`${API_BASE_URL}/api/auth/block/${id}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${currentUser?.token}` } });
+            if (res.ok) { alert('User blocked'); router.replace('/'); }
+        } catch (e) { console.error(e); }
     };
 
-    const renderContent = () => {
-        if (postsLoading) {
-            return (
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={Colors.light.primary} />
-                </View>
-            );
-        }
+    const isOwnProfile = currentUser?._id === id;
+    const canSeeContent = useMemo(() => !userData?.isPrivate || isFollowing || isOwnProfile, [userData?.isPrivate, isFollowing, isOwnProfile]);
 
+    const renderContent = () => {
+        if (postsLoading) return <View style={styles.emptyState}><ActivityIndicator size="large" color={colors.primary} /></View>;
+        if (!canSeeContent) return (
+            <View style={styles.emptyState}>
+                <Ionicons name="lock-closed" size={48} color={colors.textSecondary} />
+                <Text style={[styles.emptyStateText, { fontWeight: '700', fontSize: 18, marginTop: 12 }]}>This Account is Private</Text>
+                <Text style={[styles.emptyStateText, { fontSize: 14 }]}>Follow to see their content</Text>
+            </View>
+        );
+        const reels = userPosts.filter(p => p.type === 'reel' || p.type === 'video' || p.uri?.endsWith('.mp4'));
         if (activeTab === 0) {
-            if (userPosts.length === 0) {
-                return (
-                    <View style={styles.emptyContainer}>
-                        <Text style={styles.emptyText}>No posts yet</Text>
-                    </View>
-                );
-            }
+            if (userPosts.length === 0) return <View style={styles.emptyState}><Ionicons name="grid-outline" size={48} color={colors.textSecondary} /><Text style={styles.emptyStateText}>No posts yet</Text></View>;
             return (
                 <View style={styles.grid}>
-                    {userPosts.map((post, index) => {
+                    {userPosts.map((post, i) => {
                         const isVideo = post.type === 'video' || post.type === 'reel' || post.uri?.endsWith('.mp4');
                         return (
-                            <TouchableOpacity
-                                key={post._id || index}
-                                style={styles.gridItem}
-                                onPress={() => router.push({
-                                    pathname: '/media-view',
-                                    params: {
-                                        // uri: post.uri,
-                                        type: isVideo ? 'video' : 'image',
-                                        postId: post._id
-                                    }
-                                })}
-                            >
-                                {isVideo ? (
-                                    <GridVideoItem uri={post.uri || post.videoUri} />
-                                ) : (
-                                    <Image source={{ uri: getCorrectUrl(post.uri || post.image) }} style={styles.gridImage} />
-                                )}
+                            <TouchableOpacity key={post._id || i} style={styles.gridItem} onPress={() => router.push({ pathname: '/media-view', params: { type: isVideo ? 'video' : 'image', postId: post._id } })}>
+                                {isVideo ? <GridVideoItem uri={post.uri || post.videoUri} style={styles.gridImage} /> : <Image source={{ uri: getCorrectUrl(post.uri || post.image) }} style={styles.gridImage} resizeMode="cover" />}
+                                {isVideo && <View style={styles.videoIconOverlay}><Ionicons name="play" size={16} color="white" /></View>}
                             </TouchableOpacity>
                         );
                     })}
                 </View>
             );
         } else if (activeTab === 1) {
-            const reels = userPosts.filter(p => p.type === 'reel' || p.type === 'video' || p.uri?.endsWith('.mp4'));
-
-            if (reels.length === 0) {
-                return (
-                    <View style={styles.emptyContainer}>
-                        <Text style={styles.emptyText}>No reels yet</Text>
-                    </View>
-                );
-            }
-
+            if (reels.length === 0) return <View style={styles.emptyState}><Ionicons name="film-outline" size={48} color={colors.textSecondary} /><Text style={styles.emptyStateText}>No reels yet</Text></View>;
             return (
                 <View style={styles.grid}>
-                    {reels.map((post, index) => (
-                        <TouchableOpacity
-                            key={post._id || index}
-                            style={styles.reelItem}
-                            onPress={() => router.push({
-                                pathname: '/media-view',
-                                params: {
-                                    // uri: post.uri,
-                                    type: 'video',
-                                    postId: post._id
-                                }
-                            })}
-                        >
-                            <GridVideoItem uri={post.uri} />
-                            <View style={styles.reelIconOverlay}>
-                                <Clapperboard size={16} color="white" />
-                                <Text style={styles.reelViews}>{post.views || 0}</Text>
-                            </View>
+                    {reels.map((post, i) => (
+                        <TouchableOpacity key={post._id || i} style={styles.reelItem} onPress={() => router.push({ pathname: '/media-view', params: { type: 'video', postId: post._id } })}>
+                            <GridVideoItem uri={post.uri} style={styles.gridImage} />
+                            <View style={styles.reelIconOverlay}><Ionicons name="play" size={14} color="white" /><Text style={styles.reelViews}>{post.views || 0}</Text></View>
                         </TouchableOpacity>
                     ))}
                 </View>
             );
         }
-        return <View style={styles.emptyState}><Text>No content</Text></View>;
+        return <View style={styles.emptyState}><Ionicons name="play-outline" size={48} color={colors.textSecondary} /><Text style={styles.emptyStateText}>No videos yet</Text></View>;
     };
 
-    const { colors, isDark } = useThemeContext();
+    // Follow/Message button component
+    const FollowBtn = ({ compact }: { compact?: boolean }) => (
+        <TouchableOpacity
+            style={[styles.followBtn, (isFollowing || isRequested) && styles.followBtnOutline, followLoading && { opacity: 0.6 }, compact && { height: 36, paddingVertical: 0 }]}
+            onPress={handleFollow} disabled={followLoading}
+        >
+            {followLoading ? <ActivityIndicator size="small" color={(isFollowing || isRequested) ? colors.text : '#fff'} /> :
+                <Text style={[styles.followBtnText, (isFollowing || isRequested) && { color: colors.text }]}>
+                    {isFollowing ? 'Following' : isRequested ? 'Requested' : 'Follow'}
+                </Text>}
+        </TouchableOpacity>
+    );
+    const MsgBtn = ({ compact }: { compact?: boolean }) => (
+        <TouchableOpacity style={[styles.msgBtn, compact && { height: 36, paddingVertical: 0 }]} onPress={() => router.push('/chat')}>
+            <Text style={[styles.msgBtnText, { color: colors.text }]}>Message</Text>
+        </TouchableOpacity>
+    );
 
-    if (userLoading) {
-        return (
-            <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                        <ChevronLeft size={28} color={Colors.light.white} />
-                    </TouchableOpacity>
-                </View>
-                <SkeletonProfile />
-            </SafeAreaView>
-        );
-    }
+    if (userLoading) return (
+        <SafeAreaView style={styles.container}>
+            <View style={styles.header}><TouchableOpacity onPress={() => router.back()} style={styles.backBtn}><Ionicons name="chevron-back" size={24} color="white" /></TouchableOpacity></View>
+            <SkeletonProfile />
+        </SafeAreaView>
+    );
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <SafeAreaView style={styles.container}>
+            {/* Floating header */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <ChevronLeft size={28} color={Colors.light.white} />
+                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                    <Ionicons name="chevron-back" size={24} color="white" />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.backButton} onPress={() => setOptionsVisible(true)}>
-                    <MoreHorizontal size={24} color={Colors.light.white} />
+                <TouchableOpacity style={styles.backBtn} onPress={() => setOptionsVisible(true)}>
+                    <Ionicons name="ellipsis-horizontal" size={22} color="white" />
                 </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-                <Image source={{ uri: getCorrectUrl(user.coverImage) }} style={styles.coverImage} resizeMode="cover" />
+            <ScrollView showsVerticalScrollIndicator={isDesktop} contentContainerStyle={{ paddingBottom: isDesktop ? 60 : 100 }}>
+                {/* ── COVER ── */}
+                <View style={{ width: '100%', height: isDesktop ? 320 : 180 }}>
+                    <Image source={{ uri: getCorrectUrl(userData?.coverImage) || 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=1400&q=80' }} style={[StyleSheet.absoluteFill, { backgroundColor: colors.gray }]} resizeMode="cover" />
+                    <LinearGradient colors={['transparent', 'transparent', 'rgba(0,0,0,0.7)']} style={StyleSheet.absoluteFill} />
+                </View>
 
-                <View style={styles.profileHeader}>
-                    <View style={[styles.avatarBorder, { backgroundColor: colors.background }]}>
-                        <Image source={{ uri: getCorrectUrl(user.avatar) }} style={styles.avatar} />
-                    </View>
+                <View style={isDesktop ? styles.desktopWrapper : undefined}>
 
-                    <View style={styles.userInfo}>
-                        <Text style={[styles.name, { color: colors.text }]}>{user.name}</Text>
-                        <Text style={[styles.handle, { color: colors.textSecondary }]}>{user.handle}</Text>
-                    </View>
-
-                    {user.bio ? (
-                        <View style={styles.bioContainer}>
-                            {user.bio.split('\n').map((line: any, index: any) => (
-                                <Text key={index} style={[styles.bio, { color: colors.text }]}>{line}</Text>
-                            ))}
+                    {isDesktop ? (
+                        /* ── DESKTOP: avatar + buttons row ── */
+                        <View style={styles.desktopHeaderRow}>
+                            <LinearGradient colors={[colors.primary, '#8b5cf6', '#ec4899']} style={[styles.avatarGradientBorder, styles.avatarGradientBorderDesktop]}>
+                                <View style={[styles.avatarBorder, styles.avatarBorderDesktop]}>
+                                    <Image source={{ uri: getCorrectUrl(userData?.avatar) || 'https://i.pravatar.cc/150' }} style={[styles.avatar, styles.avatarDesktop]} />
+                                </View>
+                            </LinearGradient>
+                            <View style={styles.desktopActionGroup}>
+                                <FollowBtn compact />
+                                <MsgBtn compact />
+                                <TouchableOpacity style={styles.btnIcon} onPress={() => setOptionsVisible(true)}>
+                                    <Ionicons name="ellipsis-horizontal" size={18} color={colors.text} />
+                                </TouchableOpacity>
+                            </View>
                         </View>
-                    ) : null}
-
-                    {user.links && user.links.length > 0 && (
-                        <View style={styles.linksContainer}>
-                            {user.links.map((link: any, index: any) => {
-                                const url = typeof link === 'object' ? link.url : link;
-                                const title = typeof link === 'object' ? (link.title || link.url) : link;
-                                return (
-                                    <TouchableOpacity 
-                                        key={index} 
-                                        onPress={() => {
-                                            if (Platform.OS === 'web') {
-                                                window.open(url, '_blank');
-                                            } else {
-                                                // Handle native link opening if needed
-                                                // console.log('Opening link:', url);
-                                            }
-                                        }}
-                                    >
-                                        <Text style={styles.link}>{title}</Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
+                    ) : (
+                        /* ── MOBILE: avatar left, stats right (Instagram style) ── */
+                        <View style={styles.mobileHeaderSection}>
+                            <LinearGradient colors={[colors.primary, '#8b5cf6', '#ec4899']} style={styles.avatarGradientBorder}>
+                                <View style={styles.avatarBorder}>
+                                    <Image source={{ uri: getCorrectUrl(userData?.avatar) || 'https://i.pravatar.cc/150' }} style={styles.avatar} />
+                                </View>
+                            </LinearGradient>
+                            <View style={styles.mobileStatsGroup}>
+                                <View style={styles.mobileStatItem}>
+                                    <Text style={styles.statNumber}>{userPosts.length}</Text>
+                                    <Text style={styles.statLabel}>Posts</Text>
+                                </View>
+                                <TouchableOpacity style={styles.mobileStatItem} onPress={() => router.push({ pathname: '/users-list', params: { type: 'followers', title: 'Followers', userId: id } })}>
+                                    <Text style={styles.statNumber}>{followersCount}</Text>
+                                    <Text style={styles.statLabel}>Followers</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.mobileStatItem} onPress={() => router.push({ pathname: '/users-list', params: { type: 'following', title: 'Following', userId: id } })}>
+                                    <Text style={styles.statNumber}>{followingCount}</Text>
+                                    <Text style={styles.statLabel}>Following</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     )}
 
-                    <View style={styles.actionsRow}>
-                        <TouchableOpacity
-                            style={[
-                                styles.followButton,
-                                isFollowing && [styles.followingButton, { backgroundColor: colors.background, borderColor: colors.border }],
-                                followLoading && { opacity: 0.6 }
-                            ]}
-                            onPress={handleFollow}
-                            disabled={followLoading}
-                        >
-                            {followLoading ? (
-                                <ActivityIndicator size="small" color={isFollowing ? colors.text : Colors.light.white} />
-                            ) : (
-                                <Text style={[
-                                    styles.followButtonText,
-                                    isFollowing && [styles.followingButtonText, { color: colors.text }]
-                                ]}>
-                                    {isFollowing ? 'Following' : 'Follow'}
-                                </Text>
-                            )}
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.messageButton, { backgroundColor: isDark ? '#333' : '#F0F0F0' }]} onPress={() => router.push('/chat')}>
-                            <Text style={[styles.messageButtonText, { color: colors.text }]}>Message</Text>
-                        </TouchableOpacity>
+                    {/* ── META ── */}
+                    <View style={isDesktop ? styles.desktopMeta : styles.mobileMeta}>
+                        <Text style={styles.name}>{userData?.name}</Text>
+                        <Text style={styles.handle}>@{userData?.handle}{userData?.pronouns ? `  ·  ${userData.pronouns.replace(/\//g, ' / ')}` : ''}</Text>
+
+                        {userData?.bio ? userData.bio.split('\n').map((line: any, i: any) => <Text key={i} style={styles.bio}>{line}</Text>) : null}
+
+                        {userData?.links && userData.links.length > 0 && (
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                                {userData.links.map((link: any, i: any) => {
+                                    const url = typeof link === 'object' ? link.url : link;
+                                    const title = typeof link === 'object' ? (link.title || link.url) : link;
+                                    return (
+                                        <TouchableOpacity key={i} onPress={() => Platform.OS === 'web' ? window.open(url, '_blank') : null} style={styles.linkChip}>
+                                            <Ionicons name="link-outline" size={13} color={colors.primary} />
+                                            <Text style={styles.link}>{title}</Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                        )}
+
+                        {/* Desktop stats */}
+                        {isDesktop && (
+                            <View style={styles.statsRow}>
+                                <View style={styles.statItem}><Text style={styles.statNumber}>{userPosts.length}</Text><Text style={styles.statLabel}>Posts</Text></View>
+                                <View style={styles.vertDivider} />
+                                <TouchableOpacity style={styles.statItem} onPress={() => router.push({ pathname: '/users-list', params: { type: 'followers', title: 'Followers', userId: id } })}><Text style={styles.statNumber}>{followersCount}</Text><Text style={styles.statLabel}>Followers</Text></TouchableOpacity>
+                                <View style={styles.vertDivider} />
+                                <TouchableOpacity style={styles.statItem} onPress={() => router.push({ pathname: '/users-list', params: { type: 'following', title: 'Following', userId: id } })}><Text style={styles.statNumber}>{followingCount}</Text><Text style={styles.statLabel}>Following</Text></TouchableOpacity>
+                            </View>
+                        )}
+
+                        {/* Mobile actions */}
+                        {!isDesktop && (
+                            <View style={styles.mobileActionsRow}>
+                                <FollowBtn />
+                                <MsgBtn />
+                                <TouchableOpacity style={styles.btnShareMobile} onPress={() => setOptionsVisible(true)}>
+                                    <Ionicons name="ellipsis-horizontal" size={18} color={colors.text} />
+                                </TouchableOpacity>
+                            </View>
+                        )}
                     </View>
 
-                    <View style={styles.statsRow}>
-                        <View style={styles.statItem}>
-                            <Text style={[styles.statNumber, { color: colors.text }]}>{user.posts}</Text>
-                            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Posts</Text>
+                    {/* ── TABS ── */}
+                    <View style={styles.tabSection}>
+                        <View style={styles.tabHeader}>
+                            {[{ label: 'Posts', icon: 'grid-outline', activeIcon: 'grid' }, { label: 'Reels', icon: 'film-outline', activeIcon: 'film' }, { label: 'Videos', icon: 'play-outline', activeIcon: 'play' }].map((tab, i) => (
+                                <TouchableOpacity key={i} style={styles.tabBtn} onPress={() => setActiveTab(i)}>
+                                    <Ionicons name={(activeTab === i ? tab.activeIcon : tab.icon) as any} size={20} color={activeTab === i ? colors.text : colors.textSecondary} />
+                                    {isDesktop && <Text style={[styles.tabLabelText, { color: activeTab === i ? colors.text : colors.textSecondary }]}>{tab.label}</Text>}
+                                    {activeTab === i && <View style={styles.tabIndicator} />}
+                                </TouchableOpacity>
+                            ))}
                         </View>
-                        <TouchableOpacity style={styles.statItem} onPress={() => router.push({ pathname: '/users-list', params: { type: 'followers', title: 'Followers', userId: id } })}>
-                            <Text style={[styles.statNumber, { color: colors.text }]}>{user.followers}</Text>
-                            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Followers</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.statItem} onPress={() => router.push({ pathname: '/users-list', params: { type: 'following', title: 'Following', userId: id } })}>
-                            <Text style={[styles.statNumber, { color: colors.text }]}>{user.following}</Text>
-                            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Following</Text>
-                        </TouchableOpacity>
+                        {renderContent()}
                     </View>
-                </View>
 
-                {/* Tabs */}
-                <View style={styles.tabSection}>
-                    <View style={[styles.tabHeader, { borderBottomColor: colors.border }]}>
-                        <TouchableOpacity style={styles.tabIcon} onPress={() => setActiveTab(0)}>
-                            <Grid3X3 color={activeTab === 0 ? colors.text : colors.textSecondary} size={24} />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.tabIcon} onPress={() => setActiveTab(1)}>
-                            <Clapperboard color={activeTab === 1 ? colors.text : colors.textSecondary} size={24} />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.tabIcon} onPress={() => setActiveTab(2)}>
-                            <MonitorPlay color={activeTab === 2 ? colors.text : colors.textSecondary} size={24} />
-                        </TouchableOpacity>
-                    </View>
-                    <View style={[styles.tabIndicator, { left: (width / 3) * activeTab, backgroundColor: colors.text }]} />
-                    {renderContent()}
                 </View>
             </ScrollView>
 
-            <Modal
-                animationType="fade"
-                transparent={true}
-                visible={optionsVisible}
-                onRequestClose={() => setOptionsVisible(false)}
-            >
-                <TouchableOpacity
-                    style={styles.modalOverlay}
-                    activeOpacity={1}
-                    onPress={() => setOptionsVisible(false)}
-                >
-                    <View style={[styles.modalContent, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }]}>
+            {/* Options Modal */}
+            <Modal animationType="fade" transparent visible={optionsVisible} onRequestClose={() => setOptionsVisible(false)}>
+                <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setOptionsVisible(false)}>
+                    <View style={[styles.modalContent, { backgroundColor: isDark ? '#1C1C1E' : '#fff' }]}>
                         <View style={styles.modalHeader}>
                             <Text style={[styles.modalTitle, { color: colors.text }]}>Options</Text>
-                            <TouchableOpacity onPress={() => setOptionsVisible(false)}>
-                                <X size={24} color={colors.text} />
-                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setOptionsVisible(false)}><X size={24} color={colors.text} /></TouchableOpacity>
                         </View>
-
-                        <TouchableOpacity style={[styles.modalOption, { borderBottomColor: colors.border }]} onPress={() => { setOptionsVisible(false); /* Handle Report */ }}>
-                            <Flag size={20} color={colors.text} />
-                            <Text style={[styles.modalOptionText, { color: colors.text }]}>Report User</Text>
+                        <TouchableOpacity style={[styles.modalOption, { borderBottomColor: colors.border }]} onPress={() => setOptionsVisible(false)}>
+                            <Flag size={20} color={colors.text} /><Text style={[styles.modalOptionText, { color: colors.text }]}>Report User</Text>
                         </TouchableOpacity>
-
-
                         <TouchableOpacity style={styles.modalOption} onPress={() => { setOptionsVisible(false); handleBlockUser(); }}>
-                            <Ban size={20} color="#FF3B30" />
-                            <Text style={[styles.modalOptionText, { color: '#FF3B30' }]}>Block User</Text>
+                            <Ban size={20} color="#FF3B30" /><Text style={[styles.modalOptionText, { color: '#FF3B30' }]}>Block User</Text>
                         </TouchableOpacity>
-
-                        <TouchableOpacity style={styles.modalOption} onPress={() => { setOptionsVisible(false); /* Handle Share */ }}>
-                            <Share2 size={20} color="#000" />
-                            <Text style={styles.modalOptionText}>Share Profile</Text>
+                        <TouchableOpacity style={styles.modalOption} onPress={() => { setOptionsVisible(false); /* share */ }}>
+                            <Share2 size={20} color={colors.text} /><Text style={[styles.modalOptionText, { color: colors.text }]}>Share Profile</Text>
                         </TouchableOpacity>
                     </View>
                 </TouchableOpacity>
@@ -417,141 +339,122 @@ export default function UserProfileScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: Colors.light.white },
+const createStyles = (colors: any, isDark: boolean, width: number, COLUMN_WIDTH: number, isDesktop: boolean) => StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+
+    // ── HEADER ──────────────────────────────────────────
     header: {
         position: 'absolute',
         top: Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) + 10 : 50,
-        left: 0, right: 0,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        zIndex: 10,
+        left: 0, right: 0, flexDirection: 'row',
+        justifyContent: 'space-between', paddingHorizontal: 16, zIndex: 10,
     },
-    backButton: {
-        width: 40, height: 40,
-        backgroundColor: 'rgba(0,0,0,0.3)',
-        borderRadius: 20,
-        alignItems: 'center', justifyContent: 'center',
+    backBtn: {
+        width: 40, height: 40, borderRadius: 20,
+        backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center',
     },
-    coverImage: { width: '100%', height: 200 },
-    profileHeader: { alignItems: 'center', paddingHorizontal: 20, marginTop: -50 },
-    avatarBorder: { padding: 4, borderRadius: 60, backgroundColor: Colors.light.white, marginBottom: 12 },
-    avatar: { width: 100, height: 100, borderRadius: 50 },
-    userInfo: { alignItems: 'center', marginBottom: 8 },
-    name: { fontSize: 24, fontWeight: '900', color: '#000' },
-    handle: { fontSize: 14, color: '#666', marginTop: 2 },
-    messageButton: { flex: 1, backgroundColor: '#F0F0F0', paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-    messageButtonText: { fontWeight: '700', fontSize: 16, color: '#000' },
-    bioContainer: {
-        alignItems: 'center',
-        marginVertical: 12,
-        gap: 4,
+
+    // ── DESKTOP WRAPPER ────────────────────────────────
+    desktopWrapper: { maxWidth: 900, alignSelf: 'center', width: '100%' },
+
+    // ── DESKTOP HEADER ROW ─────────────────────────────
+    desktopHeaderRow: {
+        flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between',
+        paddingHorizontal: 32, marginTop: -56, marginBottom: 12, zIndex: 10,
     },
-    bio: { fontSize: 14, color: '#333', textAlign: 'center', lineHeight: 20 },
-    linksContainer: {
-        marginTop: 4,
-        marginBottom: 16,
-        alignItems: 'center',
-        gap: 4,
+    desktopActionGroup: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 8 },
+
+    // ── MOBILE HEADER ──────────────────────────────────
+    mobileHeaderSection: {
+        flexDirection: 'row', alignItems: 'center',
+        paddingHorizontal: 16, marginTop: -36, marginBottom: 12, gap: 20,
     },
-    link: {
-        fontSize: 14,
-        color: Colors.light.primary,
-        textDecorationLine: 'underline',
+    mobileStatsGroup: {
+        flex: 1, flexDirection: 'row', justifyContent: 'space-around',
+        alignItems: 'center', paddingTop: 36,
     },
-    actionsRow: { 
-        flexDirection: 'row', 
-        gap: 12, 
-        paddingHorizontal: 20, 
-        marginBottom: 24, 
-        width: '100%',
-        marginTop: 10
+    mobileStatItem: { alignItems: 'center', gap: 2 },
+
+    // ── AVATAR ─────────────────────────────────────────
+    avatarGradientBorder: { padding: 3, borderRadius: 68, alignSelf: 'flex-start' as any },
+    avatarGradientBorderDesktop: { borderRadius: 96, alignSelf: 'auto' as any },
+    avatarBorder: {
+        padding: 4, borderRadius: 65, backgroundColor: colors.background,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12,
     },
-    followButton: { 
-        flex: 1, 
-        backgroundColor: Colors.light.primary, 
-        paddingVertical: 12, 
-        borderRadius: 12, 
-        alignItems: 'center', 
-        justifyContent: 'center' 
+    avatarBorderDesktop: { borderRadius: 93 },
+    avatar: { width: 90, height: 90, borderRadius: 45, backgroundColor: colors.gray },
+    avatarDesktop: { width: 170, height: 170, borderRadius: 85 },
+
+    // ── ACTION BUTTONS ─────────────────────────────────
+    followBtn: {
+        flex: 1, paddingVertical: 10, borderRadius: 24, alignItems: 'center', justifyContent: 'center',
+        backgroundColor: colors.primary,
     },
-    followingButton: { 
-        backgroundColor: 'transparent', 
-        borderWidth: 1 
+    followBtnOutline: {
+        backgroundColor: 'transparent', borderWidth: 1.5,
+        borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)',
     },
-    followButtonText: { 
-        color: Colors.light.white, 
-        fontSize: 16, 
-        fontWeight: 'bold' 
+    followBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+    msgBtn: {
+        flex: 1, paddingVertical: 10, borderRadius: 24, alignItems: 'center', justifyContent: 'center',
+        borderWidth: 1.5, borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)',
+        backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
     },
-    followingButtonText: { 
-        color: Colors.light.primary 
+    msgBtnText: { fontWeight: '700', fontSize: 14 },
+    btnIcon: {
+        width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
+        borderWidth: 1.5, borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)',
+        backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
     },
-    statsRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', paddingHorizontal: 30, marginBottom: 20 },
-    statItem: { alignItems: 'center' },
-    statNumber: { fontSize: 18, fontWeight: 'bold' },
-    statLabel: { fontSize: 12, color: Colors.light.textSecondary },
+    btnShareMobile: {
+        width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center',
+        borderWidth: 1.5, borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)',
+        backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+    },
+    mobileActionsRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
+
+    // ── META ───────────────────────────────────────────
+    desktopMeta: { paddingHorizontal: 32, paddingBottom: 8 },
+    mobileMeta: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
+    name: { fontSize: isDesktop ? 28 : 22, fontWeight: '900', color: colors.text, letterSpacing: -0.5, marginBottom: 2 },
+    handle: { fontSize: 14, fontWeight: '500', color: colors.textSecondary, marginBottom: 8 },
+    bio: { fontSize: 15, color: colors.text, lineHeight: 22, marginBottom: 2 },
+    linkChip: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    link: { fontSize: 14, color: colors.primary, textDecorationLine: 'underline' },
+
+    // ── STATS ──────────────────────────────────────────
+    statsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 20, marginBottom: 8 },
+    statItem: { flex: 1, alignItems: 'center' },
+    statNumber: { fontSize: 20, fontWeight: '900', color: colors.text, letterSpacing: -0.5, marginBottom: 2 },
+    statLabel: { fontSize: 11, fontWeight: '600', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, opacity: 0.7 },
+    vertDivider: { width: 1, height: 30, backgroundColor: colors.border },
+
+    // ── TABS ───────────────────────────────────────────
     tabSection: { flex: 1 },
-    tabHeader: { flexDirection: 'row', justifyContent: 'space-around', paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
-    tabIcon: { padding: 8 },
-    tabIndicator: { position: 'absolute', top: 40, width: width / 3, height: 2, backgroundColor: Colors.light.black, zIndex: 10 },
-    grid: { flexDirection: 'row', flexWrap: 'wrap' },
-    gridItem: { width: COLUMN_WIDTH, height: COLUMN_WIDTH, padding: 1 },
-    gridImage: { width: '100%', height: '100%' },
-    reelItem: { width: COLUMN_WIDTH, height: COLUMN_WIDTH * 1.6, padding: 1 },
-    reelIconOverlay: { position: 'absolute', bottom: 8, left: 8, flexDirection: 'row', gap: 4, alignItems: 'center' },
+    tabHeader: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, paddingHorizontal: isDesktop ? 32 : 0 },
+    tabBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, position: 'relative' },
+    tabLabelText: { fontSize: 14, fontWeight: '700' },
+    tabIndicator: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 2.5, backgroundColor: colors.text, borderRadius: 2 },
+
+    // ── GRID ───────────────────────────────────────────
+    grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: isDesktop ? 32 : 0, paddingTop: isDesktop ? 16 : 0, gap: isDesktop ? 8 : 0 },
+    gridItem: { width: isDesktop ? COLUMN_WIDTH - 6 : COLUMN_WIDTH, height: (isDesktop ? COLUMN_WIDTH - 6 : COLUMN_WIDTH) * 1.25, padding: isDesktop ? 0 : 1, position: 'relative' },
+    gridImage: { width: '100%', height: '100%', borderRadius: isDesktop ? 16 : 0, backgroundColor: isDark ? '#111' : '#f0f0f0' },
+    videoIconOverlay: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 4, padding: 4 },
+    reelItem: { width: isDesktop ? COLUMN_WIDTH - 6 : COLUMN_WIDTH, height: (isDesktop ? COLUMN_WIDTH - 6 : COLUMN_WIDTH) * 1.6, padding: isDesktop ? 0 : 1, position: 'relative' },
+    reelIconOverlay: { position: 'absolute', bottom: 8, left: 8, flexDirection: 'row', alignItems: 'center', gap: 4 },
     reelViews: { color: 'white', fontSize: 12, fontWeight: '600' },
-    emptyState: { padding: 40, alignItems: 'center' },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'flex-end',
-    },
-    modalContent: {
-        backgroundColor: Colors.light.white,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        padding: 24,
-        paddingBottom: Platform.OS === 'ios' ? 40 : 24,
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 24,
-    },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-    },
-    modalOption: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 16,
-        gap: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
-    },
-    modalOptionText: {
-        fontSize: 16,
-        fontWeight: '500',
-        color: '#000',
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingTop: 100,
-    },
-    emptyContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingTop: 100,
-    },
-    emptyText: {
-        fontSize: 16,
-        color: '#999',
-    }
+
+    // ── EMPTY / LOADING ────────────────────────────────
+    emptyState: { padding: 60, alignItems: 'center', justifyContent: 'center', gap: 12 },
+    emptyStateText: { color: colors.textSecondary, fontSize: 16 },
+
+    // ── MODAL ──────────────────────────────────────────
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+    modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24 },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+    modalTitle: { fontSize: 18, fontWeight: 'bold' },
+    modalOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, gap: 16, borderBottomWidth: 1, borderBottomColor: isDark ? '#333' : '#f0f0f0' },
+    modalOptionText: { fontSize: 16, fontWeight: '500' },
 });

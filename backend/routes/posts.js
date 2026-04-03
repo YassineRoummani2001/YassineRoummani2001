@@ -110,7 +110,8 @@ router.post('/', protect, async (req, res) => {
             user: req.user._id,
             uri,
             caption,
-            type: postType
+            type: postType,
+            isMuted: !!req.body.isMuted
         });
         
         // Populate user details for the response so frontend can display immediately
@@ -189,7 +190,7 @@ router.post('/upload-reel', protect, (req, res, next) => {
 
         // console.log('✅ File received:', req.file.filename);
         
-        const { caption, music } = req.body;
+        const { caption, music, isMuted } = req.body;
         const videoPath = `/uploads/reels/${req.file.filename}`;
 
         // console.log('Creating post with:', { videoPath, caption, music });
@@ -204,7 +205,8 @@ router.post('/upload-reel', protect, (req, res, next) => {
             likes: [],
             comments: [],
             views: 0,
-            shares: 0
+            shares: 0,
+            isMuted: isMuted === 'true' || isMuted === true
         });
 
         // console.log('✅ Post created:', post._id);

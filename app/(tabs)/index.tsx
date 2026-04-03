@@ -10,12 +10,16 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Platform, RefreshControl, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SkeletonPost } from '@/components/Skeletons';
+import { SkeletonPost, SkeletonStory } from '@/components/Skeletons';
 
 
 // Lazy load heavy components
-const FeedPost = lazyLoad(() => import('@/components/FeedPost'), <MinimalLoader />);
-const StoryList = lazyLoad(() => import('@/components/StoryList'), <MinimalLoader />);
+const FeedPost = lazyLoad(() => import('@/components/FeedPost'), <SkeletonPost />);
+const StoryList = lazyLoad(() => import('@/components/StoryList'), 
+  <View style={{ flexDirection: 'row', padding: 16, backgroundColor: 'transparent' }}>
+    {[1, 2, 3, 4, 5].map(i => <SkeletonStory key={i} />)}
+  </View>
+);
 
 // Viewability config
 const viewabilityConfig = {
@@ -128,7 +132,7 @@ export default function HomeScreen() {
   const renderItem = useCallback(({ item }: { item: any }) => {
     const isVideo = item.type === 'reel' || item.type === 'video' || (item.uri && /\.(mp4|mov|m4v|webm)$/i.test(item.uri));
     return (
-      <View style={isDesktop ? { width: '100%', maxWidth: 500, alignSelf: 'center', marginBottom: 20 } : undefined}>
+      <View style={isDesktop ? { width: '100%', maxWidth: 480, alignSelf: 'center', marginBottom: 20 } : undefined}>
           <FeedPost
             onDelete={handlePostDelete}
             active={isFocused && viewableItems.includes(item._id)}
@@ -230,6 +234,13 @@ export default function HomeScreen() {
           <View style={styles.headerActions}>
             <TouchableOpacity
               style={[styles.iconButton, { backgroundColor: isDark ? '#2C2C2E' : '#F3F4F6' }]}
+              onPress={() => router.push('/marketplace' as any)}
+            >
+              <Ionicons name="bag-handle-outline" size={24} color={colors.text} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.iconButton, { backgroundColor: isDark ? '#2C2C2E' : '#F3F4F6' }]}
               onPress={() => router.push('/notifications')}
             >
               <Animated.View style={bellAnimatedStyle}>
@@ -260,8 +271,14 @@ export default function HomeScreen() {
       <FlatList
         data={posts}
         extraData={[viewableItems, isFocused]}
+        key={isDesktop ? 'desktop-list' : 'mobile-list'}
+        numColumns={1}
         keyExtractor={(item) => item._id}
         renderItem={renderItem}
+        contentContainerStyle={[
+          styles.listContent,
+          isDesktop && { paddingHorizontal: 20, alignItems: 'center' }
+        ]}
         ListHeaderComponent={<StoryList />}
         ListFooterComponent={
           isFetchingMore ? (
@@ -315,7 +332,7 @@ export default function HomeScreen() {
         onEndReachedThreshold={0.5}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={isDesktop}
         contentContainerStyle={styles.scrollContent}
         initialNumToRender={4}
         maxToRenderPerBatch={4}
@@ -350,10 +367,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoText: {
-    fontFamily: Platform.select({ ios: 'Avenir Next', android: 'sans-serif-black' }),
     fontSize: 24,
-    fontWeight: '800',
-    letterSpacing: -0.5,
+    fontWeight: '900',
+    letterSpacing: -1,
+    marginLeft: -2,
   },
   headerActions: {
     flexDirection: 'row',

@@ -1,3 +1,22 @@
+import React, { useMemo, useState, useEffect } from 'react';
+import { 
+    ActivityIndicator, 
+    Image, 
+    Keyboard, 
+    KeyboardAvoidingView, 
+    Platform, 
+    ScrollView, 
+    StatusBar, 
+    StyleSheet, 
+    Text, 
+    TextInput, 
+    TouchableOpacity, 
+    useWindowDimensions,
+    View 
+} from 'react-native';
+import { Camera, Image as ImageIcon, Video, X, Volume2, VolumeX } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 import { API_BASE_URL } from '@/constants/Config';
 import { useThemeContext } from '@/context/ThemeContext';
 import { useUser } from '@/context/UserContext';
@@ -5,11 +24,6 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { Camera, Image as ImageIcon, Video, X } from 'lucide-react-native';
-import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import CreateStoryView from '@/components/CreateStoryView';
 
 export default function CreateScreen() {
@@ -38,6 +52,7 @@ export default function CreateScreen() {
     const [caption, setCaption] = useState('');
     const [music, setMusic] = useState('');
     const [selectedMedia, setSelectedMedia] = useState<string | null>(null);
+    const [isMuted, setIsMuted] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const [keyboardVisible, setKeyboardVisible] = useState(false);
@@ -45,11 +60,18 @@ export default function CreateScreen() {
     // Video Player hooks for Reel Preview
     const videoPlayer = useVideoPlayer(selectedMedia, player => {
         player.loop = true;
+        player.muted = isMuted;
         // Auto-play if it's a video and we are in reel mode
         if (activeTab === 'reel' && selectedMedia) {
             player.play();
         }
     });
+
+    React.useEffect(() => {
+        if (videoPlayer) {
+            videoPlayer.muted = isMuted;
+        }
+    }, [isMuted, videoPlayer]);
 
     // Listen to keyboard events to hide the tab bar in Story mode
     React.useEffect(() => {
@@ -171,6 +193,7 @@ export default function CreateScreen() {
                 if (music) {
                     formData.append('music', music);
                 }
+                formData.append('isMuted', String(isMuted));
 
                 // console.log('📤 Uploading Reel...');
                 const response = await fetch(`${API_BASE_URL}/api/posts/upload-reel`, {
@@ -216,7 +239,8 @@ export default function CreateScreen() {
                     body: JSON.stringify({
                         uri: mediaToUpload,
                         caption: caption,
-                        type: 'image'
+                        type: 'image',
+                        isMuted: isMuted
                     })
                 });
 
@@ -237,12 +261,14 @@ export default function CreateScreen() {
     };
 
 
+    const isDesktop = Platform.OS === 'web' && useWindowDimensions().width > 768;
+
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, isDesktop && { alignItems: 'center' }]}>
             <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, isDesktop && { width: '100%', maxWidth: 500, borderBottomWidth: 0 }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
                     <X size={24} color={colors.text} />
                 </TouchableOpacity>
@@ -260,17 +286,43 @@ export default function CreateScreen() {
                 </TouchableOpacity>
             </View>
 
+            {/* Desktop Tab Switcher (Top) */}
+            {isDesktop && (
+                <View style={[styles.tabBar, { width: '100%', maxWidth: 500, backgroundColor: 'transparent', borderTopWidth: 0, borderBottomWidth: 1, borderBottomColor: colors.border }]}>
+                    <TouchableOpacity
+                        style={styles.tabItem}
+                        onPress={() => { setActiveTab('post'); setSelectedMedia(null); setCaption(''); }}
+                    >
+                        <Text style={[styles.tabText, activeTab === 'post' && styles.activeTabText]}>POST</Text>
+                        {activeTab === 'post' && <View style={styles.activeIndicator} />}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.tabItem}
+                        onPress={() => { setActiveTab('reel'); setSelectedMedia(null); setCaption(''); }}
+                    >
+                        <Text style={[styles.tabText, activeTab === 'reel' && styles.activeTabText]}>REEL</Text>
+                        {activeTab === 'reel' && <View style={styles.activeIndicator} />}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.tabItem}
+                        onPress={() => setActiveTab('story')}
+                    >
+                        <Text style={[styles.tabText]}>STORY</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
             {/* Content Area */}
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={{ flex: 1 }}
+                style={{ flex: 1, width: '100%', maxWidth: 500 }}
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
             >
-                <ScrollView contentContainerStyle={styles.content}>
+                <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
                     {/* Media Placeholder */}
                     <TouchableOpacity onPress={pickMedia} activeOpacity={0.9}>
-                        <View style={styles.mediaPlaceholder}>
+                        <View style={[styles.mediaPlaceholder, isDesktop && { height: 500, borderRadius: 12, marginTop: 16, overflow: 'hidden' }]}>
                             {selectedMedia ? (
                                 activeTab === 'reel' ? (
                                     <View style={{ width: '100%', height: '100%' }}>
@@ -280,7 +332,15 @@ export default function CreateScreen() {
                                             contentFit="cover"
                                             nativeControls={false}
                                         />
-                                        {/* Overlay Play Icon to indicate interaction? No, auto-play ideally. */}
+                                        {/* Silence Button Overlay */}
+                                        <TouchableOpacity
+                                            style={styles.muteButton}
+                                            onPress={() => setIsMuted(!isMuted)}
+                                        >
+                                            <BlurView intensity={30} tint="dark" style={styles.muteButtonBlur}>
+                                                {isMuted ? <VolumeX size={20} color="#fff" /> : <Volume2 size={20} color="#fff" />}
+                                            </BlurView>
+                                        </TouchableOpacity>
                                     </View>
                                 ) : (
                                     <Image source={{ uri: selectedMedia }} style={styles.selectedImage} resizeMode="cover" />
@@ -336,29 +396,31 @@ export default function CreateScreen() {
                 </ScrollView>
             </KeyboardAvoidingView>
 
-            {/* Tab Switcher (Bottom) */}
-            <View style={styles.tabBar}>
-                <TouchableOpacity
-                    style={styles.tabItem}
-                    onPress={() => { setActiveTab('post'); setSelectedMedia(null); setCaption(''); }}
-                >
-                    <Text style={[styles.tabText, activeTab === 'post' && styles.activeTabText]}>POST</Text>
-                    {activeTab === 'post' && <View style={styles.activeIndicator} />}
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={styles.tabItem}
-                    onPress={() => { setActiveTab('reel'); setSelectedMedia(null); setCaption(''); }}
-                >
-                    <Text style={[styles.tabText, activeTab === 'reel' && styles.activeTabText]}>REEL</Text>
-                    {activeTab === 'reel' && <View style={styles.activeIndicator} />}
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={styles.tabItem}
-                    onPress={() => setActiveTab('story')}
-                >
-                    <Text style={[styles.tabText]}>STORY</Text>
-                </TouchableOpacity>
-            </View>
+            {/* Mobile Tab Switcher (Bottom) */}
+            {!isDesktop && (
+                <View style={[styles.tabBar, { paddingBottom: insets.bottom + 10 }]}>
+                    <TouchableOpacity
+                        style={styles.tabItem}
+                        onPress={() => { setActiveTab('post'); setSelectedMedia(null); setCaption(''); }}
+                    >
+                        <Text style={[styles.tabText, activeTab === 'post' && styles.activeTabText]}>POST</Text>
+                        {activeTab === 'post' && <View style={styles.activeIndicator} />}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.tabItem}
+                        onPress={() => { setActiveTab('reel'); setSelectedMedia(null); setCaption(''); }}
+                    >
+                        <Text style={[styles.tabText, activeTab === 'reel' && styles.activeTabText]}>REEL</Text>
+                        {activeTab === 'reel' && <View style={styles.activeIndicator} />}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.tabItem}
+                        onPress={() => setActiveTab('story')}
+                    >
+                        <Text style={[styles.tabText]}>STORY</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
         </View>
     );
 }
@@ -367,7 +429,7 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
     container: {
         flex: 1,
         backgroundColor: colors.background,
-        paddingTop: insets.top,
+        paddingTop: Platform.OS === 'web' ? 20 : insets.top,
     },
     header: {
         flexDirection: 'row',
@@ -394,20 +456,25 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
     },
     headerTitle: {
         color: colors.text,
-        fontSize: 17,
-        fontWeight: 'bold',
+        fontSize: 18,
+        fontWeight: '900',
+        letterSpacing: -0.5,
     },
     nextButton: {
         backgroundColor: colors.primary,
-        paddingHorizontal: 16,
-        paddingVertical: 6,
-        borderRadius: 20,
+        paddingHorizontal: 20,
+        paddingVertical: 8,
+        borderRadius: 24,
         marginLeft: 'auto',
         zIndex: 10,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
     },
     nextText: {
         color: '#fff',
-        fontWeight: 'bold',
+        fontWeight: '800',
         fontSize: 14,
     },
     content: {
@@ -420,6 +487,9 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
+        borderRadius: 24,
+        marginHorizontal: 16,
+        overflow: 'hidden',
     },
     mediaIcons: {
         alignItems: 'center',
@@ -447,17 +517,17 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
         position: 'absolute',
         bottom: 20,
         right: 20,
-        width: 54,
-        height: 54,
-        borderRadius: 27,
+        width: 56,
+        height: 56,
+        borderRadius: 28,
         backgroundColor: colors.primary,
         alignItems: 'center',
         justifyContent: 'center',
-        elevation: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 5,
+        elevation: 6,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
     },
     inputContainer: {
         padding: 20,
@@ -511,5 +581,19 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
         width: 40,
         marginTop: 4,
         borderRadius: 1,
-    }
+    },
+    muteButton: {
+        position: 'absolute',
+        bottom: 16,
+        left: 16,
+        borderRadius: 20,
+        overflow: 'hidden',
+    },
+    muteButtonBlur: {
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.3)',
+    },
 });

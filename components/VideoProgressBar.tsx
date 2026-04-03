@@ -12,22 +12,24 @@ interface VideoProgressBarProps {
     currentTime: number;
     duration: number;
     onSeek: (time: number) => void;
+    bottomOffset?: number;
+    showTime?: boolean;
 }
 
 export default function VideoProgressBar({
     currentTime,
     duration,
     onSeek,
+    bottomOffset = 0,
+    showTime = false,
 }: VideoProgressBarProps) {
     const { width: screenWidth } = useWindowDimensions();
     const [isScrubbing, setIsScrubbing] = useState(false);
     const [displayProgress, setDisplayProgress] = useState(0);
 
-    // Animation for bar expansion
     const heightAnim = useRef(new Animated.Value(2)).current;
     const internalProgress = useRef(0);
 
-    // Update progress when not scrubbing
     useEffect(() => {
         if (!isScrubbing && duration > 0) {
             const progress = currentTime / duration;
@@ -36,41 +38,29 @@ export default function VideoProgressBar({
         }
     }, [currentTime, duration, isScrubbing]);
 
-    // Pan responder for seeking
     const panResponder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
             onMoveShouldSetPanResponder: () => true,
             onPanResponderGrant: (evt) => {
                 setIsScrubbing(true);
-
-                // Expand bar
                 Animated.spring(heightAnim, {
                     toValue: 4,
                     useNativeDriver: false,
                 }).start();
-
-                // Calculate initial position
-                const locationX = evt.nativeEvent.pageX;
-                updateProgress(locationX);
+                updateProgress(evt.nativeEvent.pageX);
             },
             onPanResponderMove: (evt) => {
-                const locationX = evt.nativeEvent.pageX;
-                updateProgress(locationX);
+                updateProgress(evt.nativeEvent.pageX);
             },
             onPanResponderRelease: (evt) => {
                 setIsScrubbing(false);
-
-                // Shrink bar
                 Animated.spring(heightAnim, {
                     toValue: 2,
                     useNativeDriver: false,
                 }).start();
-
-                // Perform seek
                 const progress = Math.min(Math.max(0, evt.nativeEvent.pageX / screenWidth), 1);
-                const seekTime = progress * duration;
-                onSeek(seekTime);
+                onSeek(progress * duration);
             },
         })
     ).current;
@@ -89,22 +79,22 @@ export default function VideoProgressBar({
     };
 
     return (
-        <View style={styles.container}>
-            {/* Time Tooltip (visible when scrubbing) */}
-            {isScrubbing && (
-                <View style={styles.timeTooltip}>
-                    <Text style={styles.timeText}>
-                        {formatTime(internalProgress.current * duration)} / {formatTime(duration)}
-                    </Text>
+        <View style={[styles.container, { bottom: bottomOffset }]}>
+            {/* Conditional Time Display (Pill style) */}
+            {showTime && (
+                <View style={styles.timeWrapper}>
+                    <View style={styles.timePill}>
+                        <Text style={styles.timeText}>
+                            {formatTime(isScrubbing ? internalProgress.current * duration : currentTime)} 
+                            <Text style={{ opacity: 0.5, fontWeight: '400' }}> / {formatTime(duration)}</Text>
+                        </Text>
+                    </View>
                 </View>
             )}
 
             {/* Progress Bar */}
             <View style={styles.touchArea} {...panResponder.panHandlers}>
-                {/* Background Track */}
                 <View style={styles.trackBackground} />
-
-                {/* Filled Track */}
                 <Animated.View
                     style={[
                         styles.trackFill,
@@ -122,42 +112,52 @@ export default function VideoProgressBar({
 const styles = StyleSheet.create({
     container: {
         position: 'absolute',
-        bottom: 0,
         left: 0,
         right: 0,
-        zIndex: 5,
+        zIndex: 50,
+        paddingHorizontal: 20,
     },
-    touchArea: {
-        height: 20,
-        justifyContent: 'flex-end',
-        width: '100%',
+    timeWrapper: {
+        alignItems: 'center',
+        marginBottom: 8,
     },
-    trackBackground: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 2,
-        backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    },
-    trackFill: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        backgroundColor: 'white',
-    },
-    timeTooltip: {
-        position: 'absolute',
-        bottom: 30,
-        alignSelf: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    timePill: {
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
         paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 6,
+        paddingVertical: 5,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
     },
     timeText: {
         color: 'white',
         fontSize: 12,
-        fontWeight: '600',
+        fontWeight: '700',
+        letterSpacing: 0.5,
+        textAlign: 'center',
+    },
+    touchArea: {
+        height: 16,
+        justifyContent: 'center',
+        width: '100%',
+    },
+    trackBackground: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        height: 1.5,
+        backgroundColor: 'rgba(255, 255, 255, 0.25)',
+        borderRadius: 1,
+    },
+    trackFill: {
+        position: 'absolute',
+        left: 0,
+        backgroundColor: '#fff',
+        borderRadius: 2,
+        shadowColor: '#fff',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.5,
+        shadowRadius: 4,
+        elevation: 2,
     },
 });

@@ -19,16 +19,11 @@ export default function WebSidebar() {
     const menuItems = [
         { name: 'Home', icon: 'home', outline: 'home-outline', path: '/(tabs)' },
         { name: 'Search', icon: 'search', outline: 'search-outline', path: '/(tabs)/search' },
-        { name: 'Explore', icon: 'compass', outline: 'compass-outline', path: '/(tabs)/explore' },
+        { name: 'Marketplace', icon: 'bag-handle', outline: 'bag-handle-outline', path: '/marketplace' },
         { name: 'Reels', icon: 'play-circle', outline: 'play-circle-outline', path: '/(tabs)/reels' },
         { name: 'Messages', icon: 'chatbubble', outline: 'chatbubble-outline', path: '/chat' },
         { name: 'Notifications', icon: 'heart', outline: 'heart-outline', path: '/notifications' },
         { name: 'Create', icon: 'add-circle', outline: 'add-circle-outline', path: '/(tabs)/create' },
-        { name: 'Profile', icon: 'person', outline: 'person-outline', path: '/(tabs)/profile' },
-    ];
-
-    const bottomItems = [
-        { name: 'Settings', icon: 'settings-outline', path: '/settings' },
     ];
 
     const isActive = (path: string) => {
@@ -40,8 +35,8 @@ export default function WebSidebar() {
         <View style={[
             styles.sidebar,
             {
-                backgroundColor: isDark ? 'rgba(10,10,10,0.97)' : 'rgba(255,255,255,0.98)',
-                borderRightColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+                backgroundColor: isDark ? '#000' : '#fff',
+                borderRightColor: isDark ? '#222' : '#eee',
             }
         ]}>
             {/* Logo */}
@@ -49,11 +44,10 @@ export default function WebSidebar() {
                 onPress={() => router.push('/(tabs)' as any)}
                 style={styles.logoContainer}
             >
-                <Image
-                    source={require('@/assets/images/vibe-logo.png')}
-                    style={styles.logoImage}
-                />
-                <Text style={[styles.logoText, { color: colors.primary }]}>Vibe</Text>
+                <View style={[styles.logoIconBg, { backgroundColor: colors.primary }]}>
+                     <Ionicons name="flash" size={20} color="white" />
+                </View>
+                <Text style={[styles.logoText, { color: colors.text }]}>Vibe</Text>
             </Pressable>
 
             {/* Navigation Menu */}
@@ -74,35 +68,21 @@ export default function WebSidebar() {
                             onHoverOut={() => setHoveredItem(null)}
                             style={[
                                 styles.menuItem,
-                                isHovered && {
-                                    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-                                    transform: [{ scale: 1.01 }] as any,
-                                },
-                                active && {
-                                    backgroundColor: isDark
-                                        ? `${colors.primary}18`
-                                        : `${colors.primary}10`,
-                                },
+                                isHovered && { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' },
+                                active && { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }
                             ]}
                         >
-                            {/* Active indicator bar */}
-                            {active && (
-                                <View style={[styles.activeBar, { backgroundColor: colors.primary }]} />
-                            )}
-                            <View style={[
-                                styles.menuIconWrap,
-                                active && { backgroundColor: `${colors.primary}20` },
-                            ]}>
+                            <View style={styles.menuIconWrap}>
                                 <Ionicons
                                     name={(active ? item.icon : item.outline) as any}
-                                    size={22}
+                                    size={24}
                                     color={active ? colors.primary : isDark ? '#bbb' : '#555'}
                                 />
                             </View>
                             <Text style={[
                                 styles.menuText,
                                 { color: active ? colors.primary : colors.text },
-                                active && styles.activeMenuText,
+                                active && { fontWeight: '800' },
                             ]}>
                                 {item.name}
                             </Text>
@@ -110,9 +90,6 @@ export default function WebSidebar() {
                     );
                 })}
             </ScrollView>
-
-            {/* Divider */}
-            <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }]} />
 
             {/* User Card (Bottom) */}
             {user && (
@@ -129,58 +106,30 @@ export default function WebSidebar() {
                 >
                     <Image
                         source={{ uri: user.avatar || 'https://i.pravatar.cc/150' }}
-                        style={[styles.userAvatar, { borderColor: colors.primary + '40' }]}
+                        style={styles.userAvatar}
                     />
                     <View style={styles.userInfo}>
                         <Text style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
                             {user.name || 'User'}
                         </Text>
                         <Text style={[styles.userHandle, { color: colors.textSecondary }]} numberOfLines={1}>
-                            {user.handle || '@user'}
+                            @{user.handle || 'user'}
                         </Text>
                     </View>
                     <Ionicons name="ellipsis-horizontal" size={18} color={colors.textSecondary} />
                 </Pressable>
             )}
-
-            {/* Settings at very bottom */}
-            {bottomItems.map((item) => (
-                <Pressable
-                    key={item.name}
-                    onPress={() => router.push(item.path as any)}
-                    onHoverIn={() => setHoveredItem(item.name)}
-                    onHoverOut={() => setHoveredItem(null)}
-                    style={[
-                        styles.menuItem,
-                        { marginBottom: 0 },
-                        hoveredItem === item.name && {
-                            backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-                        },
-                    ]}
-                >
-                    <View style={styles.menuIconWrap}>
-                        <Ionicons
-                            name={item.icon as any}
-                            size={22}
-                            color={isDark ? '#bbb' : '#555'}
-                        />
-                    </View>
-                    <Text style={[styles.menuText, { color: colors.text }]}>
-                        {item.name}
-                    </Text>
-                </Pressable>
-            ))}
         </View>
     );
 }
 
 const styles = StyleSheet.create({
     sidebar: {
-        width: 260,
+        width: 280,
         height: '100vh' as any,
-        paddingHorizontal: 12,
-        paddingTop: 20,
-        paddingBottom: 16,
+        paddingHorizontal: 20,
+        paddingTop: 40,
+        paddingBottom: 24,
         position: 'fixed' as any,
         left: 0,
         top: 0,
@@ -192,96 +141,70 @@ const styles = StyleSheet.create({
     logoContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 4,
-        marginBottom: 8,
-        gap: 10,
-        flexShrink: 0,
-    },
-    logoImage: {
-        width: 34,
-        height: 34,
-        borderRadius: 10,
-    },
-    logoText: {
-        fontSize: 22,
-        fontWeight: '800',
-        letterSpacing: -0.8,
-    },
-    menuContainer: {
-        flex: 1,
-        minHeight: 0,
-    },
-    menuContent: {
-        paddingVertical: 4,
-        gap: 2,
-    },
-    menuItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 10,
-        paddingHorizontal: 12,
-        borderRadius: 14,
-        marginBottom: 2,
+        marginBottom: 40,
         gap: 12,
-        position: 'relative' as any,
+        paddingHorizontal: 10,
     },
-    activeBar: {
-        position: 'absolute' as any,
-        left: 0,
-        top: '20%' as any,
-        bottom: '20%' as any,
-        width: 3,
-        borderRadius: 2,
-    },
-    menuIconWrap: {
+    logoIconBg: {
         width: 36,
         height: 36,
         borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
     },
+    logoText: {
+        fontSize: 26,
+        fontWeight: '900',
+        letterSpacing: -1,
+    },
+    menuContainer: {
+        flex: 1,
+    },
+    menuContent: {
+        gap: 8,
+    },
+    menuItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderRadius: 30, // Pill shaped active state
+        marginVertical: 2,
+    },
+    menuIconWrap: {
+        width: 30,
+        marginRight: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     menuText: {
-        fontSize: 15,
-        fontWeight: '500',
-        letterSpacing: -0.2,
-    },
-    activeMenuText: {
-        fontWeight: '700',
-    },
-    divider: {
-        height: 1,
-        marginHorizontal: 16,
-        marginVertical: 8,
-        flexShrink: 0,
+        fontSize: 18,
+        fontWeight: '600',
     },
     userCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 10,
-        paddingHorizontal: 12,
-        borderRadius: 14,
-        marginBottom: 4,
-        gap: 10,
-        flexShrink: 0,
+        padding: 12,
+        borderRadius: 20,
+        marginTop: 20,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(0,0,0,0.05)',
     },
     userAvatar: {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
-        borderWidth: 2,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        marginRight: 12,
     },
     userInfo: {
         flex: 1,
-        minWidth: 0,
     },
     userName: {
-        fontSize: 14,
-        fontWeight: '600',
-        letterSpacing: -0.2,
+        fontSize: 15,
+        fontWeight: '700',
     },
     userHandle: {
-        fontSize: 12,
-        marginTop: 1,
-    },
+        fontSize: 13,
+        opacity: 0.6,
+    }
 });

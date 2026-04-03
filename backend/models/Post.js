@@ -14,7 +14,8 @@ const postSchema = new mongoose.Schema({
         createdAt: { type: Date, default: Date.now }
     }],
     views: { type: Number, default: 0 },
-    shares: { type: Number, default: 0 }
+    shares: { type: Number, default: 0 },
+    isMuted: { type: Boolean, default: false }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Post', postSchema);

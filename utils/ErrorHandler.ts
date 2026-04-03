@@ -95,9 +95,28 @@ class ErrorHandler {
         if (!error) return ErrorMessages.DEFAULT;
 
         // Extract message from object validity
-        const rawMessage = error.message || error.error || (typeof error === 'string' ? error : '');
+        let rawMessage = error.message || error.error || (typeof error === 'string' ? error : '');
+        
+        // Handle expo-video error objects which might be nested or JSON strings
+        if (typeof error === 'object' && !rawMessage) {
+            try {
+                rawMessage = JSON.stringify(error);
+            } catch (e) {
+                rawMessage = 'Unknown error';
+            }
+        }
 
-        // 1. Network / Connection
+        // 1. Video Playback Errors (expo-video, expo-av)
+        if (
+            rawMessage.includes('Failed to load') || 
+            rawMessage.includes('player item') || 
+            rawMessage.includes('permission') ||
+            rawMessage.includes('Video playback failed')
+        ) {
+            return "This video couldn't be loaded. It may have been removed or is unavailable.";
+        }
+
+        // 2. Network / Connection
         if (
             rawMessage === 'Network request failed' ||
             rawMessage.includes('Network') ||
@@ -108,13 +127,13 @@ class ErrorHandler {
             return "Connection issue. Retrying...";
         }
 
-        // 2. HTTP Status based
+        // 3. HTTP Status based
         if (error.status === 401) return "Session expired. Please login.";
         if (error.status === 403) return "Access denied.";
         if (error.status === 404) return "Resource not found.";
         if (error.status >= 500) return "Server is temporarily unavailable.";
 
-        // 3. Backend standardized errors
+        // 4. Backend standardized errors
         if (error.response?.data?.message) {
             const serverMsg = error.response.data.message;
             if (serverMsg.includes('SQL') || serverMsg.includes('Error:') || serverMsg.length > 100) {
@@ -123,7 +142,7 @@ class ErrorHandler {
             return serverMsg;
         }
 
-        // 4. Default Safe Message
+        // 5. Default Safe Message
         return ErrorMessages.DEFAULT || "Something went wrong.";
     }
 
