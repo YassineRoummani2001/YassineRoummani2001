@@ -16,44 +16,48 @@ export function WebLayout({ children }: { children: React.ReactNode }) {
     const isAuthPage = pathname.includes('/auth/');
     if (isAuthPage) return <>{children}</>;
 
-    // Different screens need different widths on Web
     const isProfile = pathname.includes('/profile') || pathname.includes('/user/');
     const isMarketplace = pathname.includes('/marketplace');
     const isHome = pathname === '/' || pathname === '/(tabs)';
-    
-    // IG Standard Width: 935px total (with sidebar it can be wider). Feed width is usually wider if it has grid.
-    const contentMaxWidth = isMarketplace ? 1200 : (isProfile || isHome) ? 935 : 600;
 
     const showRightSidebar = isLargeScreen && width > 1100 && !isProfile && !isMarketplace;
+    const sidebarWidth = 260;
+
+    // Calculate the available width after sidebar
+    const availableWidth = isLargeScreen ? width - sidebarWidth : width;
+    
+    // Main content width: feed is 630px max, right sidebar is 320px + 40px gap
+    const feedMaxWidth = 630;
+    const rightSidebarWidth = showRightSidebar ? 340 : 0;
+    const totalContentWidth = feedMaxWidth + rightSidebarWidth;
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
             {isLargeScreen && <WebSidebar />}
-            
-            <View style={[
-                styles.content, 
-                isLargeScreen && { paddingLeft: 280 }, // Account for thicker WebSidebar
-                showRightSidebar && { paddingRight: 350 }, // Prevent overlap with Right Sidebar
-                !isLargeScreen && { paddingBottom: 60 } 
-            ]}>
-                <View style={[
-                    styles.main,
-                    isLargeScreen && { 
-                        width: '100%', 
-                        maxWidth: contentMaxWidth, 
-                        marginHorizontal: 'auto', 
-                        paddingHorizontal: isMarketplace ? 20 : 0
-                    }
-                ]}>
-                    {children}
-                </View>
 
-                {/* Optional Right Sidebar (Desktop only) */}
-                {showRightSidebar && (
-                    <View style={[styles.rightSidebar, { borderLeftColor: isDark ? '#333' : '#eee' }]}>
-                        <DesktopRightSidebar />
+            <View style={[
+                styles.content,
+                isLargeScreen && { marginLeft: sidebarWidth },
+                !isLargeScreen && { paddingBottom: 60 },
+            ]}>
+                {/* Center the content horizontally within the available space */}
+                <View style={[
+                    styles.centerWrapper,
+                    {
+                        maxWidth: totalContentWidth,
+                        paddingHorizontal: 20,
+                    },
+                ]}>
+                    <View style={[styles.main, { maxWidth: feedMaxWidth }]}>
+                        {children}
                     </View>
-                )}
+
+                    {showRightSidebar && (
+                        <View style={styles.rightSidebar}>
+                            <DesktopRightSidebar />
+                        </View>
+                    )}
+                </View>
             </View>
         </View>
     );
@@ -66,21 +70,21 @@ const styles = StyleSheet.create({
     },
     content: {
         flex: 1,
+        alignItems: 'center',
+    },
+    centerWrapper: {
         flexDirection: 'row',
-        justifyContent: 'center', // Helps centering main when row
+        width: '100%',
+        justifyContent: 'center',
     },
     main: {
         flex: 1,
+        width: '100%',
     },
     rightSidebar: {
-        width: 350,
-        height: '100%',
-        position: 'fixed' as any,
-        right: 0,
-        top: 0,
-        borderLeftWidth: 1,
-        paddingHorizontal: 30,
-        paddingVertical: 30,
-        zIndex: 50,
-    }
+        width: 320,
+        marginLeft: 24,
+        marginTop: 16,
+        flexShrink: 0,
+    },
 });

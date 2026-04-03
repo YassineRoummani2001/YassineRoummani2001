@@ -3,6 +3,41 @@ const router = express.Router();
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 
+// @desc    Get all/suggested users
+// @route   GET /api/users/all
+// @access  Public
+router.get('/all', async (req, res) => {
+    try {
+        const users = await User.find({})
+            .select('-password')
+            .limit(20)
+            .sort({ followers: -1 }); // Sort by most followers as simple "suggestions" algorithm
+        res.json(users);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// @desc    Search users
+// @route   GET /api/users/search/:query
+// @access  Public
+router.get('/search/:query', async (req, res) => {
+    try {
+        const users = await User.find({
+            $or: [
+                { name: { $regex: req.params.query, $options: 'i' } },
+                { handle: { $regex: req.params.query, $options: 'i' } }
+            ]
+        })
+            .select('-password')
+            .limit(20);
+
+        res.json(users);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 // @desc    Get user profile by ID
 // @route   GET /api/users/:id
 // @access  Public
@@ -60,41 +95,6 @@ router.put('/:id/follow', protect, async (req, res) => {
             followersCount: userToFollow.followers.length,
             followingCount: currentUser.following.length
         });
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
-
-// @desc    Get all/suggested users
-// @route   GET /api/users/all
-// @access  Public
-router.get('/all', async (req, res) => {
-    try {
-        const users = await User.find({})
-            .select('-password')
-            .limit(20)
-            .sort({ followers: -1 }); // Sort by most followers as simple "suggestions" algorithm
-        res.json(users);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
-
-// @desc    Search users
-// @route   GET /api/users/search/:query
-// @access  Public
-router.get('/search/:query', async (req, res) => {
-    try {
-        const users = await User.find({
-            $or: [
-                { name: { $regex: req.params.query, $options: 'i' } },
-                { handle: { $regex: req.params.query, $options: 'i' } }
-            ]
-        })
-            .select('-password')
-            .limit(20);
-
-        res.json(users);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

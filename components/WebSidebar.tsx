@@ -1,10 +1,9 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, Pressable, Image, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Platform, Pressable, Image, ScrollView } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeContext } from '@/context/ThemeContext';
 import { useUser } from '@/context/AuthContext';
-
 import { useState } from 'react';
 
 export default function WebSidebar() {
@@ -21,60 +20,52 @@ export default function WebSidebar() {
         { name: 'Home', icon: 'home', outline: 'home-outline', path: '/(tabs)' },
         { name: 'Search', icon: 'search', outline: 'search-outline', path: '/(tabs)/search' },
         { name: 'Explore', icon: 'compass', outline: 'compass-outline', path: '/(tabs)/explore' },
-        { name: 'Reels', icon: 'videocam', outline: 'videocam-outline', path: '/(tabs)/reels' },
+        { name: 'Reels', icon: 'play-circle', outline: 'play-circle-outline', path: '/(tabs)/reels' },
         { name: 'Messages', icon: 'chatbubble', outline: 'chatbubble-outline', path: '/chat' },
-        { name: 'Notifications', icon: 'notifications', outline: 'notifications-outline', path: '/notifications' },
+        { name: 'Notifications', icon: 'heart', outline: 'heart-outline', path: '/notifications' },
         { name: 'Create', icon: 'add-circle', outline: 'add-circle-outline', path: '/(tabs)/create' },
         { name: 'Profile', icon: 'person', outline: 'person-outline', path: '/(tabs)/profile' },
     ];
 
+    const bottomItems = [
+        { name: 'Settings', icon: 'settings-outline', path: '/settings' },
+    ];
+
+    const isActive = (path: string) => {
+        if (path === '/(tabs)' && (pathname === '/' || pathname === '/(tabs)')) return true;
+        return pathname === path || pathname.startsWith(path);
+    };
+
     return (
-        <View style={[styles.sidebar, { backgroundColor: colors.background, borderRightColor: isDark ? '#333' : '#eee' }]}>
-            <View style={styles.logoContainer}>
-                 <Image 
-                    source={require('@/assets/images/vibe-logo.png')} 
-                    style={{ width: 44, height: 44, borderRadius: 12 }} 
+        <View style={[
+            styles.sidebar,
+            {
+                backgroundColor: isDark ? 'rgba(10,10,10,0.97)' : 'rgba(255,255,255,0.98)',
+                borderRightColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+            }
+        ]}>
+            {/* Logo */}
+            <Pressable
+                onPress={() => router.push('/(tabs)' as any)}
+                style={styles.logoContainer}
+            >
+                <Image
+                    source={require('@/assets/images/vibe-logo.png')}
+                    style={styles.logoImage}
                 />
                 <Text style={[styles.logoText, { color: colors.primary }]}>Vibe</Text>
-            </View>
+            </Pressable>
 
-            {user && (
-                <View style={styles.profileSection}>
-                    <Image 
-                        source={{ uri: user.avatar || 'https://i.pravatar.cc/150' }} 
-                        style={styles.profileAvatar} 
-                    />
-                    <Text style={[styles.profileName, { color: colors.text }]}>{user.name || 'User'}</Text>
-                    <Text style={[styles.profileHandle, { color: colors.textSecondary }]}>{user.handle || '@user'}</Text>
-                    
-                    <View style={styles.statsRow}>
-                        <View style={styles.statItem}>
-                            <Text style={[styles.statValue, { color: colors.text }]}>{user.posts?.length || 0}</Text>
-                            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Posts</Text>
-                        </View>
-                        <View style={styles.statDivider} />
-                        <View style={styles.statItem}>
-                            <Text style={[styles.statValue, { color: colors.text }]}>{user.followers?.length || 0}</Text>
-                            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Followers</Text>
-                        </View>
-                        <View style={styles.statDivider} />
-                        <View style={styles.statItem}>
-                            <Text style={[styles.statValue, { color: colors.text }]}>{user.following?.length || 0}</Text>
-                            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Following</Text>
-                        </View>
-                    </View>
-                </View>
-            )}
-
-            <ScrollView 
-                style={styles.menuContainer} 
+            {/* Navigation Menu */}
+            <ScrollView
+                style={styles.menuContainer}
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 20, paddingTop: 10 }}
+                contentContainerStyle={styles.menuContent}
             >
                 {menuItems.map((item) => {
-                    const isActive = pathname === item.path || (item.path === '/(tabs)' && pathname === '/');
+                    const active = isActive(item.path);
                     const isHovered = hoveredItem === item.name;
-                    
+
                     return (
                         <Pressable
                             key={item.name}
@@ -83,19 +74,35 @@ export default function WebSidebar() {
                             onHoverOut={() => setHoveredItem(null)}
                             style={[
                                 styles.menuItem,
-                                isHovered && { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' },
-                                isActive && styles.activeMenuItem
+                                isHovered && {
+                                    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                                    transform: [{ scale: 1.01 }] as any,
+                                },
+                                active && {
+                                    backgroundColor: isDark
+                                        ? `${colors.primary}18`
+                                        : `${colors.primary}10`,
+                                },
                             ]}
                         >
-                            <Ionicons
-                                name={(isActive ? item.icon : item.outline) as any}
-                                size={26}
-                                color={isActive ? colors.primary : colors.text}
-                            />
+                            {/* Active indicator bar */}
+                            {active && (
+                                <View style={[styles.activeBar, { backgroundColor: colors.primary }]} />
+                            )}
+                            <View style={[
+                                styles.menuIconWrap,
+                                active && { backgroundColor: `${colors.primary}20` },
+                            ]}>
+                                <Ionicons
+                                    name={(active ? item.icon : item.outline) as any}
+                                    size={22}
+                                    color={active ? colors.primary : isDark ? '#bbb' : '#555'}
+                                />
+                            </View>
                             <Text style={[
                                 styles.menuText,
-                                { color: isActive ? colors.primary : colors.text },
-                                isActive && styles.activeMenuText
+                                { color: active ? colors.primary : colors.text },
+                                active && styles.activeMenuText,
                             ]}>
                                 {item.name}
                             </Text>
@@ -104,134 +111,177 @@ export default function WebSidebar() {
                 })}
             </ScrollView>
 
-            <View style={styles.footer}>
-                <Pressable 
-                    onHoverIn={() => setHoveredItem('settings')}
+            {/* Divider */}
+            <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }]} />
+
+            {/* User Card (Bottom) */}
+            {user && (
+                <Pressable
+                    onPress={() => router.push('/(tabs)/profile' as any)}
+                    onHoverIn={() => setHoveredItem('user-card')}
                     onHoverOut={() => setHoveredItem(null)}
                     style={[
-                        styles.moreButton,
-                        hoveredItem === 'settings' && { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }
+                        styles.userCard,
+                        hoveredItem === 'user-card' && {
+                            backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)',
+                        },
                     ]}
                 >
-                    <Ionicons name="settings-outline" size={26} color={colors.text} />
-                    <Text style={[styles.menuText, { color: colors.text }]}>Settings</Text>
+                    <Image
+                        source={{ uri: user.avatar || 'https://i.pravatar.cc/150' }}
+                        style={[styles.userAvatar, { borderColor: colors.primary + '40' }]}
+                    />
+                    <View style={styles.userInfo}>
+                        <Text style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
+                            {user.name || 'User'}
+                        </Text>
+                        <Text style={[styles.userHandle, { color: colors.textSecondary }]} numberOfLines={1}>
+                            {user.handle || '@user'}
+                        </Text>
+                    </View>
+                    <Ionicons name="ellipsis-horizontal" size={18} color={colors.textSecondary} />
                 </Pressable>
-            </View>
+            )}
+
+            {/* Settings at very bottom */}
+            {bottomItems.map((item) => (
+                <Pressable
+                    key={item.name}
+                    onPress={() => router.push(item.path as any)}
+                    onHoverIn={() => setHoveredItem(item.name)}
+                    onHoverOut={() => setHoveredItem(null)}
+                    style={[
+                        styles.menuItem,
+                        { marginBottom: 0 },
+                        hoveredItem === item.name && {
+                            backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                        },
+                    ]}
+                >
+                    <View style={styles.menuIconWrap}>
+                        <Ionicons
+                            name={item.icon as any}
+                            size={22}
+                            color={isDark ? '#bbb' : '#555'}
+                        />
+                    </View>
+                    <Text style={[styles.menuText, { color: colors.text }]}>
+                        {item.name}
+                    </Text>
+                </Pressable>
+            ))}
         </View>
     );
 }
 
 const styles = StyleSheet.create({
     sidebar: {
-        width: 280,
-        height: '100%',
-        paddingHorizontal: 20,
-        paddingVertical: 30,
+        width: 260,
+        height: '100vh' as any,
+        paddingHorizontal: 12,
+        paddingTop: 20,
+        paddingBottom: 16,
         position: 'fixed' as any,
         left: 0,
         top: 0,
         borderRightWidth: 1,
         zIndex: 100,
+        display: 'flex' as any,
+        flexDirection: 'column',
     },
     logoContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 40,
-        paddingLeft: 10,
-        gap: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        marginBottom: 8,
+        gap: 10,
+        flexShrink: 0,
     },
-    logoIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        alignItems: 'center',
-        justifyContent: 'center',
+    logoImage: {
+        width: 34,
+        height: 34,
+        borderRadius: 10,
     },
     logoText: {
-        fontSize: 26,
-        fontWeight: '900',
-        letterSpacing: -1,
+        fontSize: 22,
+        fontWeight: '800',
+        letterSpacing: -0.8,
     },
     menuContainer: {
         flex: 1,
+        minHeight: 0,
+    },
+    menuContent: {
+        paddingVertical: 4,
+        gap: 2,
     },
     menuItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 14,
+        paddingVertical: 10,
         paddingHorizontal: 12,
-        borderRadius: 12,
-        marginBottom: 4,
-        gap: 16,
+        borderRadius: 14,
+        marginBottom: 2,
+        gap: 12,
+        position: 'relative' as any,
     },
-    activeMenuItem: {
-        // backgroundColor: 'rgba(10, 132, 255, 0.1)',
+    activeBar: {
+        position: 'absolute' as any,
+        left: 0,
+        top: '20%' as any,
+        bottom: '20%' as any,
+        width: 3,
+        borderRadius: 2,
+    },
+    menuIconWrap: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     menuText: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '500',
+        letterSpacing: -0.2,
     },
     activeMenuText: {
         fontWeight: '700',
     },
-    footer: {
-        marginTop: 'auto',
+    divider: {
+        height: 1,
+        marginHorizontal: 16,
+        marginVertical: 8,
+        flexShrink: 0,
     },
-    moreButton: {
+    userCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 14,
+        paddingVertical: 10,
         paddingHorizontal: 12,
-        borderRadius: 12,
-        gap: 16,
-    },
-    profileSection: {
-        alignItems: 'center',
-        marginBottom: 30,
-        paddingBottom: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(150,150,150,0.1)',
-    },
-    profileAvatar: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        marginBottom: 12,
-        borderWidth: 2,
-        borderColor: '#fff',
-        boxShadow: '0px 4px 10px rgba(0,0,0,0.1)',
-    },
-    profileName: {
-        fontSize: 18,
-        fontWeight: 'bold',
+        borderRadius: 14,
         marginBottom: 4,
+        gap: 10,
+        flexShrink: 0,
     },
-    profileHandle: {
-        fontSize: 14,
-        marginBottom: 16,
+    userAvatar: {
+        width: 38,
+        height: 38,
+        borderRadius: 12,
+        borderWidth: 2,
     },
-    statsRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        width: '100%',
-        paddingHorizontal: 10,
-    },
-    statItem: {
-        alignItems: 'center',
+    userInfo: {
         flex: 1,
+        minWidth: 0,
     },
-    statValue: {
-        fontSize: 15,
-        fontWeight: 'bold',
-        marginBottom: 2,
+    userName: {
+        fontSize: 14,
+        fontWeight: '600',
+        letterSpacing: -0.2,
     },
-    statLabel: {
-        fontSize: 11,
+    userHandle: {
+        fontSize: 12,
+        marginTop: 1,
     },
-    statDivider: {
-        width: 1,
-        height: 20,
-        backgroundColor: 'rgba(150,150,150,0.2)',
-    }
 });

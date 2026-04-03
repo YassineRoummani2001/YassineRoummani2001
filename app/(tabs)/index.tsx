@@ -11,7 +11,7 @@ import { ActivityIndicator, FlatList, Platform, RefreshControl, StyleSheet, Text
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SkeletonPost } from '@/components/Skeletons';
-import { Search } from 'lucide-react-native';
+
 
 // Lazy load heavy components
 const FeedPost = lazyLoad(() => import('@/components/FeedPost'), <MinimalLoader />);
@@ -210,70 +210,52 @@ export default function HomeScreen() {
   return (
     <View style={[
       styles.container, 
-      { paddingTop: insets.top, backgroundColor: colors.background }
+      { paddingTop: isDesktop ? 0 : insets.top, backgroundColor: colors.background }
     ]}>
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderBottomWidth: 1 }]}>
-        <View style={styles.logoContainer}>
-          {!isDesktop && (
-            <>
-              <View style={[styles.logoIcon, { backgroundColor: colors.primary }]}>
-                <Ionicons name="flash" size={20} color="white" />
-              </View>
-              <Text style={[styles.logoText, { color: colors.primary }]}>Vibe</Text>
-            </>
-          )}
-          {isDesktop && (
-              <View style={[styles.desktopSearchContainer, { backgroundColor: isDark ? '#2C2C2E' : '#F3F4F6' }]}>
-                  <Search size={20} color={colors.textSecondary} />
-                  <Text style={{ color: colors.textSecondary, marginLeft: 10, fontSize: 16 }}>Search</Text>
-              </View>
-          )}
-          {refreshing && !isDesktop && (
-            <Animated.View style={[{ marginLeft: 8 }, refreshAnimatedStyle]}>
-              <Ionicons name="sync" size={18} color={colors.primary} />
-            </Animated.View>
-          )}
-        </View>
-
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={[styles.iconButton, { backgroundColor: isDark ? '#2C2C2E' : '#F3F4F6' }]}
-            onPress={() => router.push('/notifications')}
-          >
-            <Animated.View style={bellAnimatedStyle}>
-              <Ionicons name="notifications-outline" size={24} color={colors.text} />
-            </Animated.View>
-            {unreadCount > 0 && (
-              <Animated.View style={[styles.badge, { borderColor: colors.background }, badgeAnimatedStyle]}>
-                <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+      {!isDesktop && (
+        <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderBottomWidth: 1 }]}>
+          <View style={styles.logoContainer}>
+            <View style={[styles.logoIcon, { backgroundColor: colors.primary }]}>
+              <Ionicons name="flash" size={20} color="white" />
+            </View>
+            <Text style={[styles.logoText, { color: colors.primary }]}>Vibe</Text>
+            {refreshing && (
+              <Animated.View style={[{ marginLeft: 8 }, refreshAnimatedStyle]}>
+                <Ionicons name="sync" size={18} color={colors.primary} />
               </Animated.View>
             )}
-          </TouchableOpacity>
+          </View>
 
-          <TouchableOpacity
-            style={[styles.iconButton, { backgroundColor: isDark ? '#2C2C2E' : '#F3F4F6' }]}
-            onPress={() => router.push('/chat')}
-          >
-            <Ionicons name="chatbubble-ellipses-outline" size={24} color={colors.text} />
-            {unreadMessagesCount > 0 && (
-              <View style={[styles.badge, { borderColor: colors.background }]}>
-                <Text style={styles.badgeText}>{unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={[styles.iconButton, { backgroundColor: isDark ? '#2C2C2E' : '#F3F4F6' }]}
+              onPress={() => router.push('/notifications')}
+            >
+              <Animated.View style={bellAnimatedStyle}>
+                <Ionicons name="notifications-outline" size={24} color={colors.text} />
+              </Animated.View>
+              {unreadCount > 0 && (
+                <Animated.View style={[styles.badge, { borderColor: colors.background }, badgeAnimatedStyle]}>
+                  <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                </Animated.View>
+              )}
+            </TouchableOpacity>
 
-          {isDesktop && (
-              <TouchableOpacity
-                  style={styles.createPostBtn}
-                  onPress={() => router.push('/create' as any)}
-              >
-                  <Ionicons name="add" size={20} color="white" />
-                  <Text style={styles.createPostText}>Create a post</Text>
-              </TouchableOpacity>
-          )}
+            <TouchableOpacity
+              style={[styles.iconButton, { backgroundColor: isDark ? '#2C2C2E' : '#F3F4F6' }]}
+              onPress={() => router.push('/chat')}
+            >
+              <Ionicons name="chatbubble-ellipses-outline" size={24} color={colors.text} />
+              {unreadMessagesCount > 0 && (
+                <View style={[styles.badge, { borderColor: colors.background }]}>
+                  <Text style={styles.badgeText}>{unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      )}
 
       <FlatList
         data={posts}
@@ -359,16 +341,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    flex: 1, // Added flex to let search take up space
-  },
-  desktopSearchContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      height: 44,
-      borderRadius: 22,
-      width: '100%',
-      maxWidth: 400,
   },
   logoIcon: {
     width: 34,
@@ -416,19 +388,5 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 100,
   },
-  createPostBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: '#FF6B6B', // Example orange/red gradient fallback
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderRadius: 24,
-      gap: 6,
-      marginLeft: 10,
-  },
-  createPostText: {
-      color: 'white',
-      fontWeight: '600',
-      fontSize: 15,
-  }
+
 });
