@@ -96,6 +96,7 @@ export default function NotificationsScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [notifications, setNotifications] = useState<any[]>([]);
     const [sections, setSections] = useState<any[]>([]);
+    const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
 
     const groupNotifications = (data: any[]) => {
         const groups: { [key: string]: any[] } = {
@@ -129,14 +130,31 @@ export default function NotificationsScreen() {
     };
 
     const fetchNotifications = async () => {
+        if (!user?.token) {
+            setIsLoading(false);
+            return;
+        }
         try {
-            const response = await fetch(`${API_BASE_URL}/api/auth/notifications`, {
-                headers: { 'Authorization': `Bearer ${user.token}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
+            const [notifResponse, reqResponse] = await Promise.all([
+                fetch(`${API_BASE_URL}/api/notifications`, {
+                    headers: { 'Authorization': `Bearer ${user.token}` }
+                }),
+                fetch(`${API_BASE_URL}/api/auth/requests`, {
+                    headers: { 'Authorization': `Bearer ${user.token}` }
+                })
+            ]);
+
+            if (notifResponse.ok) {
+                const data = await notifResponse.json();
                 setNotifications(data);
                 setSections(groupNotifications(data));
+            } else {
+                console.error('Fetch notifications failed:', notifResponse.status, notifResponse.statusText);
+            }
+
+            if (reqResponse.ok) {
+                const reqData = await reqResponse.json();
+                setPendingRequestsCount(reqData.length);
             }
         } catch (error) {
             console.error('Fetch notifications error:', error);
@@ -148,9 +166,12 @@ export default function NotificationsScreen() {
 
     useFocusEffect(
         React.useCallback(() => {
-            fetchNotifications();
-            markAsRead();
-        }, [])
+            if (user?.token) {
+                setIsLoading(true);
+                fetchNotifications();
+                markAsRead();
+            }
+        }, [user?.token])
     );
 
     const onRefresh = () => {
@@ -173,9 +194,9 @@ export default function NotificationsScreen() {
     };
 
     const renderItem = ({ item, index }: any) => {
-        const isFollowNotification = item.type === 'follow' || item.text.includes('following');
+        const isFollowNotification = item.type === 'follow' || (item.text && item.text.includes('following'));
         let type = item.type;
-        if (!type) {
+        if (!type && item.text) {
             if (item.text.includes('liked')) type = 'like';
             else if (item.text.includes('commented')) type = 'comment';
             else if (item.text.includes('following')) type = 'follow';
@@ -198,15 +219,20 @@ export default function NotificationsScreen() {
                             source={{ uri: item.sender?.avatar || 'https://i.pravatar.cc/100' }}
                             style={styles.avatar}
                         />
-                        <View style={styles.iconBadge}>
-                            <AnimatedNotificationIcon type={type} color={colors.primary} borderColor={colors.background} />
-                        </View>
+                        <AnimatedNotificationIcon type={type} color={colors.primary} borderColor={colors.background} />
                     </View>
 
                     <View style={styles.textContainer}>
                         <Text style={[styles.mainText, { color: colors.text }]}>
                             <Text style={styles.username}>{item.sender?.name || 'User'} </Text>
-                            {item.text}
+                            {item.text || (
+                                type === 'like' ? 'liked your post.' :
+                                type === 'comment' ? 'commented on your post.' :
+                                type === 'follow' ? 'started following you.' :
+                                type === 'follow_request' ? 'requested to follow you.' :
+                                type === 'request_accepted' ? 'accepted your follow request.' :
+                                'interacted with your post.'
+                            )}
                             <Text style={[styles.timeText, { color: colors.textSecondary }]}> {formatTime(item.createdAt)}</Text>
                         </Text>
                         {item.subText && <Text style={[styles.subText, { color: colors.textSecondary }]}>{item.subText}</Text>}
@@ -251,6 +277,29 @@ export default function NotificationsScreen() {
                 renderSectionHeader={({ section: { title } }) => (
                     <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>{title}</Text>
                 )}
+                ListHeaderComponent={
+                    <TouchableOpacity
+                        style={[
+                            styles.requestsBanner,
+                            { backgroundColor: colors.background, borderBottomColor: colors.border }
+                        ]}
+                        onPress={() => router.push('/follow-requests')}
+                    >
+                        <View style={styles.requestsBannerContent}>
+                            <View style={styles.avatarStack}>
+                                <View style={[styles.avatarCircle, styles.avatarBack, { backgroundColor: isDark ? '#444' : '#e0e0e0', borderColor: colors.background }]} />
+                                <View style={[styles.avatarCircle, styles.avatarFront, { backgroundColor: isDark ? '#333' : '#d0d0d0', borderColor: colors.background }]} />
+                            </View>
+                            <View style={styles.requestsBannerTextContainer}>
+                                <Text style={[styles.requestsBannerTitle, { color: colors.text }]}>Follow requests</Text>
+                                <Text style={[styles.requestsBannerSubtitle, { color: colors.textSecondary }]}>
+                                    Approve or ignore requests
+                                </Text>
+                            </View>
+                            {pendingRequestsCount > 0 && <View style={styles.blueDot} />}
+                        </View>
+                    </TouchableOpacity>
+                }
                 contentContainerStyle={[styles.listContent, isDesktop && { maxWidth: 800, alignSelf: 'center', width: '100%' }]}
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
@@ -283,6 +332,55 @@ const styles = StyleSheet.create({
     },
     headerTitle: { fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
     listContent: { paddingBottom: 20 },
+    requestsBanner: {
+        paddingVertical: 14,
+        paddingHorizontal: 20,
+        borderBottomWidth: 0.5,
+    },
+    requestsBannerContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    avatarStack: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginRight: 12,
+        width: 60, // Fixed width to accommodate overlapping
+        height: 40,
+    },
+    avatarCircle: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        borderWidth: 2,
+        position: 'absolute',
+    },
+    avatarBack: {
+        left: 20,
+        zIndex: 1,
+    },
+    avatarFront: {
+        left: 0,
+        zIndex: 2,
+    },
+    requestsBannerTextContainer: {
+        flex: 1,
+    },
+    requestsBannerTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginBottom: 2,
+    },
+    requestsBannerSubtitle: {
+        fontSize: 14,
+    },
+    blueDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#007AFF', // iOS blue
+        marginLeft: 10,
+    },
     notificationItem: {
         flexDirection: 'row',
         alignItems: 'center',

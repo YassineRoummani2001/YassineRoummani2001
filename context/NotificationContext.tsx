@@ -20,7 +20,7 @@ interface NotificationContextType {
     unreadCount: number;
     expoPushToken: string | undefined;
     refreshCount: () => Promise<void>;
-    markAsRead: (notificationId: string) => Promise<void>;
+    markAsRead: (notificationId?: string) => Promise<void>;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -215,8 +215,6 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 
         responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
             // When user taps notification
-            // console.log('Notification tapped:', response);
-            // Navigate to screen based on response.notification.request.content.data
         });
 
         return () => {
@@ -224,6 +222,25 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
             responseListener.current?.remove();
         };
     }, []);
+
+    // Web: poll every 30s + refresh on tab focus
+    useEffect(() => {
+        if (Platform.OS !== 'web' || !user) return;
+
+        const interval = setInterval(() => {
+            fetchUnreadCount();
+        }, 30000);
+
+        const handleVisibility = () => {
+            if (document.visibilityState === 'visible') fetchUnreadCount();
+        };
+        document.addEventListener('visibilitychange', handleVisibility);
+
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibility);
+        };
+    }, [user, fetchUnreadCount]);
 
     // Refetch on app foreground
     useEffect(() => {
@@ -238,14 +255,18 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
         };
     }, [user]);
 
-    const markAsRead = useCallback(async (notificationId: string) => {
+    const markAsRead = useCallback(async (notificationId?: string) => {
         // Optimistic update
-        setUnreadCount(prev => Math.max(0, prev - 1));
+        setUnreadCount(0);
 
         if (!user?.token) return;
 
         try {
-            await fetch(`${API_BASE_URL}/api/notifications/${notificationId}/read`, {
+            // If specific ID provided, mark just that one; otherwise mark all as read
+            const url = notificationId
+                ? `${API_BASE_URL}/api/notifications/${notificationId}/read`
+                : `${API_BASE_URL}/api/notifications/mark-all-read`;
+            await fetch(url, {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${user.token}` }
             });

@@ -157,15 +157,7 @@ export default function MarketplaceScreen() {
                             </TouchableOpacity>
                         )}
                     </View>
-                    <TouchableOpacity 
-                        style={[styles.locationBtn, { backgroundColor: isDark ? '#1A1A1A' : '#F2F2F7', width: 100 }]}
-                        onPress={() => setSortOrder(prev => prev === 'new' ? 'old' : 'new')}
-                    >
-                        <Ionicons name={sortOrder === 'new' ? "time" : "time-outline"} size={18} color={sortOrder === 'old' ? colors.primary : colors.textSecondary} />
-                        <Text style={[styles.locationText, { color: sortOrder === 'old' ? colors.primary : colors.textSecondary }]} numberOfLines={1}>
-                            {sortOrder === 'new' ? 'Newest' : 'Oldest'}
-                        </Text>
-                    </TouchableOpacity>
+
                     <TouchableOpacity 
                         style={[styles.locationBtn, { backgroundColor: isDark ? '#1A1A1A' : '#F2F2F7', width: 110 }]}
                         onPress={() => setShowLocationModal(true)}

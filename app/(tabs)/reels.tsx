@@ -1,17 +1,22 @@
 import ReelItem from '@/components/ReelItem';
+import ReelInfoPanel from '@/components/ReelInfoPanel';
 import { SkeletonFullscreen } from '@/components/Skeletons';
 import { useReels } from '@/context/ReelContext';
-import { useTheme } from '@/hooks/useTheme';
+import { useUser } from '@/context/UserContext';
+import { useThemeContext } from '@/context/ThemeContext';
+import { API_BASE_URL } from '@/constants/Config';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { Camera, ChevronLeft, Search } from 'lucide-react-native';
+import { Search } from 'lucide-react-native';
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import Toast from 'react-native-toast-message';
 import {
     FlatList,
+    Image,
     Platform,
+    Pressable,
     RefreshControl,
     StatusBar,
     StyleSheet,
@@ -24,49 +29,108 @@ import {
 import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// 🎯 Memoized ReelItem to prevent unnecessary re-renders
+// ─── Memoized ReelItem ────────────────────────────────────────────────────────
 const MemoizedReelItem = memo(
     ReelItem,
-    (prevProps, nextProps) => {
-        return (
-            prevProps.active === nextProps.active &&
-            prevProps.item._id === nextProps.item._id &&
-            prevProps.isMuted === nextProps.isMuted
-        );
-    }
+    (prev, next) =>
+        prev.active === next.active &&
+        prev.item._id === next.item._id &&
+        prev.isMuted === next.isMuted
 );
 
+// ─── Helper ───────────────────────────────────────────────────────────────────
+const getValidUri = (uri?: string) => {
+    if (!uri) return '';
+    if (uri.startsWith('data:') || uri.startsWith('file:')) return uri;
+    if (uri.startsWith('http') && uri.includes('/uploads/')) {
+        const parts = uri.split('/uploads/');
+        return `${API_BASE_URL}/uploads/${parts[1]}`;
+    }
+    if (uri.startsWith('http')) return uri;
+    if (uri.startsWith('/uploads/')) return `${API_BASE_URL}${uri}`;
+    return `${API_BASE_URL}${uri.startsWith('/') ? '' : '/'}${uri}`;
+};
+
+// ─── NavArrow for desktop ─────────────────────────────────────────────────────
+function NavArrow({ direction, onPress }: { direction: 'up' | 'down'; onPress: () => void }) {
+    const [hovered, setHovered] = useState(false);
+    return (
+        <Pressable
+            onPress={onPress}
+            // @ts-ignore web
+            onHoverIn={() => setHovered(true)}
+            onHoverOut={() => setHovered(false)}
+            style={[styles.navArrow, hovered && styles.navArrowHovered]}
+        >
+            <Ionicons
+                name={direction === 'up' ? 'chevron-up' : 'chevron-down'}
+                size={22}
+                color="white"
+            />
+        </Pressable>
+    );
+}
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function ReelsScreen() {
     const { height: screenHeight, width: screenWidth } = useWindowDimensions();
-    const reelHeight = screenHeight; // Use full screen height to avoid black bar gap
-    const colors = useTheme();
+    const { colors, isDark } = useThemeContext();
     const router = useRouter();
     const isFocused = useIsFocused();
     const insets = useSafeAreaInsets();
+    const { user, followUser } = (useUser() || {}) as any;
 
-    // Use ReelContext
     const { reels, loading, error, fetchReels, isMuted, setIsMuted } = useReels();
 
-    // State
     const [activeIndex, setActiveIndex] = useState(0);
     const [refreshing, setRefreshing] = useState(false);
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
 
-    // Refs
+    // per-reel state
+    const [likeMap, setLikeMap] = useState<Record<string, boolean>>({});
+    const [likesMap, setLikesMap] = useState<Record<string, number>>({});
+    const [savedMap, setSavedMap] = useState<Record<string, boolean>>({});
+    const [followMap, setFollowMap] = useState<Record<string, boolean>>({});
+    const [reqMap, setReqMap] = useState<Record<string, boolean>>({});
+
     const flatListRef = useRef<FlatList>(null);
     const isMounted = useRef(true);
 
-    // 🔄 Load More Reels
+    const isDesktop = Platform.OS === 'web' && screenWidth > 900;
+    const isTablet = Platform.OS === 'web' && screenWidth > 600 && screenWidth <= 900;
+
+    // ─── Video dimensions ────────────────────────────────────────────────────
+    // WebLayout already subtracts the 280px sidebar, so screenWidth here is the
+    // usable area. We need to fit: arrows (56px left) + video + gap (24px) + panel.
+    const SIDEBAR_WIDTH = isDesktop ? 280 : 0; // already excluded by WebLayout but used for calculation
+    const PANEL_WIDTH = isDesktop ? 340 : 0;
+    const ARROWS_WIDTH = isDesktop ? 80 : 0;  // 40px left dots + 40px right arrows + gaps
+    const AVAILABLE_WIDTH = isDesktop
+        ? screenWidth - SIDEBAR_WIDTH - PANEL_WIDTH - ARROWS_WIDTH - 80 // 80px for padding
+        : isTablet
+        ? screenWidth * 0.55
+        : screenWidth;
+    const VIDEO_WIDTH = isDesktop
+        ? Math.max(260, Math.min(AVAILABLE_WIDTH, Math.floor((screenHeight - 80) * 0.5625)))
+        : isTablet
+        ? Math.min(AVAILABLE_WIDTH, 420)
+        : screenWidth;
+    const VIDEO_HEIGHT = isDesktop
+        ? screenHeight - 80
+        : isTablet
+        ? Math.min(screenHeight, Math.floor(VIDEO_WIDTH * (16 / 9)))
+        : screenHeight;
+
+    // ─── Load / Refresh ──────────────────────────────────────────────────────
     const loadMore = useCallback(() => {
         if (!loading && !refreshing && hasMore) {
-            const nextPage = page + 1;
-            setPage(nextPage);
-            fetchReels(nextPage);
+            const next = page + 1;
+            setPage(next);
+            fetchReels(next);
         }
     }, [loading, refreshing, hasMore, page, fetchReels]);
 
-    // 🔄 Refresh Reels
     const handleRefresh = useCallback(async () => {
         setRefreshing(true);
         setPage(1);
@@ -75,169 +139,333 @@ export default function ReelsScreen() {
         setRefreshing(false);
     }, [fetchReels]);
 
-    // 🎬 Initial Load
     useEffect(() => {
         fetchReels(1);
-        return () => {
-            isMounted.current = false;
-        };
+        return () => { isMounted.current = false; };
     }, [fetchReels]);
 
-    // 👁️ Track Viewable Items (which reel is visible)
+    // ─── Sync local state from reels data ────────────────────────────────────
+    useEffect(() => {
+        if (!user || reels.length === 0) return;
+        const lm: Record<string, boolean> = {};
+        const lc: Record<string, number> = {};
+        const sm: Record<string, boolean> = {};
+        const fm: Record<string, boolean> = {};
+        const rm: Record<string, boolean> = {};
+        reels.forEach((r: any) => {
+            lm[r._id] = r.likes?.includes(user._id);
+            lc[r._id] = r.likes?.length ?? 0;
+            sm[r._id] = user.saved?.includes(r._id) ?? false;
+            const authorId = r.user?._id || r.user?.id;
+            fm[r._id] = user.following?.includes(authorId) ?? false;
+            rm[r._id] = user.followRequests?.includes(authorId) ?? false;
+        });
+        setLikeMap(lm);
+        setLikesMap(lc);
+        setSavedMap(sm);
+        setFollowMap(fm);
+        setReqMap(rm);
+    }, [reels, user]);
+
+    // ─── Actions ────────────────────────────────────────────────────────────
+    const handleToggleLike = useCallback(async (reel: any) => {
+        const id = reel._id;
+        const wasLiked = likeMap[id];
+        setLikeMap(p => ({ ...p, [id]: !wasLiked }));
+        setLikesMap(p => ({ ...p, [id]: (p[id] ?? 0) + (wasLiked ? -1 : 1) }));
+        try {
+            await fetch(`${API_BASE_URL}/api/posts/${id}/like`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${user?.token}` },
+            });
+        } catch { /* silent */ }
+    }, [likeMap, user]);
+
+    const handleToggleSave = useCallback(async (reel: any) => {
+        const id = reel._id;
+        setSavedMap(p => ({ ...p, [id]: !p[id] }));
+        try {
+            await fetch(`${API_BASE_URL}/api/posts/${id}/save`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${user?.token}` },
+            });
+        } catch { /* silent */ }
+    }, [user]);
+
+    const handleToggleFollow = useCallback(async (reel: any) => {
+        const authorId = reel.user?._id || reel.user?.id;
+        if (!authorId) return;
+        await followUser?.(authorId);
+        setFollowMap(p => ({ ...p, [reel._id]: !p[reel._id] }));
+    }, [followUser]);
+
+    const handleShare = useCallback(() => {
+        Toast.show({ type: 'info', text1: 'Share link copied!', visibilityTime: 1500 });
+    }, []);
+
+    // ─── Navigation between reels ────────────────────────────────────────────
+    const goNext = useCallback(() => {
+        const next = Math.min(activeIndex + 1, reels.length - 1);
+        flatListRef.current?.scrollToIndex({ index: next, animated: true });
+        setActiveIndex(next);
+    }, [activeIndex, reels.length]);
+
+    const goPrev = useCallback(() => {
+        const prev = Math.max(activeIndex - 1, 0);
+        flatListRef.current?.scrollToIndex({ index: prev, animated: true });
+        setActiveIndex(prev);
+    }, [activeIndex]);
+
+    // keyboard navigation (web)
+    useEffect(() => {
+        if (Platform.OS !== 'web') return;
+        const handler = (e: KeyboardEvent) => {
+            if (e.key === 'ArrowDown') goNext();
+            if (e.key === 'ArrowUp') goPrev();
+        };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, [goNext, goPrev]);
+
+    // ─── Viewability ────────────────────────────────────────────────────────
     const onViewableItemsChanged = useRef(
         ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-            if (viewableItems && viewableItems.length > 0) {
-                const visibleItem = viewableItems[0];
-                if (visibleItem.index !== null && visibleItem.index !== undefined) {
-                    setActiveIndex(visibleItem.index);
-                }
+            if (viewableItems.length > 0 && viewableItems[0].index != null) {
+                setActiveIndex(viewableItems[0].index);
             }
         }
     ).current;
 
-    // ⚙️ Viewability Configuration (optimized for video)
     const viewabilityConfig = useRef({
-        itemVisiblePercentThreshold: 80, // 80% of item must be visible
-        minimumViewTime: 100, // Must be visible for 100ms
+        itemVisiblePercentThreshold: 80,
+        minimumViewTime: 100,
     }).current;
 
-    // 🔑 Key Extractor
-    const keyExtractor = useCallback((item: any, index: number) => {
-        return item._id?.toString() || `reel-${index}`;
-    }, []);
+    const keyExtractor = useCallback((item: any, idx: number) => item._id?.toString() || `reel-${idx}`, []);
 
-    const isDesktop = Platform.OS === 'web' && screenWidth > 768;
-    const ITEM_WIDTH = isDesktop ? 450 : screenWidth;
+    const getItemLayout = useCallback(
+        (_: any, index: number) => ({ length: VIDEO_HEIGHT, offset: VIDEO_HEIGHT * index, index }),
+        [VIDEO_HEIGHT]
+    );
 
-    // 🎨 Render Item
     const renderItem = useCallback(
         ({ item, index }: { item: any; index: number }) => (
             <MemoizedReelItem
                 item={item}
                 active={isFocused && activeIndex === index}
                 isMuted={isMuted}
-                width={ITEM_WIDTH}
-                height={reelHeight}
+                width={VIDEO_WIDTH}
+                height={VIDEO_HEIGHT}
             />
         ),
-        [activeIndex, ITEM_WIDTH, reelHeight, isFocused, isMuted]
+        [activeIndex, VIDEO_WIDTH, VIDEO_HEIGHT, isFocused, isMuted]
     );
 
-    // 📐 Get Item Layout (for performance)
-    const getItemLayout = useCallback(
-        (_: any, index: number) => ({
-            length: reelHeight,
-            offset: reelHeight * index,
-            index,
-        }),
-        [reelHeight]
-    );
+    const activeReel = reels[activeIndex];
 
-    // 🎨 Render
+    // ─── DESKTOP LAYOUT ──────────────────────────────────────────────────────
+    if (isDesktop) {
+        return (
+            <View style={styles.desktopRoot}>
+                <StatusBar barStyle="light-content" />
+
+                {/* ── Ambient blurred background ── */}
+                {activeReel?.user?.avatar && (
+                    <Image
+                        source={{ uri: getValidUri(activeReel.user.avatar) }}
+                        style={styles.ambientBg}
+                        blurRadius={Platform.OS === 'web' ? 0 : 40}
+                    />
+                )}
+                {/* dark overlay */}
+                <View style={styles.ambientOverlay} />
+
+                {/* ── Floating top-right controls (mute + search) ── */}
+                <View style={[styles.desktopTopBar, { paddingTop: Math.max(insets.top, 16) }]}>
+                    <View style={styles.desktopTopActions}>
+                        <TouchableOpacity
+                            style={styles.topBarBtn}
+                            onPress={() => {
+                                const n = !isMuted;
+                                setIsMuted(n);
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            }}
+                        >
+                            <Ionicons name={isMuted ? 'volume-mute' : 'volume-high'} size={20} color="#fff" />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.topBarBtn} onPress={() => router.push('/search')}>
+                            <Search size={20} color="#fff" />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* ── Main area: Video + Nav Arrows + Info Panel ── */}
+                <View style={styles.desktopMain}>
+
+                    {/* Left: Video column */}
+                    <View style={[styles.videoColumn, { width: VIDEO_WIDTH }]}>
+                        {/* Navigation arrows */}
+                        <View style={styles.navArrows}>
+                            <NavArrow direction="up" onPress={goPrev} />
+                            <View style={{ height: 12 }} />
+                            <NavArrow direction="down" onPress={goNext} />
+                        </View>
+
+                        {/* Dot indicators */}
+                        <View style={styles.dotIndicators}>
+                            {reels.slice(Math.max(0, activeIndex - 3), activeIndex + 4).map((r: any, i: number) => {
+                                const absI = Math.max(0, activeIndex - 3) + i;
+                                return (
+                                    <View
+                                        key={r._id}
+                                        style={[
+                                            styles.dot,
+                                            absI === activeIndex && styles.dotActive,
+                                        ]}
+                                    />
+                                );
+                            })}
+                        </View>
+
+                        {/* The video list */}
+                        <View style={[styles.videoWrapper, { width: VIDEO_WIDTH, height: VIDEO_HEIGHT }]}>
+                            {loading && reels.length === 0 && <SkeletonFullscreen />}
+                            {!loading && (error || reels.length === 0) && (
+                                <View style={styles.emptyState}>
+                                    <Text style={styles.emptyText}>{error || 'No reels yet'}</Text>
+                                    <TouchableOpacity onPress={handleRefresh} style={styles.retryBtn}>
+                                        <Text style={styles.retryText}>Retry</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+                            {reels.length > 0 && (
+                                <FlatList
+                                    ref={flatListRef}
+                                    data={reels}
+                                    keyExtractor={keyExtractor}
+                                    renderItem={renderItem}
+                                    pagingEnabled
+                                    snapToInterval={VIDEO_HEIGHT}
+                                    snapToAlignment="start"
+                                    decelerationRate="fast"
+                                    disableIntervalMomentum
+                                    getItemLayout={getItemLayout}
+                                    initialNumToRender={1}
+                                    maxToRenderPerBatch={2}
+                                    windowSize={3}
+                                    onViewableItemsChanged={onViewableItemsChanged}
+                                    viewabilityConfig={viewabilityConfig}
+                                    onEndReached={loadMore}
+                                    onEndReachedThreshold={0.5}
+                                    showsVerticalScrollIndicator={false}
+                                    refreshControl={
+                                        <RefreshControl
+                                            refreshing={refreshing}
+                                            onRefresh={handleRefresh}
+                                            tintColor="white"
+                                        />
+                                    }
+                                    style={{ width: VIDEO_WIDTH, height: VIDEO_HEIGHT, borderRadius: 20, overflow: 'hidden' }}
+                                />
+                            )}
+                        </View>
+                    </View>
+
+                    {/* Right: Info panel */}
+                    {activeReel && (
+                        <View style={[styles.infoPanelWrapper, { width: PANEL_WIDTH, height: VIDEO_HEIGHT }]}>
+                            <ReelInfoPanel
+                                key={activeReel._id}
+                                item={activeReel}
+                                liked={likeMap[activeReel._id] ?? false}
+                                likesCount={likesMap[activeReel._id] ?? 0}
+                                isSaved={savedMap[activeReel._id] ?? false}
+                                commentsCount={activeReel.comments?.length ?? 0}
+                                isFollowing={followMap[activeReel._id] ?? false}
+                                isRequested={reqMap[activeReel._id] ?? false}
+                                onToggleLike={() => handleToggleLike(activeReel)}
+                                onToggleSave={() => handleToggleSave(activeReel)}
+                                onToggleFollow={() => handleToggleFollow(activeReel)}
+                                onShare={handleShare}
+                            />
+                        </View>
+                    )}
+                </View>
+            </View>
+        );
+    }
+
+    // ─── MOBILE LAYOUT (unchanged classic fullscreen) ─────────────────────────
     return (
-        <View style={[styles.container, isDesktop && { width: 450, alignSelf: 'center', backgroundColor: '#000', borderRadius: 24, overflow: 'hidden', marginVertical: 20 }]}>
-            <StatusBar
-                barStyle="light-content"
-                translucent
-                backgroundColor="transparent"
-            />
+        <View style={styles.mobileContainer}>
+            <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-            {/* 📝 Header Actions */}
-            <View style={[styles.header, { top: Math.max(insets.top, 20) }]}>
-                <TouchableOpacity
-                    style={styles.headerButton}
-                    onPress={() => router.back()}
-                    activeOpacity={0.8}
-                >
-                    <BlurView intensity={20} tint="light" style={styles.headerButtonBlur}>
-                        <ChevronLeft size={24} color="#fff" strokeWidth={2.5} />
+            {/* Header */}
+            <View style={[styles.mobileHeader, { top: Math.max(insets.top, 20) }]}>
+                <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()} activeOpacity={0.8}>
+                    <BlurView intensity={20} tint="light" style={styles.headerBtnBlur}>
+                        <Ionicons name="chevron-back" size={24} color="#fff" />
                     </BlurView>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                    style={styles.headerButton}
+                    style={styles.headerBtn}
                     onPress={() => {
-                        const newState = !isMuted;
-                        setIsMuted(newState);
+                        setIsMuted(!isMuted);
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        Toast.show({
-                            type: 'info',
-                            text1: newState ? 'Audio Muted' : 'Audio Unmuted',
-                            position: 'top',
-                            visibilityTime: 1000
-                        });
                     }}
                     activeOpacity={0.8}
                 >
-                    <BlurView intensity={20} tint="light" style={styles.headerButtonBlur}>
-                        <Ionicons name={isMuted ? "volume-mute" : "volume-high"} size={20} color="#fff" />
+                    <BlurView intensity={20} tint="light" style={styles.headerBtnBlur}>
+                        <Ionicons name={isMuted ? 'volume-mute' : 'volume-high'} size={20} color="#fff" />
                     </BlurView>
                 </TouchableOpacity>
-                
-                <TouchableOpacity
-                    style={styles.headerButton}
-                    onPress={() => router.push('/search')}
-                    activeOpacity={0.8}
-                >
-                    <BlurView intensity={20} tint="light" style={styles.headerButtonBlur}>
-                        <Search size={22} color="#fff" strokeWidth={2.5} />
+
+                <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/search')} activeOpacity={0.8}>
+                    <BlurView intensity={20} tint="light" style={styles.headerBtnBlur}>
+                        <Search size={22} color="#fff" />
                     </BlurView>
                 </TouchableOpacity>
             </View>
 
-            {/* ❌ Error / Empty State */}
             {!loading && (error || reels.length === 0) && (
                 <View style={styles.emptyState}>
-                    <Text style={styles.emptyText}>
-                        {error || 'No reels available'}
-                    </Text>
-                    <TouchableOpacity onPress={handleRefresh} style={styles.retryButton}>
+                    <Text style={styles.emptyText}>{error || 'No reels available'}</Text>
+                    <TouchableOpacity onPress={handleRefresh} style={styles.retryBtn}>
                         <Text style={styles.retryText}>Retry</Text>
                     </TouchableOpacity>
                 </View>
             )}
 
-            {/* 🔄 Loading State */}
             {loading && reels.length === 0 && <SkeletonFullscreen />}
 
-            {/* 📜 Reels List */}
             {reels.length > 0 && (
                 <FlatList
                     ref={flatListRef}
                     data={reels}
                     keyExtractor={keyExtractor}
                     renderItem={renderItem}
-                    // 📱 Paging Configuration
-                    pagingEnabled={true}
-                    snapToInterval={reelHeight}
+                    pagingEnabled
+                    snapToInterval={screenHeight}
                     snapToAlignment="start"
                     decelerationRate="fast"
                     disableIntervalMomentum
-                    // Web scrolling fix (CSS injection via style for snap)
-                    style={[styles.list, isDesktop && { scrollSnapType: 'y mandatory' } as any]}
-                    // 🚀 Performance Optimizations
-                    getItemLayout={getItemLayout}
+                    getItemLayout={(_, index) => ({ length: screenHeight, offset: screenHeight * index, index })}
                     initialNumToRender={1}
                     maxToRenderPerBatch={2}
-                    windowSize={3} // Render 1 above + current + 1 below
-                    removeClippedSubviews={Platform.OS === 'android'} // Android optimization
-                    // 👁️ Viewability
+                    windowSize={3}
+                    removeClippedSubviews={Platform.OS === 'android'}
                     onViewableItemsChanged={onViewableItemsChanged}
                     viewabilityConfig={viewabilityConfig}
-                    // 🔄 Infinite Scroll
                     onEndReached={loadMore}
                     onEndReachedThreshold={0.5}
-                    // 🎨 Styling
                     showsVerticalScrollIndicator={false}
-                    contentContainerStyle={styles.listContent}
-                    // 🔄 Pull to Refresh
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
                             onRefresh={handleRefresh}
                             tintColor="white"
                             colors={['#fff']}
-                            progressBackgroundColor="#000"
                         />
                     }
                 />
@@ -246,19 +474,136 @@ export default function ReelsScreen() {
     );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-    container: {
+    // ── Desktop ──────────────────────────────────────────────────────────────
+    desktopRoot: {
+        flex: 1,
+        backgroundColor: '#060608',
+        overflow: 'hidden' as any,
+        height: Platform.OS === 'web' ? ('100vh' as any) : '100%',
+    },
+    ambientBg: {
+        position: 'absolute' as any,
+        top: 0, left: 0, right: 0, bottom: 0,
+        width: '100%' as any,
+        height: '100%' as any,
+        opacity: 0.22,
+        filter: 'blur(80px)' as any,
+        transform: [{ scale: 1.3 }],
+    },
+    ambientOverlay: {
+        position: 'absolute' as any,
+        top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: 'rgba(6,6,8,0.82)',
+    },
+    desktopTopBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        paddingHorizontal: 24,
+        paddingBottom: 8,
+        zIndex: 10,
+    },
+    desktopTopActions: {
+        flexDirection: 'row',
+        gap: 10,
+        alignItems: 'center',
+    },
+    topBarBtn: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+        backdropFilter: 'blur(10px)' as any,
+    },
+    desktopMain: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 20,
+        paddingHorizontal: 24,
+        paddingBottom: 16,
+    },
+    videoColumn: {
+        alignItems: 'center',
+        position: 'relative' as any,
+        flexDirection: 'row' as any,
+    },
+    videoWrapper: {
+        borderRadius: 20,
+        overflow: 'hidden' as any,
+        backgroundColor: '#111',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 20 },
+        shadowOpacity: 0.6,
+        shadowRadius: 40,
+        elevation: 30,
+    },
+    navArrows: {
+        position: 'absolute' as any,
+        right: -56,
+        top: '50%' as any,
+        transform: [{ translateY: -40 }],
+        alignItems: 'center',
+        zIndex: 20,
+    },
+    navArrow: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        cursor: 'pointer' as any,
+    },
+    navArrowHovered: {
+        backgroundColor: 'rgba(255,255,255,0.25)',
+    },
+    dotIndicators: {
+        position: 'absolute' as any,
+        left: -28,
+        top: '50%' as any,
+        transform: [{ translateY: -40 }],
+        alignItems: 'center',
+        gap: 6,
+        zIndex: 20,
+    },
+    dot: {
+        width: 4,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: 'rgba(255,255,255,0.25)',
+    },
+    dotActive: {
+        width: 4,
+        height: 18,
+        borderRadius: 2,
+        backgroundColor: 'white',
+    },
+    infoPanelWrapper: {
+        borderRadius: 20,
+        overflow: 'hidden' as any,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 24,
+        elevation: 12,
+    },
+    // ── Mobile ────────────────────────────────────────────────────────────────
+    mobileContainer: {
         flex: 1,
         backgroundColor: '#000',
     },
-    list: {
-        flex: 1,
-    },
-    listContent: {
-        backgroundColor: '#000',
-    },
-    header: {
-        position: 'absolute',
+    mobileHeader: {
+        position: 'absolute' as any,
         left: 20,
         right: 20,
         flexDirection: 'row',
@@ -266,22 +611,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         zIndex: 100,
     },
-    title: {
-        color: 'white',
-        fontSize: 28,
-        fontWeight: '900',
-        letterSpacing: -0.5,
-        textShadowColor: 'rgba(0,0,0,0.5)',
-        textShadowOffset: { width: 0, height: 2 },
-        textShadowRadius: 8,
-    },
-    headerButton: {
+    headerBtn: {
         borderRadius: 22,
-        overflow: 'hidden',
+        overflow: 'hidden' as any,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.15)',
     },
-    headerButtonBlur: {
+    headerBtnBlur: {
         width: 44,
         height: 44,
         justifyContent: 'center',
@@ -302,7 +638,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginBottom: 20,
     },
-    retryButton: {
+    retryBtn: {
         backgroundColor: 'white',
         paddingHorizontal: 32,
         paddingVertical: 12,

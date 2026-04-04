@@ -27,6 +27,12 @@ const getCorrectUrl = (url: string) => {
     return `${API_BASE_URL}/uploads/${url}`;
 };
 
+const formatCount = (n: number): string => {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+    return String(n);
+};
+
 function GridVideoItem({ uri, style }: { uri: string, style: any }) {
     const player = useVideoPlayer(getCorrectUrl(uri), player => {
         player.loop = true;
@@ -119,6 +125,11 @@ export default function ProfileScreen() {
                 const data = await response.json();
                 setFollowersCount(data.followersCount || 0);
                 setFollowingCount(data.followingCount || 0);
+                
+                // If viewing own profile, use fresh data to update avatar & coverImage
+                if (!userId) {
+                    setProfileUser(data);
+                }
             } else if (response.status === 404) {
                 // console.log('User not found');
                 if (isOwnProfile) {
@@ -317,135 +328,167 @@ export default function ProfileScreen() {
                 <View style={isDesktop ? styles.desktopWrapper : undefined}>
 
                     {isDesktop ? (
-                        /* ── DESKTOP HEADER ROW: avatar left, buttons right ── */
                         <View style={styles.desktopHeaderRow}>
-                            <LinearGradient colors={[colors.primary, '#8b5cf6', '#ec4899']} style={[styles.avatarGradientBorder, styles.avatarGradientBorderDesktop]}>
-                                <View style={[styles.avatarBorder, styles.avatarBorderDesktop]}>
-                                    <Image
-                                        source={{ uri: getCorrectUrl(user.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random` }}
-                                        style={[styles.avatar, styles.avatarDesktop]}
-                                    />
+                            {/* Avatar */}
+                            <View style={styles.avatarSection}>
+                                <LinearGradient colors={[colors.primary, '#8b5cf6', '#ec4899']} style={styles.avatarRing}>
+                                    <View style={[styles.avatarInner, { backgroundColor: colors.background }]}>
+                                        <Image
+                                            source={{ uri: getCorrectUrl(user.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random` }}
+                                            style={styles.avatarImage}
+                                        />
+                                    </View>
+                                </LinearGradient>
+                            </View>
+
+                            {/* Right side: stacked layout */}
+                            <View style={styles.desktopHeaderRight}>
+                                {/* Row 1: name + handle */}
+                                <View style={styles.desktopNameBlock}>
+                                    <Text style={styles.name} numberOfLines={1}>{user.name}</Text>
+                                    <Text style={styles.handle} numberOfLines={1}>
+                                        @{user.handle?.replace(/^@+/, '')}
+                                        {user.pronouns ? `  ·  ${user.pronouns.replace(/\//g, ' / ')}` : ''}
+                                    </Text>
                                 </View>
-                            </LinearGradient>
-                            <View style={styles.desktopActionGroup}>
-                                <TouchableOpacity style={styles.btnEdit} onPress={() => router.push('/edit-profile')}>
-                                    <Ionicons name="pencil" size={14} color={colors.text} />
-                                    <Text style={[styles.btnEditText, { color: colors.text }]}>Edit Profile</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity style={styles.btnIcon} onPress={() => router.push('/qr-code')}>
-                                    <Ionicons name="share-social-outline" size={18} color={colors.text} />
-                                </TouchableOpacity>
-                                <TouchableOpacity style={styles.btnIcon} onPress={() => router.push('/settings')}>
-                                    <Ionicons name="settings-outline" size={18} color={colors.text} />
-                                </TouchableOpacity>
+
+                                {/* Row 2: action buttons */}
+                                <View style={styles.desktopActionGroup}>
+                                    <TouchableOpacity style={styles.btnEdit} onPress={() => router.push('/edit-profile')}>
+                                        <Ionicons name="pencil" size={14} color={colors.text} />
+                                        <Text style={[styles.btnEditText, { color: colors.text }]}>Edit Profile</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.btnIcon} onPress={() => router.push('/qr-code')}>
+                                        <Ionicons name="share-social-outline" size={18} color={colors.text} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.btnIcon} onPress={() => router.push('/settings')}>
+                                        <Ionicons name="settings-outline" size={18} color={colors.text} />
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* Row 3: stats */}
+                                <View style={styles.desktopStatsRow}>
+                                    <View style={styles.statPill}>
+                                        <Text style={styles.statNumber}>{formatCount(userPosts.length)}</Text>
+                                        <Text style={styles.statLabel}>posts</Text>
+                                    </View>
+                                    <TouchableOpacity style={styles.statPill} onPress={() => router.push({ pathname: '/users-list', params: { type: 'followers', title: 'Followers', userId: user._id } })} activeOpacity={0.7}>
+                                        <Text style={styles.statNumber}>{formatCount(followersCount)}</Text>
+                                        <Text style={styles.statLabel}>followers</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.statPill} onPress={() => router.push({ pathname: '/users-list', params: { type: 'following', title: 'Following', userId: user._id } })} activeOpacity={0.7}>
+                                        <Text style={styles.statNumber}>{formatCount(followingCount)}</Text>
+                                        <Text style={styles.statLabel}>following</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* Row 4: Bio */}
+                                {user.bio ? (
+                                    <View style={styles.bioSection}>
+                                        {user.bio.split('\n').map((line: any, i: any) => <Text key={i} style={styles.bio}>{line}</Text>)}
+                                    </View>
+                                ) : null}
+
+                                {/* Row 5: Links */}
+                                {user.links && user.links.length > 0 && (
+                                    <View style={styles.linksRow}>
+                                        {user.links.map((link: any, i: any) => {
+                                            const url = typeof link === 'object' ? link.url : link;
+                                            const title = typeof link === 'object' ? (link.title || link.url) : link;
+                                            return (
+                                                <TouchableOpacity key={i} onPress={() => Platform.OS === 'web' ? window.open(url, '_blank') : null} style={styles.linkChip} activeOpacity={0.7}>
+                                                    <Ionicons name="link-outline" size={13} color={colors.primary} />
+                                                    <Text style={styles.link}>{title}</Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </View>
+                                )}
                             </View>
                         </View>
                     ) : (
-                        /* ── MOBILE HEADER: avatar left, stats right (Instagram style) ── */
-                        <View style={styles.mobileHeaderSection}>
-                            {/* Avatar - fixed size, not stretching */}
-                            <LinearGradient colors={[colors.primary, '#8b5cf6', '#ec4899']} style={styles.avatarGradientBorder}>
-                                <View style={styles.avatarBorder}>
-                                    <Image
-                                        source={{ uri: getCorrectUrl(user.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random` }}
-                                        style={styles.avatar}
-                                    />
-                                </View>
-                            </LinearGradient>
+                        <>
+                            {/* ── MOBILE HEADER: avatar left, stats right (Instagram style) ── */}
+                            <View style={styles.mobileHeaderSection}>
+                                {/* Avatar - fixed size, not stretching */}
+                                <LinearGradient colors={[colors.primary, '#8b5cf6', '#ec4899']} style={styles.avatarRing}>
+                                    <View style={styles.avatarInner}>
+                                        <Image
+                                            source={{ uri: getCorrectUrl(user.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random` }}
+                                            style={styles.avatarImage}
+                                        />
+                                    </View>
+                                </LinearGradient>
 
-                            {/* Stats to the right of avatar */}
-                            <View style={styles.mobileStatsGroup}>
-                                <View style={styles.mobileStatItem}>
-                                    <Text style={styles.statNumber}>{userPosts.length}</Text>
-                                    <Text style={styles.statLabel}>Posts</Text>
+                                {/* Stats to the right of avatar */}
+                                <View style={styles.mobileStatsGroup}>
+                                    <View style={styles.mobileStatItem}>
+                                        <Text style={styles.statNumber}>{formatCount(userPosts.length)}</Text>
+                                        <Text style={styles.statLabel}>Posts</Text>
+                                    </View>
+                                    <TouchableOpacity style={styles.mobileStatItem} onPress={() => router.push({ pathname: '/users-list', params: { type: 'followers', title: 'Followers', userId: user._id } })}>
+                                        <Text style={styles.statNumber}>{formatCount(followersCount)}</Text>
+                                        <Text style={styles.statLabel}>Followers</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.mobileStatItem} onPress={() => router.push({ pathname: '/users-list', params: { type: 'following', title: 'Following', userId: user._id } })}>
+                                        <Text style={styles.statNumber}>{formatCount(followingCount)}</Text>
+                                        <Text style={styles.statLabel}>Following</Text>
+                                    </TouchableOpacity>
                                 </View>
-                                <TouchableOpacity style={styles.mobileStatItem} onPress={() => router.push({ pathname: '/users-list', params: { type: 'followers', title: 'Followers', userId: user._id } })}>
-                                    <Text style={styles.statNumber}>{followersCount}</Text>
-                                    <Text style={styles.statLabel}>Followers</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity style={styles.mobileStatItem} onPress={() => router.push({ pathname: '/users-list', params: { type: 'following', title: 'Following', userId: user._id } })}>
-                                    <Text style={styles.statNumber}>{followingCount}</Text>
-                                    <Text style={styles.statLabel}>Following</Text>
-                                </TouchableOpacity>
                             </View>
-                        </View>
+
+                            {/* ── META: name / handle / bio / links / actions ── */}
+                            <View style={styles.mobileMeta}>
+                                <Text style={styles.name}>{user.name}</Text>
+                                <Text style={styles.handle}>@{user.handle?.replace(/^@+/, '')}{user.pronouns ? `  ·  ${user.pronouns.replace(/\//g, ' / ')}` : ''}</Text>
+
+                                {user.bio ? (
+                                    user.bio.split('\n').map((line: any, i: any) => <Text key={i} style={styles.bio}>{line}</Text>)
+                                ) : null}
+
+                                {user.links && user.links.length > 0 && (
+                                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                                        {user.links.map((link: any, i: any) => {
+                                            const url = typeof link === 'object' ? link.url : link;
+                                            const title = typeof link === 'object' ? (link.title || link.url) : link;
+                                            return (
+                                                <TouchableOpacity key={i} onPress={() => Platform.OS === 'web' ? window.open(url, '_blank') : null} style={styles.linkChip}>
+                                                    <Ionicons name="link-outline" size={13} color={colors.primary} />
+                                                    <Text style={styles.link}>{title}</Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </View>
+                                )}
+
+                                {/* Action buttons */}
+                                <View style={styles.mobileActionsRow}>
+                                    <TouchableOpacity style={styles.btnEditMobile} onPress={() => router.push('/edit-profile')}>
+                                        <Text style={[styles.btnEditText, { color: colors.text }]}>Edit Profile</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.btnShareMobile} onPress={() => router.push('/qr-code')}>
+                                        <Ionicons name="share-social-outline" size={18} color={colors.text} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.btnShareMobile} onPress={() => router.push('/discover-people')}>
+                                        <Ionicons name="person-add-outline" size={18} color={colors.text} />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </>
                     )}
-
-                    {/* ── META: name / handle / bio / links / actions ── */}
-                    <View style={isDesktop ? styles.desktopMeta : styles.mobileMeta}>
-                        <Text style={styles.name}>{user.name}</Text>
-                        <Text style={styles.handle}>@{user.handle}{user.pronouns ? `  ·  ${user.pronouns.replace(/\//g, ' / ')}` : ''}</Text>
-
-                        {user.bio ? (
-                            user.bio.split('\n').map((line: any, i: any) => <Text key={i} style={styles.bio}>{line}</Text>)
-                        ) : null}
-
-                        {user.links && user.links.length > 0 && (
-                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
-                                {user.links.map((link: any, i: any) => {
-                                    const url = typeof link === 'object' ? link.url : link;
-                                    const title = typeof link === 'object' ? (link.title || link.url) : link;
-                                    return (
-                                        <TouchableOpacity key={i} onPress={() => Platform.OS === 'web' ? window.open(url, '_blank') : null} style={styles.linkChip}>
-                                            <Ionicons name="link-outline" size={13} color={colors.primary} />
-                                            <Text style={styles.link}>{title}</Text>
-                                        </TouchableOpacity>
-                                    );
-                                })}
-                            </View>
-                        )}
-
-                        {/* Desktop stats row (mobile uses mobileStatsGroup above) */}
-                        {isDesktop && (
-                            <View style={styles.statsRow}>
-                                <View style={styles.statItem}>
-                                    <Text style={styles.statNumber}>{userPosts.length}</Text>
-                                    <Text style={styles.statLabel}>Posts</Text>
-                                </View>
-                                <View style={styles.vertDivider} />
-                                <TouchableOpacity style={styles.statItem} onPress={() => router.push({ pathname: '/users-list', params: { type: 'followers', title: 'Followers', userId: user._id } })}>
-                                    <Text style={styles.statNumber}>{followersCount}</Text>
-                                    <Text style={styles.statLabel}>Followers</Text>
-                                </TouchableOpacity>
-                                <View style={styles.vertDivider} />
-                                <TouchableOpacity style={styles.statItem} onPress={() => router.push({ pathname: '/users-list', params: { type: 'following', title: 'Following', userId: user._id } })}>
-                                    <Text style={styles.statNumber}>{followingCount}</Text>
-                                    <Text style={styles.statLabel}>Following</Text>
-                                </TouchableOpacity>
-                                <View style={styles.vertDivider} />
-                                <View style={styles.statItem}>
-                                    <Text style={styles.statNumber}>{likesCount}</Text>
-                                    <Text style={styles.statLabel}>Likes</Text>
-                                </View>
-                            </View>
-                        )}
-
-                        {/* Action buttons */}
-                        {!isDesktop && (
-                            <View style={styles.mobileActionsRow}>
-                                <TouchableOpacity style={styles.btnEditMobile} onPress={() => router.push('/edit-profile')}>
-                                    <Text style={[styles.btnEditText, { color: colors.text }]}>Edit Profile</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity style={styles.btnShareMobile} onPress={() => router.push('/qr-code')}>
-                                    <Ionicons name="share-social-outline" size={18} color={colors.text} />
-                                </TouchableOpacity>
-                                <TouchableOpacity style={styles.btnShareMobile} onPress={() => router.push('/discover-people')}>
-                                    <Ionicons name="person-add-outline" size={18} color={colors.text} />
-                                </TouchableOpacity>
-                            </View>
-                        )}
-                    </View>
 
                     {/* Tabs */}
                     <View style={styles.tabSection}>
-                        <View style={styles.tabHeader}>
-                            {[{ label: 'Posts', icon: 'grid-outline', activeIcon: 'grid' }, { label: 'Reels', icon: 'film-outline', activeIcon: 'film' }, { label: 'Videos', icon: 'play-outline', activeIcon: 'play' }].map((tab, i) => (
-                                <TouchableOpacity key={i} style={styles.tabBtn} onPress={() => setActiveTab(i)}>
-                                    <Ionicons name={(activeTab === i ? tab.activeIcon : tab.icon) as any} size={20} color={activeTab === i ? colors.text : colors.textSecondary} />
-                                    {isDesktop && <Text style={[styles.tabLabel, { color: activeTab === i ? colors.text : colors.textSecondary }]}>{tab.label}</Text>}
-                                    {activeTab === i && <View style={styles.tabIndicator} />}
-                                </TouchableOpacity>
-                            ))}
+                        <View style={styles.tabHeaderContainer}>
+                            <View style={styles.tabHeader}>
+                                {[{ label: 'Posts', icon: 'grid-outline', activeIcon: 'grid' }, { label: 'Reels', icon: 'film-outline', activeIcon: 'film' }, { label: 'Videos', icon: 'play-outline', activeIcon: 'play' }].map((tab, i) => (
+                                    <TouchableOpacity key={i} style={styles.tabBtn} onPress={() => setActiveTab(i)} activeOpacity={0.7}>
+                                        <Ionicons name={(activeTab === i ? tab.activeIcon : tab.icon) as any} size={isDesktop ? 16 : 22} color={activeTab === i ? colors.text : colors.textSecondary} />
+                                        {isDesktop && <Text style={[styles.tabLabel, { color: activeTab === i ? colors.text : colors.textSecondary }]}>{tab.label.toUpperCase()}</Text>}
+                                        {activeTab === i && <View style={styles.tabIndicator} />}
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
                         </View>
                         {renderContent()}
                     </View>
@@ -483,17 +526,65 @@ const createStyles = (colors: any, isDark: boolean, insets: any, width: number, 
         paddingHorizontal: 0,
     },
 
-    // ── AVATAR OVERLAP ROW (web) ───────────────────────────
+    // ── DESKTOP HEADER ROW ──────────────────────────────
     desktopHeaderRow: {
         flexDirection: 'row',
-        alignItems: 'flex-end',
-        justifyContent: 'space-between',
         paddingHorizontal: 32,
-        marginTop: -56,
-        marginBottom: 12,
+        marginTop: 16,
+        marginBottom: 24,
+        gap: 32,
         zIndex: 10,
+        alignItems: 'flex-start',
     },
-    // Mobile: avatar on left, stats on right (Instagram style)
+    avatarSection: {
+        marginTop: -80,
+        alignSelf: 'flex-start' as any,
+        flexShrink: 0,
+    },
+    desktopHeaderRight: {
+        flex: 1,
+        minWidth: 0,
+        paddingTop: 0,
+        gap: 12,
+    },
+    desktopNameBlock: {
+        gap: 2,
+    },
+    desktopStatsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 24,
+    },
+    statPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    bioSection: {
+        gap: 2,
+    },
+    linksRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap' as any,
+        gap: 8,
+        marginTop: 4,
+    },
+    linkChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+        borderRadius: 12,
+    },
+    link: {
+        fontSize: 13,
+        color: colors.primary,
+        fontWeight: '600',
+    },
+
+    // ── MOBILE HEADER (Instagram style) ─────────────────
     mobileHeaderSection: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -502,44 +593,52 @@ const createStyles = (colors: any, isDark: boolean, insets: any, width: number, 
         marginBottom: 12,
         gap: 20,
     },
-    // Stats group shown to the right of avatar on mobile
     mobileStatsGroup: {
         flex: 1,
         flexDirection: 'row',
         justifyContent: 'space-around',
         alignItems: 'center',
-        paddingTop: 36, // offset to align with bottom of avatar
+        paddingTop: 36,
     },
     mobileStatItem: {
         alignItems: 'center',
         gap: 2,
     },
 
-    // ── AVATAR ─────────────────────────────────────────────
-    // alignSelf: 'flex-start' prevents gradient from stretching full width
-    avatarGradientBorder: { padding: 3, borderRadius: 68, alignSelf: 'flex-start' },
-    avatarGradientBorderDesktop: { borderRadius: 96, alignSelf: 'auto' },
-    avatarBorder: {
-        padding: 4, borderRadius: 65, backgroundColor: colors.background,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25, shadowRadius: 12,
+    // ── AVATAR SIZES ─────────────────────────────────────
+    avatarRing: {
+        padding: 3,
+        borderRadius: 68,
     },
-    avatarBorderDesktop: { borderRadius: 93 },
-    avatar: { width: 110, height: 110, borderRadius: 55, backgroundColor: colors.gray },
-    avatarDesktop: { width: 170, height: 170, borderRadius: 85 },
+    avatarInner: {
+        padding: 4,
+        borderRadius: 65,
+        backgroundColor: colors.background,
+    },
+    avatarImage: {
+        width: 122,
+        height: 122,
+        borderRadius: 61,
+        backgroundColor: colors.gray,
+    },
 
     // ── DESKTOP ACTION BUTTONS ─────────────────────────────
-    desktopActionGroup: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 8 },
+    desktopActionGroup: { 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        gap: 10,
+        flexWrap: 'wrap' as any,
+    },
     btnEdit: {
         flexDirection: 'row', alignItems: 'center', gap: 6,
-        paddingHorizontal: 18, paddingVertical: 9,
-        borderRadius: 24, borderWidth: 1.5,
+        paddingHorizontal: 18, paddingVertical: 10,
+        borderRadius: 12, borderWidth: 1.5,
         borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)',
         backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
     },
     btnEditText: { fontSize: 14, fontWeight: '700' },
     btnIcon: {
-        width: 40, height: 40, borderRadius: 20,
+        width: 38, height: 38, borderRadius: 12,
         alignItems: 'center', justifyContent: 'center',
         borderWidth: 1.5,
         borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)',
@@ -549,101 +648,100 @@ const createStyles = (colors: any, isDark: boolean, insets: any, width: number, 
     // ── MOBILE ACTION BUTTONS ──────────────────────────────
     mobileActionsRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
     btnEditMobile: {
-        flex: 1, paddingVertical: 10, borderRadius: 24, alignItems: 'center',
+        flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center',
         borderWidth: 1.5,
         borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)',
         backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
     },
     btnShareMobile: {
-        width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center',
+        width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
         borderWidth: 1.5,
         borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)',
         backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
     },
 
     // ── META SECTION ───────────────────────────────────────
-    desktopMeta: { paddingHorizontal: 32, paddingBottom: 8 },
     mobileMeta: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
     name: {
-        fontSize: isDesktop ? 28 : 22, fontWeight: '900',
-        color: colors.text, letterSpacing: -0.5, marginBottom: 2,
+        fontSize: isDesktop ? 22 : 22, fontWeight: '900',
+        color: colors.text, marginBottom: 2,
     },
-    handle: { fontSize: 14, fontWeight: '500', color: colors.textSecondary, marginBottom: 10 },
-    bio: { fontSize: 15, color: colors.text, lineHeight: 22, marginBottom: 2 },
-    linkChip: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    link: { fontSize: 14, color: colors.primary, textDecorationLine: 'underline' },
+    handle: { fontSize: 14, fontWeight: '500', color: colors.textSecondary },
+    bio: { fontSize: 15, color: colors.text, lineHeight: 22 },
     pronouns: { fontSize: 14, color: colors.textSecondary },
 
-    // ── STATS ──────────────────────────────────────────────
-    statsRow: {
-        flexDirection: 'row', alignItems: 'center',
-        gap: 0, marginTop: 20, marginBottom: 8,
-    },
-    statItem: { flex: 1, alignItems: 'center' },
+    // ── STATS (Mobile & internal) ──────────────────────────
     statNumber: {
-        fontSize: 20, fontWeight: '900', color: colors.text,
-        letterSpacing: -0.5, marginBottom: 2,
+        fontSize: 16, fontWeight: '900', color: colors.text,
     },
     statLabel: {
-        fontSize: 11, fontWeight: '600', color: colors.textSecondary,
-        textTransform: 'uppercase', letterSpacing: 0.5, opacity: 0.7,
+        fontSize: 12, fontWeight: '500', color: colors.textSecondary, opacity: 0.8,
     },
-    vertDivider: { width: 1, height: 30, backgroundColor: colors.border },
-
-    // ── LEGACY MOBILE STYLES (kept for fallback) ───────────
-    profileHeader: { paddingHorizontal: 20, paddingBottom: 20, backgroundColor: 'transparent' },
-    profileHeaderDesktop: {
-        flexDirection: 'row', paddingHorizontal: 40,
-        marginTop: -60, alignItems: 'flex-end',
-        gap: 30, backgroundColor: 'transparent', zIndex: 10,
-    },
-    avatarWrap: { marginTop: isDesktop ? -90 : -60, marginBottom: 10 },
-    profileInfo: { marginTop: 4 },
-    profileInfoDesktop: { flex: 1, marginTop: 65, paddingBottom: 10 },
-    nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-    nameRowDesktop: { justifyContent: 'flex-start', gap: 20, marginBottom: 20 },
-    desktopStatItem: { flexDirection: 'row', alignItems: 'center' },
-    desktopActions: { flexDirection: 'row', alignItems: 'center', gap: 12, marginLeft: 'auto' },
-    desktopStatsRow: { flexDirection: 'row', alignItems: 'center', gap: 24, marginBottom: 16 },
-    handleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingHorizontal: isDesktop ? 0 : 8, backgroundColor: 'transparent', paddingVertical: 0, borderRadius: 20 },
-    bioContainer: { alignItems: 'center', marginVertical: 12, gap: 6 },
-    bioContainerDesktop: { alignItems: 'flex-start', marginTop: 0 },
-    actionsRow: { flexDirection: 'row', alignItems: 'center', gap: 12, width: '100%', marginTop: 20, justifyContent: 'center' },
-    actionIconButton: { padding: 12, borderRadius: 20, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' },
-    actionButtonPrimary: { flex: 1, paddingVertical: 14, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, borderWidth: 0, maxWidth: isDesktop ? 400 : '100%' },
-    actionButtonText: { fontWeight: '800', fontSize: 14, color: 'white' },
-    followButton: { backgroundColor: colors.primary, paddingVertical: 12, paddingHorizontal: 32, borderRadius: 16, flex: 1, maxWidth: 200, alignItems: 'center' },
-    followButtonText: { fontWeight: '800', fontSize: 16, color: colors.white },
-    iconButton: { padding: 10, borderRadius: 30, backgroundColor: colors.gray },
-    userInfo: { alignItems: 'center', marginBottom: 8 },
-    linksContainer: { marginTop: 8, gap: 4 },
-    separator: { fontSize: 14, color: '#999' },
 
     // ── TABS ───────────────────────────────────────────────
-    tabSection: { flex: 1 },
+    tabSection: { flex: 1, marginTop: isDesktop ? 60 : 4 },
+    tabHeaderContainer: {
+        alignItems: isDesktop ? 'center' : 'stretch',
+        borderTopWidth: isDesktop ? 1 : 0,
+        borderBottomWidth: isDesktop ? 0 : 1,
+        borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+        width: '100%',
+    },
     tabHeader: {
         flexDirection: 'row',
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-        paddingHorizontal: isDesktop ? 32 : 0,
+        width: isDesktop ? 400 : '100%',
+        position: 'relative',
     },
     tabBtn: {
         flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        gap: 8, paddingVertical: 14, position: 'relative',
+        gap: 8, paddingVertical: 18, position: 'relative',
     },
-    tabLabel: { fontSize: 14, fontWeight: '700' },
+    tabLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 1.2 },
     tabIndicator: {
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        height: 2.5, backgroundColor: colors.text, borderRadius: 2,
+        position: 'absolute', 
+        top: isDesktop ? -1 : undefined,
+        bottom: isDesktop ? undefined : 0,
+        left: 0, right: 0,
+        height: isDesktop ? 1 : 2.5, 
+        backgroundColor: colors.text, 
+        borderRadius: isDesktop ? 0 : 2,
     },
     tabIcon: { padding: 8 },
 
     // ── POST GRID ──────────────────────────────────────────
-    grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: isDesktop ? 32 : 0, paddingTop: isDesktop ? 16 : 0, gap: isDesktop ? 8 : 0 },
-    gridItem: { width: isDesktop ? COLUMN_WIDTH - 6 : COLUMN_WIDTH, height: (isDesktop ? COLUMN_WIDTH - 6 : COLUMN_WIDTH) * 1.25, padding: isDesktop ? 0 : 1, position: 'relative' },
-    gridImage: { width: '100%', height: '100%', borderRadius: isDesktop ? 16 : 0, backgroundColor: isDark ? '#111' : '#f0f0f0' },
-    videoIconOverlay: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 4, padding: 4 },
-    reelItem: { width: isDesktop ? COLUMN_WIDTH - 6 : COLUMN_WIDTH, height: (isDesktop ? COLUMN_WIDTH - 6 : COLUMN_WIDTH) * 1.6, padding: isDesktop ? 0 : 1, position: 'relative' },
+    grid: { 
+        flexDirection: 'row', 
+        flexWrap: 'wrap', 
+        paddingHorizontal: isDesktop ? 32 : 0, 
+        paddingTop: isDesktop ? 16 : 2, 
+        gap: isDesktop ? 6 : 2,
+    },
+    gridItem: { 
+        width: isDesktop ? '32.1%' : (width / 3) - 1.5, 
+        aspectRatio: 1,
+        borderRadius: isDesktop ? 14 : 0, 
+        overflow: 'hidden' as any,
+        position: 'relative',
+    },
+    gridImage: { 
+        width: '100%', 
+        height: '100%', 
+        backgroundColor: isDark ? '#111' : '#f0f0f0' 
+    },
+    videoIconOverlay: { 
+        position: 'absolute', 
+        top: 8, right: 8, 
+        backgroundColor: 'rgba(0,0,0,0.3)', 
+        borderRadius: 4, 
+        padding: 4 
+    },
+    reelItem: { 
+        width: isDesktop ? '32.1%' : (width / 3) - 1.5, 
+        aspectRatio: 9/16,
+        borderRadius: isDesktop ? 14 : 0, 
+        overflow: 'hidden' as any,
+        position: 'relative',
+    },
     reelIconOverlay: { position: 'absolute', bottom: 8, left: 8, flexDirection: 'row', alignItems: 'center', gap: 4 },
     reelViews: { color: 'white', fontSize: 12, fontWeight: '600' },
     viewsOverlay: { position: 'absolute', bottom: 8, left: 8, flexDirection: 'row', alignItems: 'center' },

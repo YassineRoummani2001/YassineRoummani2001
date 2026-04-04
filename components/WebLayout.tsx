@@ -25,13 +25,13 @@ export function WebLayout({ children }: { children: React.ReactNode }) {
     const isCreate = pathname.includes('/create');
     const isHome = (pathname === '/' || pathname === '/(tabs)' || pathname === '/index') && !isCreate;
 
-    const showRightSidebar = isLargeScreen && width > 1200 && !isChat;
+    const showRightSidebar = isLargeScreen && width > 1200 && !isChat && !isReels;
     const sidebarWidth = 280;
     const rightSidebarWidth = 350;
 
     // Calculate dynamic widths for web
-    let feedMaxWidth = 650; // Increased base
-    if (isReels) feedMaxWidth = 450; 
+    let feedMaxWidth: number | string = 650; // Increased base
+    if (isReels) feedMaxWidth = '100%'; 
     else if (isChat) feedMaxWidth = 1000;
     else if (isMarketplace) feedMaxWidth = 850;
     else if (isProfile) feedMaxWidth = 800; // So Profile fits with the Right Sidebar
