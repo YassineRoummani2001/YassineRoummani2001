@@ -737,6 +737,7 @@ router.get('/user/:userId', async (req, res) => {
             pronouns: user.pronouns,
             gender: user.gender,
             links: user.links,
+            isPrivate: user.isPrivate,
             stories: stories || [], // Return fetched stories
             followersCount: user.followers?.length || 0,
             followingCount: user.following?.length || 0,

@@ -185,22 +185,33 @@ export const UserProvider = ({ children }) => {
                 let updatedFollowing = user.following || [];
                 let updatedSentRequests = user.sentRequests || [];
 
+                const isMatch = (item, targetId) => {
+                    if (typeof item === 'string') return item === targetId;
+                    return item._id === targetId || item.id === targetId;
+                };
+
                 if (data.status === 'followed') {
-                   if (!updatedFollowing.includes(userId)) updatedFollowing = [...updatedFollowing, userId];
-                   updatedSentRequests = updatedSentRequests.filter(id => id !== userId);
+                   if (!updatedFollowing.some(f => isMatch(f, userId))) {
+                       updatedFollowing = [...updatedFollowing, userId];
+                   }
+                   updatedSentRequests = updatedSentRequests.filter(r => !isMatch(r, userId));
                 } else if (data.status === 'unfollowed') {
-                    updatedFollowing = updatedFollowing.filter(id => id !== userId);
-                    updatedSentRequests = updatedSentRequests.filter(id => id !== userId);
+                    updatedFollowing = updatedFollowing.filter(f => !isMatch(f, userId));
+                    updatedSentRequests = updatedSentRequests.filter(r => !isMatch(r, userId));
                 } else if (data.status === 'requested') {
-                    if (!updatedSentRequests.includes(userId)) updatedSentRequests = [...updatedSentRequests, userId];
-                    updatedFollowing = updatedFollowing.filter(id => id !== userId);
+                    if (!updatedSentRequests.some(r => isMatch(r, userId))) {
+                        updatedSentRequests = [...updatedSentRequests, userId];
+                    }
+                    updatedFollowing = updatedFollowing.filter(f => !isMatch(f, userId));
                 } else if (data.status === 'cancelled') {
-                    updatedSentRequests = updatedSentRequests.filter(id => id !== userId);
+                    updatedSentRequests = updatedSentRequests.filter(r => !isMatch(r, userId));
                 } else {
                      if (data.isFollowing) {
-                         if (!updatedFollowing.includes(userId)) updatedFollowing = [...updatedFollowing, userId];
+                         if (!updatedFollowing.some(f => isMatch(f, userId))) {
+                             updatedFollowing = [...updatedFollowing, userId];
+                         }
                      } else {
-                         updatedFollowing = updatedFollowing.filter(id => id !== userId);
+                         updatedFollowing = updatedFollowing.filter(f => !isMatch(f, userId));
                      }
                 }
 

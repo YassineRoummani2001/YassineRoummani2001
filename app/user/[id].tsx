@@ -25,6 +25,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import VibeConfirmModal from '@/components/VibeConfirmModal';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const getCorrectUrl = (url: string) => {
@@ -135,20 +136,26 @@ function HoverableGridCard({
                         <View style={gridOverlayStyles.hoverStats}>
                             {isReel || isVideo ? (
                                 <View style={gridOverlayStyles.hoverStatItem}>
-                                    <Ionicons name="play" size={18} color="white" />
+                                    <View style={gridOverlayStyles.shadowIcon}>
+                                        <Ionicons name="play" size={20} color="white" />
+                                    </View>
                                     <Text style={gridOverlayStyles.hoverStatText}>
                                         {formatCount(post.views || 0)}
                                     </Text>
                                 </View>
                             ) : null}
                             <View style={gridOverlayStyles.hoverStatItem}>
-                                <Ionicons name="heart" size={18} color="white" />
+                                <View style={gridOverlayStyles.shadowIcon}>
+                                    <Ionicons name="heart" size={20} color="white" />
+                                </View>
                                 <Text style={gridOverlayStyles.hoverStatText}>
                                     {formatCount(post.likes?.length || 0)}
                                 </Text>
                             </View>
                             <View style={gridOverlayStyles.hoverStatItem}>
-                                <Ionicons name="chatbubble" size={16} color="white" />
+                                <View style={gridOverlayStyles.shadowIcon}>
+                                    <Ionicons name="chatbubble" size={18} color="white" />
+                                </View>
                                 <Text style={gridOverlayStyles.hoverStatText}>
                                     {formatCount(post.comments?.length || 0)}
                                 </Text>
@@ -173,24 +180,36 @@ const gridOverlayStyles = StyleSheet.create({
     },
     hoverOverlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.45)',
+        backgroundColor: 'rgba(0,0,0,0.55)',
         justifyContent: 'center',
         alignItems: 'center',
+        zIndex: 10,
     },
     hoverStats: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 20,
+        justifyContent: 'center',
+        gap: 12,
+        width: '100%',
     },
     hoverStatItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: 4,
     },
     hoverStatText: {
         color: 'white',
-        fontSize: 15,
-        fontWeight: '700',
+        fontSize: 17,
+        fontWeight: '900',
+        textShadowColor: 'rgba(0, 0, 0, 0.4)',
+        textShadowOffset: { width: 0, height: 2 },
+        textShadowRadius: 4,
+    },
+    shadowIcon: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.4,
+        shadowRadius: 4,
     },
 });
 
@@ -201,6 +220,8 @@ export default function UserProfileScreen() {
     const { user: currentUser, followUser } = (useUser() || {}) as any;
     const [activeTab, setActiveTab] = useState(0);
     const [optionsVisible, setOptionsVisible] = useState(false);
+    const [isFollowModalVisible, setFollowModalVisible] = useState(false);
+    const [followModalMsg, setFollowModalMsg] = useState('');
     const [isFollowing, setIsFollowing] = useState(false);
     const [followersCount, setFollowersCount] = useState(0);
     const [followingCount, setFollowingCount] = useState(0);
@@ -245,10 +266,16 @@ export default function UserProfileScreen() {
     useEffect(() => { if (id) fetchUserData(); }, [id]);
     useEffect(() => { fetchUserPosts(); }, [id]);
     useEffect(() => {
-        if (currentUser) {
-            const uid = id?.toString();
-            setIsFollowing(!!currentUser.following?.some((f: any) => (typeof f === 'string' ? f : f._id) === uid));
-            setIsRequested(!!currentUser.sentRequests?.some((r: any) => (typeof r === 'string' ? r : r._id) === uid));
+        if (currentUser && id) {
+            const uid = id.toString();
+            const isMatch = (item: any, targetId: string) => {
+                if (!item) return false;
+                if (typeof item === 'string') return item === targetId;
+                return item._id === targetId || item.id === targetId;
+            };
+
+            setIsFollowing(!!currentUser.following?.some((f: any) => isMatch(f, uid)));
+            setIsRequested(!!currentUser.sentRequests?.some((r: any) => isMatch(r, uid)));
         }
     }, [currentUser, id]);
 
@@ -275,29 +302,31 @@ export default function UserProfileScreen() {
         finally { setPostsLoading(false); }
     };
 
-    const handleFollow = async () => {
+    const handleFollow = () => {
         if (!currentUser || !id || followLoading) return;
-        const performFollow = async () => {
-            setFollowLoading(true);
-            try {
-                const result = await followUser(id);
-                if (result.success) {
-                    const s = result.data.status;
-                    if (s === 'followed') { setIsFollowing(true); setIsRequested(false); }
-                    else if (s === 'unfollowed' || s === 'cancelled') { setIsFollowing(false); setIsRequested(false); }
-                    else if (s === 'requested') { setIsFollowing(false); setIsRequested(true); }
-                    if (result.data.followersCount !== undefined) setFollowersCount(result.data.followersCount);
-                    if (result.data.followingCount !== undefined) setFollowingCount(result.data.followingCount);
-                }
-            } catch (e) { console.error(e); }
-            finally { setFollowLoading(false); }
-        };
-
+        
         if (isFollowing || isRequested) {
-            const msg = isFollowing ? `Unfollow ${userData?.name}?` : `Cancel request to ${userData?.name}?`;
-            if (Platform.OS === 'web') { if (confirm(msg)) performFollow(); }
-            else Alert.alert(isFollowing ? 'Unfollow?' : 'Cancel?', msg, [{ text: 'No', style: 'cancel' }, { text: 'Yes', onPress: performFollow }]);
-        } else performFollow();
+            setFollowModalMsg(isFollowing ? `Unfollow ${userData?.name}?` : `Cancel request to ${userData?.name}?`);
+            setFollowModalVisible(true);
+        } else {
+            performFollow();
+        }
+    };
+
+    const performFollow = async () => {
+        setFollowLoading(true);
+        try {
+            const result = await followUser(id);
+            if (result.success) {
+                const s = result.data.status;
+                if (s === 'followed') { setIsFollowing(true); setIsRequested(false); }
+                else if (s === 'unfollowed' || s === 'cancelled') { setIsFollowing(false); setIsRequested(false); }
+                else if (s === 'requested') { setIsFollowing(false); setIsRequested(true); }
+                if (result.data.followersCount !== undefined) setFollowersCount(result.data.followersCount);
+                if (result.data.followingCount !== undefined) setFollowingCount(result.data.followingCount);
+            }
+        } catch (e) { console.error(e); }
+        finally { setFollowLoading(false); }
     };
 
     const handleBlockUser = async () => {
@@ -311,10 +340,12 @@ export default function UserProfileScreen() {
     };
 
     const isOwnProfile = currentUser?._id === id;
-    const canSeeContent = useMemo(
-        () => !userData?.isPrivate || isFollowing || isOwnProfile,
-        [userData?.isPrivate, isFollowing, isOwnProfile]
-    );
+    const canSeeContent = useMemo(() => {
+        if (!userData) return false;
+        if (isOwnProfile) return true;
+        if (isFollowing) return true;
+        return !userData.isPrivate;
+    }, [userData, isFollowing, isOwnProfile]);
 
     // ─── Content renderer ────────────────────────────────────────────────────
     const reels = useMemo(
@@ -323,6 +354,18 @@ export default function UserProfileScreen() {
     );
 
     const renderContent = () => {
+        if (!canSeeContent) {
+            return (
+                <View style={styles.privateState}>
+                    <View style={styles.privateIconWrap}>
+                        <Ionicons name="lock-closed" size={40} color={colors.textSecondary} />
+                    </View>
+                    <Text style={styles.emptyTitle}>This Account is Private</Text>
+                    <Text style={styles.emptySub}>Follow this account to see their posts and reels.</Text>
+                </View>
+            );
+        }
+
         if (postsLoading) {
             return (
                 <View style={styles.emptyState}>
@@ -330,6 +373,7 @@ export default function UserProfileScreen() {
                 </View>
             );
         }
+
 
         if (!canSeeContent) {
             return (
@@ -562,14 +606,18 @@ export default function UserProfileScreen() {
                                 {!isOwnProfile && (
                                     <View style={styles.desktopActionGroup}>
                                         <FollowBtn compact />
-                                        <MsgBtn compact />
-                                        <TouchableOpacity
-                                            style={styles.btnIcon}
-                                            onPress={() => setOptionsVisible(true)}
-                                            activeOpacity={0.8}
-                                        >
-                                            <Ionicons name="ellipsis-horizontal" size={18} color={colors.text} />
-                                        </TouchableOpacity>
+                                        {canSeeContent && (
+                                            <>
+                                                <MsgBtn compact />
+                                                <TouchableOpacity
+                                                    style={styles.btnIcon}
+                                                    onPress={() => setOptionsVisible(true)}
+                                                    activeOpacity={0.8}
+                                                >
+                                                    <Ionicons name="ellipsis-horizontal" size={18} color={colors.text} />
+                                                </TouchableOpacity>
+                                            </>
+                                        )}
                                     </View>
                                 )}
 
@@ -699,14 +747,18 @@ export default function UserProfileScreen() {
                                 {!isOwnProfile && (
                                     <View style={styles.mobileActionsRow}>
                                         <FollowBtn />
-                                        <MsgBtn />
-                                        <TouchableOpacity
-                                            style={styles.btnShareMobile}
-                                            onPress={() => setOptionsVisible(true)}
-                                            activeOpacity={0.8}
-                                        >
-                                            <Ionicons name="ellipsis-horizontal" size={18} color={colors.text} />
-                                        </TouchableOpacity>
+                                        {canSeeContent && (
+                                            <>
+                                                <MsgBtn />
+                                                <TouchableOpacity
+                                                    style={styles.btnShareMobile}
+                                                    onPress={() => setOptionsVisible(true)}
+                                                    activeOpacity={0.8}
+                                                >
+                                                    <Ionicons name="ellipsis-horizontal" size={18} color={colors.text} />
+                                                </TouchableOpacity>
+                                            </>
+                                        )}
                                     </View>
                                 )}
                             </View>
@@ -826,6 +878,16 @@ export default function UserProfileScreen() {
                     </View>
                 </TouchableOpacity>
             </Modal>
+
+            <VibeConfirmModal 
+                visible={isFollowModalVisible}
+                onClose={() => setFollowModalVisible(false)}
+                onConfirm={performFollow}
+                title={isFollowing ? 'Unfollow?' : 'Cancel?'}
+                message={followModalMsg}
+                confirmText="Yes"
+                cancelText="No"
+            />
         </SafeAreaView>
     );
 }
@@ -1261,6 +1323,29 @@ const createStyles = (
             paddingVertical: 14,
             gap: 14,
             borderBottomWidth: 1,
+        },
+        privateState: {
+            paddingVertical: 100,
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 14,
+            backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
+            marginHorizontal: isDesktop ? 32 : 16,
+            borderRadius: 24,
+            marginTop: 20,
+            borderWidth: 1,
+            borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+        },
+        privateIconWrap: {
+            width: 86,
+            height: 86,
+            borderRadius: 43,
+            backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: 2.5,
+            borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+            marginBottom: 10,
         },
         modalOptionIcon: {
             width: 40,

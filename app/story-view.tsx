@@ -4,12 +4,14 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { Edit3, Eye, Heart, MoreHorizontal, Plus, Send, Share2, Trash2, X } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Edit3, Eye, Heart, MoreHorizontal, Plus, Send, Share2, Trash2, X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Alert, Animated, Dimensions, Image, KeyboardAvoidingView, Modal, Platform, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import VibeConfirmModal from '@/components/VibeConfirmModal';
 
-const { width, height } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const isDesktop = SCREEN_WIDTH > 768;
 
 export default function StoryViewScreen() {
     const router = useRouter();
@@ -29,6 +31,7 @@ export default function StoryViewScreen() {
 
     const [showOptions, setShowOptions] = useState(false);
     const [mediaError, setMediaError] = useState(false);
+    const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
 
     // Reset error when story changes
     useEffect(() => {
@@ -158,49 +161,37 @@ export default function StoryViewScreen() {
         }
     };
 
-    const handleDeleteStory = async () => {
+    const handleDeleteStory = () => {
+        setIsPaused(true);
+        setDeleteModalVisible(true);
+    };
+
+    const confirmDeleteStory = async () => {
         if (!currentUser?.token || !activeStory?._id) return;
-
-        Alert.alert(
-            'Delete Story',
-            'Are you sure you want to delete this story?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            setIsPaused(true); // Pause playback
-                            setShowOptions(false);
-
-                            const res = await fetch(`${API_BASE_URL}/api/stories/${activeStory._id}`, {
-                                method: 'DELETE',
-                                headers: {
-                                    'Authorization': `Bearer ${currentUser.token}`
-                                }
-                            });
-
-                            if (res.ok) {
-                                // If last story, close
-                                if (stories.length <= 1) {
-                                    handleClose();
-                                } else {
-                                    // Move to prev or next
-                                    handleNextStory();
-                                }
-                            } else {
-                                Alert.alert('Error', 'Failed to delete story');
-                                setIsPaused(false);
-                            }
-                        } catch (error) {
-                            console.error(error);
-                            setIsPaused(false);
-                        }
-                    }
+        try {
+            setShowOptions(false);
+            const res = await fetch(`${API_BASE_URL}/api/stories/${activeStory._id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${currentUser.token}`
                 }
-            ]
-        );
+            });
+            if (res.ok) {
+                // If last story, close
+                if (stories.length <= 1) {
+                    handleClose();
+                } else {
+                    // Move to prev or next
+                    handleNextStory();
+                }
+            } else {
+                Alert.alert('Error', 'Failed to delete story');
+                setIsPaused(false);
+            }
+        } catch (error) {
+            console.error(error);
+            setIsPaused(false);
+        }
     };
 
 
@@ -411,253 +402,259 @@ export default function StoryViewScreen() {
         return <View style={styles.container} />;
     }
 
+    const isDesktop = SCREEN_WIDTH > 768;
+    const frameHeight = isDesktop ? SCREEN_HEIGHT * 0.95 : SCREEN_HEIGHT;
+    const frameWidth = isDesktop ? (frameHeight * 9) / 16 : SCREEN_WIDTH;
+
     return (
         <View style={styles.container}>
             <StatusBar hidden />
 
-            {/* Media Content */}
-            {mediaError ? (
-                <View style={[styles.image, { backgroundColor: '#1a1a1a', justifyContent: 'center', alignItems: 'center' }]}>
-                    <Trash2 size={48} color="#666" />
-                    <Text style={{ color: '#999', marginTop: 16 }}>Failed to load media</Text>
-                </View>
-            ) : storyType === 'video' ? (
-                <VideoView
-                    player={player}
-                    style={styles.image}
-                    contentFit="contain"
-                    nativeControls={false}
-                />
-            ) : storyType === 'text' ? (
-                <View style={[styles.image, { backgroundColor: storyColor, justifyContent: 'center', alignItems: 'center', padding: 40 }]}>
-                    <Text style={{ color: 'white', fontSize: 24, fontWeight: 'bold', textAlign: 'center' }}>
-                        {storyContent}
-                    </Text>
-                </View>
-            ) : (
-                <View style={[styles.image, { justifyContent: 'center', alignItems: 'center' }]}>
-                    <Image
-                        source={{ uri: storyUri }}
-                        style={StyleSheet.absoluteFill}
-                        resizeMode="contain"
-                        onError={(e) => {
-                            // console.log('Story image load error:', e.nativeEvent.error);
-                            setMediaError(true);
-                        }}
+            {/* Ambient Ambient Background */}
+            {isDesktop && (
+                <View style={StyleSheet.absoluteFill}>
+                    <Image 
+                        source={{ uri: storyUri }} 
+                        style={styles.ambientBlur}
+                        blurRadius={80}
                     />
-                    {storyContent ? (
-                        <Text style={{
-                            color: 'white',
-                            fontSize: 24,
-                            fontWeight: 'bold',
-                            textAlign: 'center',
-                            textShadowColor: 'rgba(0,0,0,0.75)',
-                            textShadowOffset: { width: 0, height: 1 },
-                            textShadowRadius: 5,
-                            padding: 20
-                        }}>
-                            {storyContent}
-                        </Text>
-                    ) : null}
+                    <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} />
                 </View>
             )}
 
-            {/* Tap Zones for Navigation */}
-            <View style={styles.tapZones}>
-                <TouchableOpacity
-                    style={styles.tapLeft}
-                    onPress={handlePrevStory}
-                    activeOpacity={1}
-                />
-                <TouchableOpacity
-                    style={styles.tapRight}
-                    onPress={handleNextStory}
-                    activeOpacity={1}
-                />
-            </View>
-
-            {/* Gradient Overlay */}
-            <LinearGradient
-                colors={['rgba(0,0,0,0.6)', 'transparent', 'rgba(0,0,0,0.3)']}
-                style={styles.gradient}
-            >
-
-                {/* Progress Bar */}
-                <View style={[styles.progressContainer, { paddingTop: insets.top > 0 ? insets.top + 10 : 40 }]}>
-                    {stories.map((_: any, index: number) => (
-                        <View key={index} style={styles.progressBarWrapper}>
-                            <View style={styles.progressBarBackground}>
-                                {index === currentStoryIndex ? (
-                                    <Animated.View
-                                        style={[
-                                            styles.progressBarFill,
-                                            {
-                                                width: progress.interpolate({
-                                                    inputRange: [0, 1],
-                                                    outputRange: ['0%', '100%'],
-                                                }),
-                                            },
-                                        ]}
-                                    />
-                                ) : (
-                                    <View style={[
-                                        styles.progressBarFill,
-                                        { width: index < currentStoryIndex ? '100%' : '0%' }
-                                    ]} />
-                                )}
-                            </View>
-                        </View>
-                    ))}
+            {/* Navigation Arrows for Desktop */}
+            {isDesktop && (
+                <View style={styles.desktopNav}>
+                    <TouchableOpacity 
+                        onPress={handlePrevStory} 
+                        style={[styles.navCircle, currentStoryIndex === 0 && { opacity: 0.3 }]}
+                        disabled={currentStoryIndex === 0}
+                    >
+                        <ChevronLeft size={32} color="white" />
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                        onPress={handleNextStory} 
+                        style={styles.navCircle}
+                    >
+                        <ChevronRight size={32} color="white" />
+                    </TouchableOpacity>
                 </View>
+            )}
 
-                {/* Header */}
-                <View style={styles.header}>
-                    <View style={styles.userInfo}>
-                        <Image source={{ uri: user.avatar || 'https://cdn-icons-png.flaticon.com/512/149/149071.png' }} style={styles.avatar} />
-                        <Text style={styles.userName}>{user.name}</Text>
-                        <Text style={styles.timeAgo}>{timeAgo}</Text>
+            <View style={[
+                styles.storyFrame,
+                isDesktop && { 
+                    width: frameWidth, 
+                    height: frameHeight,
+                    borderRadius: 20,
+                    overflow: 'hidden',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 25 },
+                    shadowOpacity: 0.6,
+                    shadowRadius: 40,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.1)',
+                }
+            ]}>
+                {/* Media Content */}
+                {mediaError ? (
+                    <View style={[styles.image, { backgroundColor: '#1a1a1a', justifyContent: 'center', alignItems: 'center' }]}>
+                        <Trash2 size={48} color="#666" />
+                        <Text style={{ color: '#999', marginTop: 16 }}>Failed to load media</Text>
                     </View>
-
-                    <View style={styles.headerActions}>
-                        {isCurrentUser && (
-                            <TouchableOpacity
-                                onPress={() => {
-                                    setIsPaused(true);
-                                    router.push('/story-create');
-                                }}
-                                style={styles.addStoryButton}
-                            >
-                                <Plus color="white" size={24} />
-                            </TouchableOpacity>
-                        )}
-                        <TouchableOpacity onPress={handleClose}>
-                            <X color="white" size={28} />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-            </LinearGradient>
-
-            {/* Options Modal */}
-            <Modal
-                visible={showOptions}
-                animationType="slide"
-                transparent={true}
-                onRequestClose={() => {
-                    setShowOptions(false);
-                    setIsPaused(false);
-                }}
-            >
-                <View style={styles.modalOverlay}>
-                    <TouchableOpacity
-                        style={styles.modalDismiss}
-                        onPress={() => {
-                            setShowOptions(false);
-                            setIsPaused(false);
-                        }}
+                ) : storyType === 'video' ? (
+                    <VideoView
+                        player={player}
+                        style={styles.image}
+                        contentFit="cover"
+                        nativeControls={false}
                     />
-                    <View style={styles.optionsModalContent}>
-                        <View style={styles.optionHeader}>
-                            <Text style={styles.optionHeaderTitle}>Story Options</Text>
-                        </View>
-
-                        <TouchableOpacity style={styles.optionItem} onPress={() => { setShowOptions(false); setIsPaused(false); Alert.alert('Share', 'Sharing functionality coming soon!'); }}>
-                            <Share2 size={24} color="#1a1a1a" />
-                            <Text style={styles.optionText}>Share Story</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={styles.optionItem} onPress={() => { setShowOptions(false); setIsPaused(false); Alert.alert('Edit', 'Editing functionality coming soon!'); }}>
-                            <Edit3 size={24} color="#1a1a1a" />
-                            <Text style={styles.optionText}>Edit Story</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={styles.optionItem} onPress={handleDeleteStory}>
-                            <Trash2 size={24} color="#FF3B30" />
-                            <Text style={[styles.optionText, styles.dangerText]}>Delete Story</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.optionItem, { borderTopWidth: 1, borderTopColor: '#f0f0f0', marginTop: 8 }]}
-                            onPress={() => {
-                                setShowOptions(false);
-                                setIsPaused(false);
-                            }}
-                        >
-                            <Text style={{ fontSize: 16, fontWeight: '600', color: '#1a1a1a', width: '100%', textAlign: 'center' }}>Cancel</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
-
-            {/* Footer Input - Positioned at Bottom */}
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
-                style={styles.footerContainer}
-            >
-                {isCurrentUser ? (
-                    <View style={styles.footer}>
-                        <BlurView intensity={30} tint="dark" style={styles.glassBadge}>
-                            <TouchableOpacity
-                                onPress={() => handleShowViewers('views')}
-                                style={styles.statButton}
-                            >
-                                <Eye size={18} color="white" />
-                                <Text style={styles.statText}>
-                                    {activeStory.views?.length || 0}
-                                </Text>
-                            </TouchableOpacity>
-                            <View style={styles.divider} />
-                            <TouchableOpacity
-                                onPress={() => handleShowViewers('likes')}
-                                style={styles.statButton}
-                            >
-                                <Heart size={18} color="white" fill={activeStory.likes?.length > 0 ? "white" : "transparent"} />
-                                <Text style={styles.statText}>
-                                    {activeStory.likes?.length || 0}
-                                </Text>
-                            </TouchableOpacity>
-                        </BlurView>
-
-                        <BlurView intensity={30} tint="dark" style={styles.iconButtonBlur}>
-                            <TouchableOpacity
-                                onPress={() => {
-                                    setIsPaused(true);
-                                    setShowOptions(true);
-                                }}
-                                style={styles.iconButton}
-                            >
-                                <MoreHorizontal size={24} color="white" />
-                            </TouchableOpacity>
-                        </BlurView>
-                    </View>
+                ) : storyType === 'text' ? (
+                    <LinearGradient
+                        colors={[storyColor || '#6E48AA', storyColor ? `${storyColor}CC` : '#9D50BB']}
+                        style={[styles.image, { justifyContent: 'center', alignItems: 'center', padding: 40 }]}
+                    >
+                        <Text style={styles.textStoryContent}>
+                            {storyContent}
+                        </Text>
+                    </LinearGradient>
                 ) : (
-                    <View style={styles.footer}>
-                        <BlurView intensity={20} tint="dark" style={styles.messageInputBlur}>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Send message..."
-                                placeholderTextColor="rgba(255,255,255,0.6)"
-                                onFocus={() => setIsPaused(true)}
-                                onBlur={() => setIsPaused(false)}
-                            />
-                            <TouchableOpacity onPress={() => alert('Sent!')} style={styles.sendButton}>
-                                <Send size={20} color="white" />
-                            </TouchableOpacity>
-                        </BlurView>
-
-                        <TouchableOpacity onPress={handleLikeStory} style={styles.likeButtonContainer}>
-                            <BlurView intensity={20} tint="dark" style={styles.likeButtonBlur}>
-                                <Heart
-                                    size={28}
-                                    color={isLiked ? "#FF3B30" : "white"}
-                                    fill={isLiked ? "#FF3B30" : "transparent"}
-                                />
-                            </BlurView>
-                        </TouchableOpacity>
+                    <View style={[styles.image, { justifyContent: 'center', alignItems: 'center' }]}>
+                        <Image
+                            source={{ uri: storyUri }}
+                            style={StyleSheet.absoluteFill}
+                            resizeMode="cover"
+                            onError={(e) => {
+                                setMediaError(true);
+                            }}
+                        />
+                        {storyContent ? (
+                            <Text style={{
+                                color: 'white',
+                                fontSize: 22,
+                                fontWeight: 'bold',
+                                textAlign: 'center',
+                                textShadowColor: 'rgba(0,0,0,0.75)',
+                                textShadowOffset: { width: 0, height: 1 },
+                                textShadowRadius: 5,
+                                padding: 20,
+                                position: 'absolute',
+                                bottom: 100,
+                            }}>
+                                {storyContent}
+                            </Text>
+                        ) : null}
                     </View>
                 )}
-            </KeyboardAvoidingView>
+
+                {/* Tap Zones for Navigation */}
+                <View style={styles.tapZones}>
+                    <TouchableOpacity
+                        style={styles.tapLeft}
+                        onPress={handlePrevStory}
+                        activeOpacity={1}
+                    />
+                    <TouchableOpacity
+                        style={styles.tapRight}
+                        onPress={handleNextStory}
+                        activeOpacity={1}
+                    />
+                </View>
+
+                {/* Content Overlay */}
+                <LinearGradient
+                    colors={['rgba(0,0,0,0.5)', 'transparent', 'rgba(0,0,0,0.4)']}
+                    style={styles.gradient}
+                >
+                    {/* Progress Bar */}
+                    <View style={[styles.progressContainer, { paddingTop: insets.top > 0 ? insets.top + 10 : 16 }]}>
+                        {stories.map((_: any, index: number) => (
+                            <View key={index} style={styles.progressBarWrapper}>
+                                <View style={styles.progressBarBackground}>
+                                    {index === currentStoryIndex ? (
+                                        <Animated.View
+                                            style={[
+                                                styles.progressBarFill,
+                                                {
+                                                    width: progress.interpolate({
+                                                        inputRange: [0, 1],
+                                                        outputRange: ['0%', '100%'],
+                                                    }),
+                                                },
+                                            ]}
+                                        />
+                                    ) : (
+                                        <View style={[
+                                            styles.progressBarFill,
+                                            { width: index < currentStoryIndex ? '100%' : '0%' }
+                                        ]} />
+                                    )}
+                                </View>
+                            </View>
+                        ))}
+                    </View>
+
+                    {/* Header */}
+                    <View style={styles.header}>
+                        <View style={styles.userInfo}>
+                            <Image source={{ uri: user.avatar || 'https://cdn-icons-png.flaticon.com/512/149/149071.png' }} style={styles.avatar} />
+                            <View>
+                                <Text style={styles.userName}>{user.name}</Text>
+                                <Text style={styles.timeAgo}>{timeAgo}</Text>
+                            </View>
+                        </View>
+
+                        <View style={styles.headerActions}>
+                            {isCurrentUser && (
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setIsPaused(true);
+                                        router.push('/story-create');
+                                    }}
+                                    style={styles.addStoryButton}
+                                >
+                                    <Plus color="white" size={20} />
+                                </TouchableOpacity>
+                            )}
+                            <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
+                                <X color="white" size={24} />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* Footer Input - Positioned inside frame */}
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
+                        style={styles.footerContainer}
+                    >
+                        {isCurrentUser ? (
+                            <View style={styles.footer}>
+                                <BlurView intensity={40} tint="dark" style={styles.glassBadge}>
+                                    <TouchableOpacity
+                                        onPress={() => handleShowViewers('views')}
+                                        style={styles.statButton}
+                                    >
+                                        <Eye size={18} color="white" />
+                                        <Text style={styles.statText}>
+                                            {activeStory.views?.length || 0}
+                                        </Text>
+                                    </TouchableOpacity>
+                                    <View style={styles.divider} />
+                                    <TouchableOpacity
+                                        onPress={() => handleShowViewers('likes')}
+                                        style={styles.statButton}
+                                    >
+                                        <Heart size={18} color="white" fill={activeStory.likes?.length > 0 ? "white" : "transparent"} />
+                                        <Text style={styles.statText}>
+                                            {activeStory.likes?.length || 0}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </BlurView>
+
+                                <View style={{ flex: 1 }} />
+
+                                <BlurView intensity={40} tint="dark" style={styles.iconButtonBlur}>
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setIsPaused(true);
+                                            setShowOptions(true);
+                                        }}
+                                        style={styles.iconButton}
+                                    >
+                                        <MoreHorizontal size={24} color="white" />
+                                    </TouchableOpacity>
+                                </BlurView>
+                            </View>
+                        ) : (
+                            <View style={styles.footer}>
+                                <BlurView intensity={30} tint="dark" style={styles.messageInputBlur}>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Send message..."
+                                        placeholderTextColor="rgba(255,255,255,0.7)"
+                                        onFocus={() => setIsPaused(true)}
+                                        onBlur={() => setIsPaused(false)}
+                                    />
+                                    <TouchableOpacity onPress={() => alert('Toast: Message Sent!')} style={styles.sendButton}>
+                                        <Send size={18} color="white" />
+                                    </TouchableOpacity>
+                                </BlurView>
+
+                                <TouchableOpacity onPress={handleLikeStory} style={styles.likeButtonContainer}>
+                                    <BlurView intensity={30} tint="dark" style={styles.likeButtonBlur}>
+                                        <Heart
+                                            size={26}
+                                            color={isLiked ? "#FF3B30" : "white"}
+                                            fill={isLiked ? "#FF3B30" : "transparent"}
+                                        />
+                                    </BlurView>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                    </KeyboardAvoidingView>
+                </LinearGradient>
+            </View>
 
             {/* Viewers/Likers Modal */}
             <Modal
@@ -704,6 +701,19 @@ export default function StoryViewScreen() {
                     </View>
                 </View>
             </Modal>
+            <VibeConfirmModal 
+                visible={isDeleteModalVisible}
+                onClose={() => {
+                    setDeleteModalVisible(false);
+                    setIsPaused(false);
+                }}
+                onConfirm={confirmDeleteStory}
+                title="Delete Story"
+                message="Are you sure you want to delete this story?"
+                confirmText="Delete"
+                isDestructive
+                icon={<Trash2 size={28} color="#FF3B30" />}
+            />
         </View>
     );
 }
@@ -711,12 +721,57 @@ export default function StoryViewScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: 'black',
+        backgroundColor: '#050505',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    textStoryContent: {
+        fontSize: 42,
+        fontWeight: '900',
+        color: 'white',
+        textAlign: 'center',
+        lineHeight: 52,
+        letterSpacing: -1,
+        textShadowColor: 'rgba(0,0,0,0.4)',
+        textShadowOffset: { width: 0, height: 4 },
+        textShadowRadius: 15,
+    },
+    ambientBlur: {
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT,
+        opacity: 0.6,
+    },
+    desktopNav: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: SCREEN_WIDTH * 0.15,
+        zIndex: 10,
+    },
+    navCircle: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)',
+    },
+    storyFrame: {
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT,
+        backgroundColor: '#000',
+        zIndex: 5,
     },
     image: {
-        width: width,
-        height: height,
-        position: 'absolute',
+        width: '100%',
+        height: '100%',
     },
     gradient: {
         position: 'absolute',
@@ -769,23 +824,27 @@ const styles = StyleSheet.create({
     userInfo: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 10,
     },
     avatar: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: 'white',
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        borderWidth: 1.5,
+        borderColor: 'rgba(255,255,255,0.5)',
     },
     userName: {
         color: 'white',
-        fontWeight: 'bold',
-        fontSize: 14,
+        fontWeight: '700',
+        fontSize: 15,
     },
     timeAgo: {
-        color: 'rgba(255,255,255,0.7)',
+        color: 'rgba(255,255,255,0.6)',
         fontSize: 12,
+        marginTop: -2,
+    },
+    closeBtn: {
+        padding: 4,
     },
     headerActions: {
         flexDirection: 'row',

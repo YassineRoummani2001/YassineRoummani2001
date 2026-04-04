@@ -20,7 +20,21 @@ router.get('/', protect, async (req, res) => {
         })
             .populate('participants', 'name handle avatar')
             .sort({ updatedAt: -1 });
-        res.json(chats);
+
+        // Calculate unreadCount for each chat
+        const chatsWithUnread = await Promise.all(chats.map(async (chat) => {
+            const unreadCount = await Message.countDocuments({
+                chatId: chat._id,
+                sender: { $ne: req.user._id },
+                readBy: { $ne: req.user._id }
+            });
+            return {
+                ...chat._doc,
+                unreadCount
+            };
+        }));
+
+        res.json(chatsWithUnread);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -40,12 +54,53 @@ router.post('/', protect, async (req, res) => {
 
         if (!chat) {
             chat = await Chat.create({
-                participants: [req.user._id, userId]
+                participants: [req.user._id, userId],
+                isMarketplace: req.body.isMarketplace || false
             });
         }
         
         const fullChat = await Chat.findById(chat._id).populate('participants', 'name handle avatar');
         res.json(fullChat);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Create group chat
+router.post('/group', protect, async (req, res) => {
+    const { name, users, avatar } = req.body;
+    try {
+        const chat = await Chat.create({
+            participants: [...users, req.user._id],
+            isGroup: true,
+            groupName: name,
+            groupAvatar: avatar,
+            admin: req.user._id
+        });
+
+        // Also create an entry in the new Group collection
+        const Group = require('../models/Group');
+        await Group.create({
+            name,
+            avatar,
+            chatId: chat._id,
+            admin: req.user._id
+        });
+        
+        const fullChat = await Chat.findById(chat._id).populate('participants', 'name handle avatar');
+        res.status(201).json(fullChat);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Get single chat info
+router.get('/:chatId', protect, async (req, res) => {
+    try {
+        const chat = await Chat.findById(req.params.chatId)
+            .populate('participants', 'name handle avatar username bio');
+        if (!chat) return res.status(404).json({ message: 'Chat not found' });
+        res.json(chat);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -438,6 +493,114 @@ router.get('/:chatId/media', protect, async (req, res) => {
         .sort({ createdAt: -1 }); // Newest first
         
         res.json(mediaMessages);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Update group info (Admin only)
+router.put('/:chatId', protect, async (req, res) => {
+    try {
+        const { groupName, groupAvatar, groupCoverImage, groupDescription, disappearingMessages } = req.body;
+        const chat = await Chat.findById(req.params.chatId);
+        
+        if (!chat) return res.status(404).json({ message: 'Chat not found' });
+        
+        // Safety check: isGroup and Participant check
+        if (!chat.isGroup) return res.status(400).json({ message: 'Not a group chat' });
+        if (!chat.participants.includes(req.user._id)) {
+            return res.status(403).json({ message: 'Only participants can edit group info' });
+        }
+
+        if (groupName) chat.groupName = groupName;
+        if (groupAvatar) chat.groupAvatar = groupAvatar;
+        if (groupCoverImage) chat.groupCoverImage = groupCoverImage;
+        if (groupDescription !== undefined) chat.groupDescription = groupDescription;
+        if (disappearingMessages !== undefined) chat.disappearingMessages = disappearingMessages;
+        
+        chat.updatedAt = Date.now();
+        await chat.save();
+        
+        // Also update the Group collection
+        const Group = require('../models/Group');
+        const updateData = {};
+        if (groupName) updateData.name = groupName;
+        if (groupAvatar) updateData.avatar = groupAvatar;
+        if (groupCoverImage) updateData.coverImage = groupCoverImage;
+        if (groupDescription !== undefined) updateData.description = groupDescription;
+        updateData.updatedAt = Date.now();
+
+        await Group.findOneAndUpdate(
+            { chatId: chat._id },
+            { $set: updateData }
+        );
+        
+        const fullChat = await Chat.findById(chat._id).populate('participants', 'name handle avatar username bio');
+        res.json(fullChat);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Add participants to group
+router.post('/:chatId/participants', protect, async (req, res) => {
+    try {
+        const { userIds } = req.body;
+        const chat = await Chat.findById(req.params.chatId);
+        
+        if (!chat) return res.status(404).json({ message: 'Chat not found' });
+        if (!chat.isGroup) return res.status(400).json({ message: 'Not a group' });
+        
+        // Allow any participant to add members
+        if (!chat.participants.includes(req.user._id)) {
+            return res.status(403).json({ message: 'Only participants can add members' });
+        }
+
+        // Add new participants
+        userIds.forEach(id => {
+            if (!chat.participants.includes(id)) {
+                chat.participants.push(id);
+            }
+        });
+
+        await chat.save();
+        
+        // Update group model as well if necessary, but group model only has admin, name, avatar
+        const fullChat = await Chat.findById(chat._id).populate('participants', 'name handle avatar username bio');
+        res.json(fullChat);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Leave group
+router.post('/:chatId/leave', protect, async (req, res) => {
+    try {
+        const chat = await Chat.findById(req.params.chatId);
+        if (!chat) return res.status(404).json({ message: 'Chat not found' });
+        if (!chat.isGroup) return res.status(400).json({ message: 'Not a group' });
+
+        chat.participants = chat.participants.filter(p => p.toString() !== req.user._id.toString());
+        
+        // If admin leaves, assign new admin or delete if empty
+        const Group = require('../models/Group');
+        
+        if (chat.participants.length === 0) {
+            await Chat.findByIdAndDelete(chat._id);
+            await Group.findOneAndDelete({ chatId: chat._id });
+            return res.json({ message: 'Group deleted' });
+        }
+
+        if (chat.admin.toString() === req.user._id.toString()) {
+            chat.admin = chat.participants[0];
+            await Group.findOneAndUpdate(
+                { chatId: chat._id },
+                { $set: { admin: chat.participants[0] } }
+            );
+        }
+
+        await chat.save();
+        res.json({ message: 'Left group' });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

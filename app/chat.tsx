@@ -1,7 +1,8 @@
 import ChatItem from '@/components/ChatItem';
+import CreateGroupModal from '@/components/CreateGroupModal';
 import NewChatModal from '@/components/NewChatModal';
 import NoteViewer from '@/components/NoteViewer';
-import { SkeletonRow } from '@/components/Skeletons';
+import { SkeletonChat } from '@/components/Skeletons';
 import { API_BASE_URL } from '@/constants/Config';
 import { useMessages } from '@/context/MessagesContext';
 import { useThemeContext } from '@/context/ThemeContext';
@@ -17,6 +18,7 @@ import {
     Platform,
     RefreshControl,
     SafeAreaView,
+    ScrollView,
     StatusBar,
     StyleSheet,
     Text,
@@ -31,45 +33,49 @@ const UserNoteBubble = ({ note, isDark }: { note: any, isDark: boolean }) => {
     return (
         <View style={{
             position: 'absolute',
-            bottom: 85,
+            bottom: 60,
             alignSelf: 'center',
-            backgroundColor: isDark ? 'rgba(50,50,50,0.98)' : 'rgba(40,40,40,0.95)',
-            borderRadius: 18,
-            paddingHorizontal: 14,
-            paddingVertical: 10,
+            backgroundColor: isDark ? '#262626' : '#FFFFFF',
+            borderRadius: 20,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
             alignItems: 'center',
             justifyContent: 'center',
-            minWidth: 85,
-            maxWidth: 110,
-            zIndex: 999,
-            elevation: 999,
+            minWidth: 60,
+            maxWidth: 100,
+            zIndex: 100,
             shadowColor: "#000",
-            shadowOffset: { width: 0, height: 3 },
-            shadowOpacity: 0.3,
-            shadowRadius: 5
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.15,
+            shadowRadius: 4,
+            elevation: 5,
+            borderWidth: 1,
+            borderColor: isDark ? '#333' : '#EEE',
         }}>
-            <Text numberOfLines={2} style={{ fontSize: 12, color: '#FFFFFF', textAlign: 'center', lineHeight: 16, fontWeight: '500' }}>
-                {note.content}
-            </Text>
-
-            {note.music && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.2)' }}>
-                    <Ionicons name="musical-notes" size={10} color="#FFF" />
-                    <Text numberOfLines={1} style={{ fontSize: 9, color: '#FFF', opacity: 0.8 }}>
+            {note.music ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Ionicons name="musical-notes" size={12} color={isDark ? '#FFF' : '#000'} />
+                    <Text numberOfLines={1} style={{ fontSize: 11, color: isDark ? '#FFF' : '#000', fontWeight: '600' }}>
                         {note.music.track}
                     </Text>
                 </View>
+            ) : (
+                <Text numberOfLines={2} style={{ fontSize: 11, color: isDark ? '#FFF' : '#000', textAlign: 'center', fontWeight: '500' }}>
+                    {note.content}
+                </Text>
             )}
 
             <View style={{
                 position: 'absolute',
-                bottom: -6,
-                width: 12,
-                height: 12,
-                backgroundColor: isDark ? 'rgba(50,50,50,0.98)' : 'rgba(40,40,40,0.95)',
+                bottom: -5,
+                width: 10,
+                height: 10,
+                backgroundColor: isDark ? '#262626' : '#FFFFFF',
                 transform: [{ rotate: '45deg' }],
                 zIndex: -1,
-                borderRadius: 2
+                borderRightWidth: 1,
+                borderBottomWidth: 1,
+                borderColor: isDark ? '#333' : '#EEE',
             }} />
         </View>
     );
@@ -95,6 +101,8 @@ export default function ChatScreen() {
     const [showNewChat, setShowNewChat] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedNote, setSelectedNote] = useState<any>(null);
+    const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'groups' | 'marketplace'>('all');
+    const [showGroupModal, setShowGroupModal] = useState(false);
 
     // Fetch Data
     const fetchData = useCallback(async () => {
@@ -106,7 +114,10 @@ export default function ChatScreen() {
                 ApiClient.get<any>('/api/notes', { 'Authorization': `Bearer ${user.token}` })
             ]);
 
-            if (chatRes.ok) setChats(await chatRes.json());
+            if (chatRes.ok) {
+                const data = await chatRes.json();
+                setChats(data);
+            }
             if (followRes.ok) setFollowingUsers(await followRes.json());
 
             if (notesRes.success && notesRes.data) {
@@ -150,10 +161,23 @@ export default function ChatScreen() {
         };
     }, [socket, fetchData]);
 
-    // Filter
+    // Filter Logic
     const filteredChats = chats.filter(c => {
-        const other = c.participants.find((p: any) => p._id !== user._id) || c.participants[0];
-        return other?.name?.toLowerCase().includes(searchQuery.toLowerCase());
+        // Name Search
+        let matchesSearch = true;
+        if (searchQuery) {
+            const other = c.participants.find((p: any) => p._id !== user._id) || c.participants[0];
+            const nameToSearch = c.isGroup ? c.groupName : other?.name;
+            matchesSearch = nameToSearch?.toLowerCase().includes(searchQuery.toLowerCase());
+        }
+        if (!matchesSearch) return false;
+
+        // Custom Filters
+        if (activeFilter === 'unread') return c.unreadCount > 0;
+        if (activeFilter === 'groups') return c.isGroup;
+        if (activeFilter === 'marketplace') return c.isMarketplace;
+        
+        return true;
     });
 
     // Formatting Time
@@ -169,6 +193,13 @@ export default function ChatScreen() {
             .replace(' day', 'd')
             .replace(' less than a minute', 'now');
     };
+
+    const filters = [
+        { id: 'all', label: 'All' },
+        { id: 'unread', label: 'Unread' },
+        { id: 'groups', label: 'Groups' },
+        { id: 'marketplace', label: 'Marketplace' }
+    ];
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -188,16 +219,14 @@ export default function ChatScreen() {
                     </View>
                 </View>
 
-                {!isDesktop && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-                        <TouchableOpacity>
-                            <Ionicons name="create-outline" size={24} color={colors.text} />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setShowNewChat(true)}>
-                            <Ionicons name="add" size={28} color={colors.text} />
-                        </TouchableOpacity>
-                    </View>
-                )}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                    <TouchableOpacity onPress={() => setShowGroupModal(true)}>
+                        <Ionicons name="people-outline" size={24} color={colors.text} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setShowNewChat(true)}>
+                        <Ionicons name="add" size={28} color={colors.text} />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {/* Search */}
@@ -214,10 +243,35 @@ export default function ChatScreen() {
                 </View>
             </View>
 
+            {/* Filter Bar */}
+            <View style={styles.filterBar}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
+                    {filters.map((f) => (
+                        <TouchableOpacity 
+                            key={f.id}
+                            onPress={() => setActiveFilter(f.id as any)}
+                            style={[
+                                styles.filterPill, 
+                                { 
+                                    backgroundColor: activeFilter === f.id ? (isDark ? '#FFF' : '#000') : (isDark ? '#262626' : '#F3F4F6'),
+                                }
+                            ]}
+                        >
+                            <Text style={[
+                                styles.filterText, 
+                                { color: activeFilter === f.id ? (isDark ? '#000' : '#FFF') : colors.textSecondary }
+                            ]}>
+                                {f.label}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+            </View>
+
             {/* List */}
             {isLoading ? (
-                <View style={{ padding: 16 }}>
-                    {[1, 2, 3, 4, 5].map(i => <SkeletonRow key={i} />)}
+                <View style={{ flex: 1 }}>
+                    <SkeletonChat />
                 </View>
             ) : (
                 <FlatList
@@ -225,19 +279,17 @@ export default function ChatScreen() {
                     keyExtractor={item => item._id}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(); }} />}
                     ListHeaderComponent={
-                        !searchQuery ? (
-                            <View style={{ marginBottom: 16, paddingTop: 40, overflow: 'visible', zIndex: 10, elevation: 10 }}>
+                        (!searchQuery && activeFilter === 'all') ? (
+                            <View style={{ marginBottom: 16, paddingTop: 10, overflow: 'visible', zIndex: 10, elevation: 10 }}>
                                 <FlatList
                                     horizontal
                                     data={[{ _id: 'me', name: 'Your Note', avatar: user?.avatar }, ...followingUsers]}
-                                    contentContainerStyle={{ paddingHorizontal: 16, gap: 16, paddingTop: 30, paddingBottom: 10 }} // Added padding for bubbles
+                                    contentContainerStyle={{ paddingHorizontal: 16, gap: 16, paddingTop: 30, paddingBottom: 10 }}
                                     showsHorizontalScrollIndicator={false}
-                                    style={{ overflow: 'visible' }} // Allow bubbles to overflow
-                                    removeClippedSubviews={false} // Prevent clipping on Android
+                                    style={{ overflow: 'visible' }}
+                                    removeClippedSubviews={false}
                                     renderItem={({ item }) => {
                                         const isMe = item._id === 'me';
-
-                                        // Match note to user
                                         const note = notes.find(n => {
                                             const nUserId = typeof n.user === 'object' ? n.user._id : n.user;
                                             return isMe ? (nUserId === user?._id) : (nUserId === item._id);
@@ -246,67 +298,33 @@ export default function ChatScreen() {
                                         return (
                                             <TouchableOpacity
                                                 onPress={() => {
-                                                    if (isMe) {
-                                                        router.push('/notes/create');
-                                                    } else if (note) {
-                                                        setSelectedNote(note);
-                                                    } else {
-                                                        router.push(`/message/${item._id}`);
-                                                    }
+                                                    if (isMe) router.push('/notes/create');
+                                                    else if (note) setSelectedNote(note);
+                                                    else router.push(`/message/${item._id}`);
                                                 }}
                                                 style={{ alignItems: 'center', width: 72 }}
                                                 activeOpacity={0.85}
                                             >
                                                 <View style={{ position: 'relative', marginBottom: 6 }}>
-                                                    {/* NOTE */}
                                                     <UserNoteBubble note={note} isDark={isDark} />
-
-                                                    {/* AVATAR */}
                                                     <Image
                                                         source={{
-                                                            uri: item.avatar ||
-                                                                `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                                                    item.name || 'User'
-                                                                )}&background=random`,
+                                                            uri: item.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || 'User')}&background=random`,
                                                         }}
                                                         style={{
-                                                            width: 72,
-                                                            height: 72,
-                                                            borderRadius: 36,
+                                                            width: 72, height: 72, borderRadius: 36,
                                                             borderWidth: note ? 2.5 : 0,
                                                             borderColor: note ? (isDark ? '#444' : '#555') : 'transparent',
                                                         }}
                                                     />
-
-                                                    {/* PLUS / ONLINE */}
                                                     {isMe ? (
-                                                        <View style={styles.plusBadge}>
-                                                            <View style={styles.plusInner}>
-                                                                <Ionicons name="add" size={14} color={colors.text} />
-                                                            </View>
-                                                        </View>
+                                                        <View style={styles.plusBadge}><View style={styles.plusInner}><Ionicons name="add" size={14} color={colors.text} /></View></View>
                                                     ) : (
-                                                        item.isOnline && (
-                                                            <View
-                                                                style={[
-                                                                    styles.onlineBadge,
-                                                                    { borderColor: colors.background },
-                                                                ]}
-                                                            />
-                                                        )
+                                                        item.isOnline && <View style={[styles.onlineBadge, { borderColor: colors.background }]} />
                                                     )}
                                                 </View>
-
-                                                <Text
-                                                    numberOfLines={1}
-                                                    style={{
-                                                        fontSize: 12,
-                                                        marginTop: 4,
-                                                        color: isDark ? '#fff' : '#000',
-                                                        opacity: 0.75,
-                                                    }}
-                                                >
-                                                    {isMe ? 'Your Note' : item.name?.split(' ')[0] || 'User'}
+                                                <Text numberOfLines={1} style={{ fontSize: 11, marginTop: 4, color: isDark ? '#fff' : '#444', fontWeight: '500' }}>
+                                                    {isMe ? 'Your note' : item.name?.split(' ')[0] || 'User'}
                                                 </Text>
                                             </TouchableOpacity>
                                         );
@@ -320,34 +338,20 @@ export default function ChatScreen() {
                     }
                     ListEmptyComponent={
                         <View style={{ alignItems: 'center', marginTop: 50, padding: 20 }}>
-                            <Ionicons name="create-outline" size={40} color={colors.text} style={{ opacity: 0.5, marginBottom: 10 }} />
+                            <Ionicons name="chatbubbles-outline" size={40} color={colors.text} style={{ opacity: 0.5, marginBottom: 10 }} />
                             <Text style={{ color: colors.textSecondary, fontSize: 16 }}>No chats found.</Text>
                         </View>
                     }
                     renderItem={({ item }) => {
                         const other = item.participants.find((p: any) => p._id !== user._id) || item.participants[0];
-                        if (!other) return null;
-
-                        // Find note for this user
-                        const userNote = notes.find(n => {
-                            const nUserId = typeof n.user === 'object' ? n.user._id : n.user;
-                            return nUserId === other._id;
-                        });
-
-                        // Calculate expiry (24 hours from creation)
-                        const noteData = userNote ? {
-                            text: userNote.content,
-                            expiresAt: new Date(new Date(userNote.createdAt).getTime() + 24 * 60 * 60 * 1000).toISOString()
-                        } : null;
-
-                        if (noteData) {
-                            // console.log(`💬 Note for ${other.name}:`, noteData);
-                        }
+                        
+                        const chatName = item.isGroup ? item.groupName : (other?.name || 'Vibe User');
+                        const chatAvatar = item.isGroup ? item.groupAvatar : other?.avatar;
 
                         return (
                             <ChatItem
-                                avatar={other.avatar}
-                                name={other.name}
+                                avatar={chatAvatar}
+                                name={chatName}
                                 lastMessage={
                                     item.lastMessageType === 'audio'
                                         ? (item.lastMessageSender === user._id ? 'You: Sent a voice message' : 'Sent a voice message')
@@ -355,8 +359,14 @@ export default function ChatScreen() {
                                 }
                                 time={formatTime(item.updatedAt)}
                                 unread={item.unreadCount || 0}
-                                online={other.isOnline}
-                                onPress={() => router.push(`/message/${other._id}`)}
+                                online={!item.isGroup && other?.isOnline}
+                                onPress={() => {
+                                    if (item.isGroup) {
+                                        router.push({ pathname: `/message/${item._id}`, params: { isGroup: 'true' } } as any);
+                                    } else {
+                                        router.push(`/message/${other?._id}`);
+                                    }
+                                }}
                                 isDark={isDark}
                             />
                         );
@@ -365,16 +375,29 @@ export default function ChatScreen() {
             )}
 
             <NewChatModal visible={showNewChat} onClose={() => setShowNewChat(false)} />
+            
+            <CreateGroupModal 
+                visible={showGroupModal} 
+                onClose={() => setShowGroupModal(false)}
+                onSuccess={(newChat: any) => {
+                    setChats(prev => [newChat, ...prev]);
+                    router.push({ pathname: `/message/${newChat._id}`, params: { isGroup: 'true' } } as any);
+                }}
+            />
 
             <NoteViewer
                 visible={!!selectedNote}
                 note={selectedNote}
                 onClose={() => setSelectedNote(null)}
-                onReply={() => {
+                onReply={(text) => {
                     if (selectedNote) {
                         const userId = typeof selectedNote.user === 'object' ? selectedNote.user._id : selectedNote.user;
                         setSelectedNote(null);
-                        router.push(`/message/${userId}`);
+                        // Redirect to chat with the pre-filled message (passing as param for now, the message screen should handle it)
+                        router.push({
+                            pathname: `/message/${userId}`,
+                            params: { initialMessage: text }
+                        } as any);
                     }
                 }}
             />
@@ -399,55 +422,45 @@ const styles = StyleSheet.create({
     },
     searchContainer: {
         paddingHorizontal: 20,
-        marginBottom: 20,
+        marginBottom: 16,
     },
     searchBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        height: 52,
-        borderRadius: 30,
+        height: 48,
+        borderRadius: 24,
         paddingHorizontal: 16,
         gap: 12,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.04,
-        shadowRadius: 12,
-        elevation: 3,
         borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.05)',
     },
     searchInput: {
         flex: 1,
-        fontSize: 16,
+        fontSize: 15,
         height: '100%',
-        fontWeight: '600',
+        fontWeight: '500',
+    },
+    filterBar: {
+        marginBottom: 16,
+    },
+    filterPill: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        marginVertical: 4,
+    },
+    filterText: {
+        fontSize: 14,
+        fontWeight: '700',
     },
     plusBadge: {
-        position: 'absolute',
-        bottom: 0,
-        right: 0,
-        width: 26,
-        height: 26,
-        borderRadius: 13,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 3,
+        position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 3,
     },
     plusInner: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
+        width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
     },
     onlineBadge: {
-        position: 'absolute',
-        bottom: 2,
-        right: 2,
-        width: 14,
-        height: 14,
-        borderRadius: 7,
-        backgroundColor: '#10B981',
-        borderWidth: 2,
+        position: 'absolute', bottom: 2, right: 2, width: 14, height: 14, borderRadius: 7, backgroundColor: '#10B981', borderWidth: 2,
     }
 });
 

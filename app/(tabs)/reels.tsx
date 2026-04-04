@@ -104,10 +104,10 @@ export default function ReelsScreen() {
     // WebLayout already subtracts the 280px sidebar, so screenWidth here is the
     // usable area. We need to fit: arrows (56px left) + video + gap (24px) + panel.
     const SIDEBAR_WIDTH = isDesktop ? 280 : 0; // already excluded by WebLayout but used for calculation
-    const PANEL_WIDTH = isDesktop ? 340 : 0;
+    const PANEL_WIDTH = isDesktop ? 400 : 0;
     const ARROWS_WIDTH = isDesktop ? 80 : 0;  // 40px left dots + 40px right arrows + gaps
     const AVAILABLE_WIDTH = isDesktop
-        ? screenWidth - SIDEBAR_WIDTH - PANEL_WIDTH - ARROWS_WIDTH - 80 // 80px for padding
+        ? screenWidth - SIDEBAR_WIDTH - PANEL_WIDTH - ARROWS_WIDTH - 40 // 40px for padding
         : isTablet
         ? screenWidth * 0.55
         : screenWidth;
@@ -117,7 +117,7 @@ export default function ReelsScreen() {
         ? Math.min(AVAILABLE_WIDTH, 420)
         : screenWidth;
     const VIDEO_HEIGHT = isDesktop
-        ? screenHeight - 80
+        ? screenHeight - 40
         : isTablet
         ? Math.min(screenHeight, Math.floor(VIDEO_WIDTH * (16 / 9)))
         : screenHeight;
@@ -174,22 +174,33 @@ export default function ReelsScreen() {
         setLikeMap(p => ({ ...p, [id]: !wasLiked }));
         setLikesMap(p => ({ ...p, [id]: (p[id] ?? 0) + (wasLiked ? -1 : 1) }));
         try {
-            await fetch(`${API_BASE_URL}/api/posts/${id}/like`, {
+            const res = await fetch(`${API_BASE_URL}/api/posts/${id}/like`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${user?.token}` },
             });
-        } catch { /* silent */ }
+            if (!res.ok) {
+                // Revert on error
+                setLikeMap(p => ({ ...p, [id]: wasLiked }));
+                setLikesMap(p => ({ ...p, [id]: (p[id] ?? 0) + (wasLiked ? 1 : -1) }));
+            }
+        } catch {
+            setLikeMap(p => ({ ...p, [id]: wasLiked }));
+            setLikesMap(p => ({ ...p, [id]: (p[id] ?? 0) + (wasLiked ? 1 : -1) }));
+        }
     }, [likeMap, user]);
 
     const handleToggleSave = useCallback(async (reel: any) => {
         const id = reel._id;
         setSavedMap(p => ({ ...p, [id]: !p[id] }));
         try {
-            await fetch(`${API_BASE_URL}/api/posts/${id}/save`, {
+            const res = await fetch(`${API_BASE_URL}/api/posts/${id}/save`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${user?.token}` },
             });
-        } catch { /* silent */ }
+            if (!res.ok) setSavedMap(p => ({ ...p, [id]: !p[id] }));
+        } catch { 
+            setSavedMap(p => ({ ...p, [id]: !p[id] }));
+        }
     }, [user]);
 
     const handleToggleFollow = useCallback(async (reel: any) => {
@@ -266,8 +277,8 @@ export default function ReelsScreen() {
     // ─── DESKTOP LAYOUT ──────────────────────────────────────────────────────
     if (isDesktop) {
         return (
-            <View style={styles.desktopRoot}>
-                <StatusBar barStyle="light-content" />
+            <View style={[styles.desktopRoot, { backgroundColor: colors.background }]}>
+                <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
                 {/* ── Ambient blurred background ── */}
                 {activeReel?.user?.avatar && (
@@ -278,32 +289,33 @@ export default function ReelsScreen() {
                     />
                 )}
                 {/* dark overlay */}
-                <View style={styles.ambientOverlay} />
-
-                {/* ── Floating top-right controls (mute + search) ── */}
-                <View style={[styles.desktopTopBar, { paddingTop: Math.max(insets.top, 16) }]}>
-                    <View style={styles.desktopTopActions}>
-                        <TouchableOpacity
-                            style={styles.topBarBtn}
-                            onPress={() => {
-                                const n = !isMuted;
-                                setIsMuted(n);
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            }}
-                        >
-                            <Ionicons name={isMuted ? 'volume-mute' : 'volume-high'} size={20} color="#fff" />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.topBarBtn} onPress={() => router.push('/search')}>
-                            <Search size={20} color="#fff" />
-                        </TouchableOpacity>
-                    </View>
-                </View>
+                <View style={[styles.ambientOverlay, { backgroundColor: isDark ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.85)' }]} />
 
                 {/* ── Main area: Video + Nav Arrows + Info Panel ── */}
                 <View style={styles.desktopMain}>
 
                     {/* Left: Video column */}
                     <View style={[styles.videoColumn, { width: VIDEO_WIDTH }]}>
+                        {/* Side actions (Mute + Search) */}
+                        <View style={styles.sideActions}>
+                            <TouchableOpacity
+                                style={[styles.topBarBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
+                                onPress={() => {
+                                    const n = !isMuted;
+                                    setIsMuted(n);
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                }}
+                            >
+                                <Ionicons name={isMuted ? 'volume-mute' : 'volume-high'} size={20} color={isDark ? '#fff' : '#000'} />
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                style={[styles.topBarBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]} 
+                                onPress={() => router.push('/search')}
+                            >
+                                <Search size={20} color={isDark ? '#fff' : '#000'} />
+                            </TouchableOpacity>
+                        </View>
+
                         {/* Navigation arrows */}
                         <View style={styles.navArrows}>
                             <NavArrow direction="up" onPress={goPrev} />
@@ -497,6 +509,14 @@ const styles = StyleSheet.create({
         top: 0, left: 0, right: 0, bottom: 0,
         backgroundColor: 'rgba(6,6,8,0.82)',
     },
+    sideActions: {
+        position: 'absolute' as any,
+        left: -56,
+        top: 10,
+        gap: 12,
+        alignItems: 'center',
+        zIndex: 20,
+    },
     desktopTopBar: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -547,7 +567,7 @@ const styles = StyleSheet.create({
     },
     navArrows: {
         position: 'absolute' as any,
-        right: -56,
+        left: -56,
         top: '50%' as any,
         transform: [{ translateY: -40 }],
         alignItems: 'center',
@@ -557,19 +577,19 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: 'rgba(255,255,255,0.12)',
+        backgroundColor: 'rgba(128,128,128,0.2)',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
+        borderColor: 'rgba(128,128,128,0.2)',
         cursor: 'pointer' as any,
     },
     navArrowHovered: {
-        backgroundColor: 'rgba(255,255,255,0.25)',
+        backgroundColor: 'rgba(128,128,128,0.4)',
     },
     dotIndicators: {
         position: 'absolute' as any,
-        left: -28,
+        right: -28,
         top: '50%' as any,
         transform: [{ translateY: -40 }],
         alignItems: 'center',
@@ -580,13 +600,13 @@ const styles = StyleSheet.create({
         width: 4,
         height: 4,
         borderRadius: 2,
-        backgroundColor: 'rgba(255,255,255,0.25)',
+        backgroundColor: 'rgba(128,128,128,0.3)',
     },
     dotActive: {
         width: 4,
         height: 18,
         borderRadius: 2,
-        backgroundColor: 'white',
+        backgroundColor: 'rgba(128,128,128,0.8)',
     },
     infoPanelWrapper: {
         borderRadius: 20,

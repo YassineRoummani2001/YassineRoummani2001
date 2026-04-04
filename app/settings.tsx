@@ -29,7 +29,7 @@ import { useTranslation } from 'react-i18next';
 import {
     Alert,
     I18nManager,
-    Modal,
+    Modal as RNModal,
     Platform,
     ScrollView,
     StyleSheet,
@@ -40,6 +40,8 @@ import {
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import VibeConfirmModal from '@/components/VibeConfirmModal';
+import { LogOut as LogOutIcon, Trash2 } from 'lucide-react-native';
 // Actually I18nManager + Updates.reloadAsync() is the expo way. But user said no backend logic change and expo managed.
 // We will rely on purely JS reload if possible or just the context switch.
 
@@ -54,68 +56,33 @@ export default function SettingsScreen() {
     // UI States
     const [isColorModalVisible, setColorModalVisible] = useState(false);
     const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
+    const [isLogoutModalVisible, setLogoutModalVisible] = useState(false);
+    const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
 
     // Use Memoized styles
     const styles = useMemo(() => createStyles(colors, insets), [colors, insets]);
 
     const handleLogout = async () => {
-        if (Platform.OS === 'web') {
-            const confirmed = window.confirm(t('settings.logout') + "?");
-            if (confirmed) {
-                if (logout) {
-                    await logout();
-                    router.replace('/auth/login');
-                }
-            }
-        } else {
-            Alert.alert(
-                t('settings.logout'),
-                t('settings.logout') + "?",
-                [
-                    { text: t('common.cancel'), style: "cancel" },
-                    {
-                        text: t('settings.logout'),
-                        style: "destructive",
-                        onPress: async () => {
-                            if (logout) {
-                                await logout();
-                                router.replace('/auth/login');
-                            }
-                        }
-                    }
-                ]
-            );
+        setLogoutModalVisible(true);
+    };
+
+    const confirmLogout = async () => {
+        if (logout) {
+            await logout();
+            router.replace('/auth/login');
         }
     };
 
     const handleDeleteAccount = () => {
-        if (Platform.OS === 'web') {
-            if (window.confirm("Are you sure you want to delete your account? This action cannot be undone.")) {
-                deleteAccount?.().then((res: any) => {
-                    if (!res.success) alert(res.message || "Failed to delete account");
-                    else router.replace('/auth/login');
-                });
-            }
+        setDeleteModalVisible(true);
+    };
+
+    const confirmDeleteAccount = async () => {
+        const res = await deleteAccount?.();
+        if (!res?.success) {
+            Alert.alert("Error", res?.message || "Failed to delete account");
         } else {
-            Alert.alert(
-                (t('common.delete') || "Delete") + " Account",
-                "Are you sure you want to delete your account? This action cannot be undone.",
-                [
-                    { text: t('common.cancel'), style: 'cancel' },
-                    {
-                        text: (t('common.delete') || "Delete"),
-                        style: 'destructive',
-                        onPress: async () => {
-                            const res = await deleteAccount?.();
-                            if (!res?.success) {
-                                Alert.alert("Error", res?.message || "Failed to delete account");
-                            } else {
-                                router.replace('/auth/login');
-                            }
-                        }
-                    }
-                ]
-            );
+            router.replace('/auth/login');
         }
     };
 
@@ -148,7 +115,7 @@ export default function SettingsScreen() {
     );
 
     const renderColorModal = () => (
-        <Modal
+        <RNModal
             visible={isColorModalVisible}
             transparent={true}
             animationType="fade"
@@ -186,7 +153,7 @@ export default function SettingsScreen() {
                     </TouchableWithoutFeedback>
                 </View>
             </TouchableWithoutFeedback>
-        </Modal>
+        </RNModal>
     );
 
     const LANGUAGES = [
@@ -196,7 +163,7 @@ export default function SettingsScreen() {
     ];
 
     const renderLanguageModal = () => (
-        <Modal
+        <RNModal
             visible={isLanguageModalVisible}
             transparent={true}
             animationType="fade"
@@ -229,7 +196,7 @@ export default function SettingsScreen() {
                     </TouchableWithoutFeedback>
                 </View>
             </TouchableWithoutFeedback>
-        </Modal>
+        </RNModal>
     );
 
     const SettingSection = ({ title, children }: any) => (
@@ -436,6 +403,30 @@ export default function SettingsScreen() {
 
             {renderColorModal()}
             {renderLanguageModal()}
+
+            <VibeConfirmModal 
+                visible={isLogoutModalVisible}
+                onClose={() => setLogoutModalVisible(false)}
+                onConfirm={confirmLogout}
+                title={t('settings.logout')}
+                message={t('settings.logout') + "?"}
+                confirmText={t('settings.logout')}
+                cancelText={t('common.cancel')}
+                isDestructive
+                icon={<LogOutIcon size={28} color="#FF3B30" />}
+            />
+
+            <VibeConfirmModal 
+                visible={isDeleteModalVisible}
+                onClose={() => setDeleteModalVisible(false)}
+                onConfirm={confirmDeleteAccount}
+                title={(t('common.delete') || "Delete") + " Account"}
+                message="Are you sure you want to delete your account? This action cannot be undone."
+                confirmText={t('common.delete') || "Delete"}
+                cancelText={t('common.cancel')}
+                isDestructive
+                icon={<Trash2 size={28} color="#FF3B30" />}
+            />
         </View>
     );
 }

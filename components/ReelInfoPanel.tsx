@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { formatDistanceToNow } from 'date-fns';
 import {
     View,
     Text,
@@ -18,6 +19,7 @@ import { useUser } from '@/context/UserContext';
 import { API_BASE_URL } from '@/constants/Config';
 import { useThemeContext } from '@/context/ThemeContext';
 import CommentsModal from './CommentsModal';
+import ShareToUsersModal from './ShareToUsersModal';
 
 interface ReelInfoPanelProps {
     item: any;
@@ -58,6 +60,7 @@ export default function ReelInfoPanel({
     const [commentsLoading, setCommentsLoading] = useState(false);
     const [showAllComments, setShowAllComments] = useState(false);
     const [captionExpanded, setCaptionExpanded] = useState(false);
+    const [showShareModal, setShowShareModal] = useState(false);
 
     const likeScaleAnim = useRef(new Animated.Value(1)).current;
     const saveScaleAnim = useRef(new Animated.Value(1)).current;
@@ -71,7 +74,7 @@ export default function ReelInfoPanel({
             });
             if (res.ok) {
                 const data = await res.json();
-                setComments(Array.isArray(data) ? data.slice(0, 5) : []);
+                setComments(Array.isArray(data) ? data : []);
             }
         } catch (e) {
             // silent
@@ -81,8 +84,12 @@ export default function ReelInfoPanel({
     };
 
     useEffect(() => {
-        if (item?._id) fetchComments();
-    }, [item?._id]);
+        if (item?.comments && Array.isArray(item.comments) && item.comments.length > 0 && item.comments[0].text) {
+             setComments(item.comments);
+        } else if (item?._id) {
+             fetchComments();
+        }
+    }, [item]);
 
     const handleLike = () => {
         Animated.sequence([
@@ -104,8 +111,22 @@ export default function ReelInfoPanel({
         if (!commentText.trim() || !user) return;
         const text = commentText.trim();
         setCommentText('');
+
+        // Optimistic update
+        const newComment = {
+            _id: Math.random().toString(),
+            text,
+            user: {
+                _id: user._id,
+                name: user.name || 'User',
+                avatar: user.avatar,
+            },
+            createdAt: new Date().toISOString(),
+        };
+        setComments(prev => [newComment, ...prev]);
+
         try {
-            await fetch(`${API_BASE_URL}/api/posts/${item._id}/comments`, {
+            const res = await fetch(`${API_BASE_URL}/api/posts/${item._id}/comment`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -113,28 +134,28 @@ export default function ReelInfoPanel({
                 },
                 body: JSON.stringify({ text }),
             });
-            fetchComments();
+            if (res.ok) {
+                fetchComments(); // Sync with server
+            }
         } catch (e) {
-            // silent
+            console.error("Error posting comment to Reel:", e);
         }
     };
 
     const isOwnReel = user?._id === (author._id || author.id);
 
-    const bg = isDark ? '#0d0d0d' : '#fff';
-    const cardBg = isDark ? '#161616' : '#f7f7f7';
+    const bg = isDark ? '#060608' : '#ffffff';
+    const cardBg = isDark ? '#111111' : '#f7f7f7';
     const border = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)';
-    const textColor = isDark ? '#fff' : '#111';
+    const textColor = isDark ? '#ffffff' : '#000000';
     const subText = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)';
-    const inputBg = isDark ? '#1e1e1e' : '#f0f0f0';
+    const inputBg = isDark ? '#1a1a1a' : '#f0f0f0';
 
     return (
         <View style={[styles.panel, { backgroundColor: bg, borderLeftColor: border }]}>
-            <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.scrollContent}
-            >
-                {/* ─── USER CARD ─── */}
+            {/* ─── FIXED TOP SECTION ─── */}
+            <View style={styles.fixedTop}>
+                {/* ── USER CARD ── */}
                 <View style={[styles.userCard, { backgroundColor: cardBg, borderColor: border }]}>
                     <TouchableOpacity
                         onPress={() => router.push(`/user/${author._id || author.id}` as any)}
@@ -180,7 +201,7 @@ export default function ReelInfoPanel({
                     )}
                 </View>
 
-                {/* ─── CAPTION ─── */}
+                {/* ── CAPTION ── */}
                 {item?.caption ? (
                     <TouchableOpacity
                         onPress={() => setCaptionExpanded(!captionExpanded)}
@@ -198,7 +219,7 @@ export default function ReelInfoPanel({
                     </TouchableOpacity>
                 ) : null}
 
-                {/* ─── STATS ROW ─── */}
+                {/* ── STATS ROW ── */}
                 <View style={[styles.statsRow, { backgroundColor: cardBg, borderColor: border }]}>
                     <TouchableOpacity onPress={handleLike} style={styles.statBtn} activeOpacity={0.7}>
                         <Animated.View style={{ transform: [{ scale: likeScaleAnim }] }}>
@@ -219,13 +240,13 @@ export default function ReelInfoPanel({
                     <TouchableOpacity style={styles.statBtn} activeOpacity={0.7}>
                         <MessageCircle size={26} color={textColor} strokeWidth={2} />
                         <Text style={[styles.statText, { color: textColor }]}>
-                            {commentsCount > 999 ? `${(commentsCount / 1000).toFixed(1)}k` : commentsCount}
+                            {comments.length > 0 ? comments.length : (commentsCount || 0)}
                         </Text>
                     </TouchableOpacity>
 
                     <View style={[styles.statDivider, { backgroundColor: border }]} />
 
-                    <TouchableOpacity onPress={onShare} style={styles.statBtn} activeOpacity={0.7}>
+                    <TouchableOpacity onPress={() => setShowShareModal(true)} style={styles.statBtn} activeOpacity={0.7}>
                         <Send size={24} color={textColor} strokeWidth={2} />
                         <Text style={[styles.statText, { color: textColor }]}>Share</Text>
                     </TouchableOpacity>
@@ -236,61 +257,68 @@ export default function ReelInfoPanel({
                         <Animated.View style={{ transform: [{ scale: saveScaleAnim }] }}>
                             <Bookmark
                                 size={24}
-                                color={isSaved ? '#FACD00' : textColor}
-                                fill={isSaved ? '#FACD00' : 'transparent'}
+                                color={isSaved ? '#FFEA00' : textColor}
+                                fill={isSaved ? '#FFEA00' : 'transparent'}
                                 strokeWidth={isSaved ? 0 : 2}
                             />
                         </Animated.View>
                     </TouchableOpacity>
                 </View>
+            </View>
 
-                {/* ─── COMMENTS SECTION ─── */}
-                <View style={[styles.commentsSection, { backgroundColor: cardBg, borderColor: border }]}>
-                    <Text style={[styles.commentsTitle, { color: textColor }]}>
-                        Comments
-                        {commentsCount > 0 && (
-                            <Text style={{ color: subText, fontWeight: '500' }}> · {commentsCount}</Text>
-                        )}
-                    </Text>
+            {/* ─── SCROLLABLE COMMENTS SECTION ─── */}
+            <View style={[styles.commentsContainer, { backgroundColor: cardBg, borderColor: border }]}>
+                <Text style={[styles.commentsTitle, { color: textColor }]}>
+                    Comments
+                    {(comments.length > 0 || commentsCount > 0) && (
+                        <Text style={{ color: subText, fontWeight: '500' }}> · {comments.length || commentsCount}</Text>
+                    )}
+                </Text>
 
-                    {commentsLoading ? (
-                        <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 12 }} />
-                    ) : comments.length === 0 ? (
-                        <View style={styles.noComments}>
-                            <MessageCircle size={28} color={subText} strokeWidth={1.5} />
-                            <Text style={[styles.noCommentsText, { color: subText }]}>
-                                No comments yet
-                            </Text>
-                        </View>
-                    ) : (
-                        comments.map((comment, idx) => (
+                {commentsLoading ? (
+                    <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 12 }} />
+                ) : comments.length === 0 ? (
+                    <View style={styles.noComments}>
+                        <MessageCircle size={28} color={subText} strokeWidth={1.5} />
+                        <Text style={[styles.noCommentsText, { color: subText }]}>
+                            No comments yet
+                        </Text>
+                    </View>
+                ) : (
+                    <ScrollView 
+                        style={{ flex: 1 }} 
+                        contentContainerStyle={{ paddingRight: 4 }}
+                        nestedScrollEnabled={true} 
+                        showsVerticalScrollIndicator={true}
+                    >
+                        {[...comments].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()).map((comment, idx) => (
                             <View key={comment._id || idx} style={[styles.commentItem, { borderBottomColor: border }]}>
                                 <Image
                                     source={{ uri: comment.user?.avatar || 'https://i.pravatar.cc/100' }}
                                     style={styles.commentAvatar}
                                 />
                                 <View style={styles.commentBody}>
-                                    <Text style={[styles.commentUser, { color: textColor }]}>
-                                        {comment.user?.name || 'User'}
-                                    </Text>
-                                    <Text style={[styles.commentText, { color: isDark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.7)' }]} numberOfLines={2}>
+                                    <View style={styles.commentUserRow}>
+                                        <Text style={[styles.commentUser, { color: textColor }]} numberOfLines={1}>
+                                            {comment.user?.name || 'User'}
+                                        </Text>
+                                        <Text style={[styles.commentDate, { color: subText }]}>
+                                            {comment.createdAt ? formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true }).replace('about ', '') : ''}
+                                        </Text>
+                                    </View>
+                                    <Text style={[styles.commentText, { color: isDark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.7)' }]} numberOfLines={3}>
                                         {comment.text}
                                     </Text>
                                 </View>
                             </View>
-                        ))
-                    )}
+                        ))}
+                    </ScrollView>
+                )}
+            </View>
 
-                    {commentsCount > 5 && (
-                        <TouchableOpacity style={styles.viewAllBtn} activeOpacity={0.7}>
-                            <Text style={[styles.viewAllText, { color: colors.primary }]}>
-                                View all {commentsCount} comments
-                            </Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
-
-                {/* ─── COMMENT INPUT ─── */}
+            {/* ─── FIXED BOTTOM SECTION ─── */}
+            <View style={styles.fixedBottom}>
+                {/* ── COMMENT INPUT ── */}
                 <View style={[styles.commentInputRow, { backgroundColor: cardBg, borderColor: border }]}>
                     <Image
                         source={{ uri: user?.avatar || 'https://i.pravatar.cc/150' }}
@@ -313,7 +341,7 @@ export default function ReelInfoPanel({
                     )}
                 </View>
 
-                {/* ─── MUSIC TAG ─── */}
+                {/* ── MUSIC TAG ── */}
                 {item?.music && (
                     <View style={[styles.musicTag, { backgroundColor: cardBg, borderColor: border }]}>
                         <Ionicons name="musical-notes" size={16} color={colors.primary} />
@@ -322,7 +350,10 @@ export default function ReelInfoPanel({
                         </Text>
                     </View>
                 )}
-            </ScrollView>
+            </View>
+
+            {/* MODALS */}
+            <ShareToUsersModal visible={showShareModal} onClose={() => setShowShareModal(false)} post={item} />
         </View>
     );
 }
@@ -335,10 +366,25 @@ const styles = StyleSheet.create({
         borderLeftWidth: 1,
         flexShrink: 0,
     },
-    scrollContent: {
-        padding: 16,
-        gap: 12,
-        paddingBottom: 40,
+    fixedTop: {
+        padding: 12,
+        paddingBottom: 4,
+        gap: 8,
+    },
+    fixedBottom: {
+        padding: 12,
+        paddingTop: 4,
+        gap: 8,
+        paddingBottom: 16,
+    },
+    commentsContainer: {
+        flex: 1,
+        marginHorizontal: 12,
+        padding: 12,
+        borderRadius: 16,
+        borderWidth: 1,
+        marginBottom: 4,
+        overflow: 'hidden' as any,
     },
     // User Card
     userCard: {
@@ -352,17 +398,20 @@ const styles = StyleSheet.create({
     avatarWrap: {
         position: 'relative',
     },
+    avatarArea: {
+        marginBottom: 4,
+    },
     avatar: {
-        width: 52,
-        height: 52,
-        borderRadius: 26,
+        width: 64,
+        height: 64,
+        borderRadius: 32,
     },
     onlineDot: {
         position: 'absolute',
-        bottom: 1,
-        right: 1,
-        width: 13,
-        height: 13,
+        bottom: 2,
+        right: 2,
+        width: 14,
+        height: 14,
         borderRadius: 7,
         backgroundColor: '#22c55e',
         borderWidth: 2,
@@ -371,12 +420,12 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     userName: {
-        fontSize: 15,
-        fontWeight: '700',
+        fontSize: 18,
+        fontWeight: '800',
         letterSpacing: 0.1,
     },
     userHandle: {
-        fontSize: 13,
+        fontSize: 14,
         marginTop: 2,
     },
     followBtn: {
@@ -403,8 +452,8 @@ const styles = StyleSheet.create({
         borderWidth: 1,
     },
     caption: {
-        fontSize: 14,
-        lineHeight: 21,
+        fontSize: 16,
+        lineHeight: 24,
         fontWeight: '400',
     },
     seeMore: {
@@ -434,8 +483,8 @@ const styles = StyleSheet.create({
         opacity: 0.5,
     },
     statText: {
-        fontSize: 12,
-        fontWeight: '600',
+        fontSize: 14,
+        fontWeight: '700',
     },
     // Comments
     commentsSection: {
@@ -471,10 +520,20 @@ const styles = StyleSheet.create({
     commentBody: {
         flex: 1,
     },
+    commentUserRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 2,
+    },
     commentUser: {
         fontSize: 13,
         fontWeight: '700',
-        marginBottom: 2,
+        flexShrink: 1,
+    },
+    commentDate: {
+        fontSize: 11,
+        opacity: 0.8,
     },
     commentText: {
         fontSize: 13,

@@ -9,12 +9,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { Download, Heart, MessageCircle, MoreHorizontal, Play, Send, Volume2, VolumeX, X } from 'lucide-react-native';
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { ActivityIndicator, Alert, Animated, Dimensions, Image, Platform, Share, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Image, Platform, Share, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
-const { width, height } = Dimensions.get('window');
 
 export default function MediaViewScreen() {
     const router = useRouter();
@@ -327,185 +326,186 @@ export default function MediaViewScreen() {
         }
     };
 
-    return (
-        <View style={styles.container}>
-            {isVideo && activeUri ? (
-                <TouchableWithoutFeedback onPress={() => {
-                    const now = Date.now();
-                    const DOUBLE_TAP_DELAY = 300;
-                    if (lastTap.current && (now - lastTap.current) < DOUBLE_TAP_DELAY) {
-                        // Double tap detected
-                        if (!isLiked) handleLike();
-                        
-                        // Animate heart
-                        bigHeartAnim.setValue(0);
-                        Animated.sequence([
-                            Animated.spring(bigHeartAnim, { toValue: 1, useNativeDriver: true, friction: 3 }),
-                            Animated.timing(bigHeartAnim, { toValue: 0, duration: 500, delay: 200, useNativeDriver: true })
-                        ]).start();
-                    } else {
-                        togglePlay();
-                    }
-                    lastTap.current = now;
-                }}>
-                    <View style={styles.videoWrapper}>
-                        <VideoView
-                            player={player}
-                            style={styles.media}
-                            contentFit="contain"
-                            nativeControls={false}
-                        />
-                        {!isPlaying && (
-                            <View style={styles.centerPlayIcon}>
-                                <Play size={64} color="rgba(255,255,255,0.7)" fill="rgba(255,255,255,0.7)" />
-                            </View>
-                        )}
-                        <Animated.View style={[
-                            styles.bigHeartOverlay, 
-                            { 
-                                opacity: bigHeartAnim,
-                                transform: [
-                                    { scale: bigHeartAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.5] }) }
-                                ]
-                            }
-                        ]}>
-                            <Heart size={100} color="#ff2d55" fill="#ff2d55" />
-                        </Animated.View>
-                    </View>
-                </TouchableWithoutFeedback>
-            ) : activeUri ? (
-                <TouchableWithoutFeedback onPress={() => {
-                    const now = Date.now();
-                    const DOUBLE_TAP_DELAY = 300;
-                    if (lastTap.current && (now - lastTap.current) < DOUBLE_TAP_DELAY) {
-                        if (!isLiked) handleLike();
-                        bigHeartAnim.setValue(0);
-                        Animated.sequence([
-                            Animated.spring(bigHeartAnim, { toValue: 1, useNativeDriver: true, friction: 3 }),
-                            Animated.timing(bigHeartAnim, { toValue: 0, duration: 500, delay: 200, useNativeDriver: true })
-                        ]).start();
-                    }
-                    lastTap.current = now;
-                }}>
-                    <View style={styles.container}>
-                        <Image
-                            source={{ uri: activeUri }}
-                            style={styles.media}
-                            resizeMode="contain"
-                        />
-                        <Animated.View style={[
-                            styles.bigHeartOverlay, 
-                            { 
-                                opacity: bigHeartAnim,
-                                transform: [
-                                    { scale: bigHeartAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.5] }) }
-                                ]
-                            }
-                        ]}>
-                            <Heart size={100} color="#ff2d55" fill="#ff2d55" />
-                        </Animated.View>
-                    </View>
-                </TouchableWithoutFeedback>
-            ) : null}
+    const { width: winWidth, height: winHeight } = useWindowDimensions();
+    const isDesktop = winWidth > 768;
 
-            <View style={[styles.overlay, { paddingTop: insets.top, paddingBottom: insets.bottom }]} pointerEvents="box-none">
+    return (
+        <View style={[styles.container, { backgroundColor: '#000' }]}>
+            <StatusBar barStyle="light-content" translucent />
+            
+            {/* Immersive Background Blur (Web/iOS support handled by overlay) */}
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+
+            {/* Media Content */}
+            <View style={[
+                styles.mediaContainer, 
+                isDesktop && {
+                    width: Math.min(winWidth * 0.9, winHeight * 0.7 * (9/16)),
+                    height: winHeight * 0.85,
+                    maxHeight: 900,
+                    borderRadius: 20,
+                    overflow: 'hidden',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 20 },
+                    shadowOpacity: 0.5,
+                    shadowRadius: 30,
+                    elevation: 10,
+                }
+            ]}>
+                {isVideo && activeUri ? (
+                    <TouchableWithoutFeedback onPress={() => {
+                        const now = Date.now();
+                        const DOUBLE_TAP_DELAY = 300;
+                        if (lastTap.current && (now - lastTap.current) < DOUBLE_TAP_DELAY) {
+                            if (!isLiked) handleLike();
+                            bigHeartAnim.setValue(0);
+                            Animated.sequence([
+                                Animated.spring(bigHeartAnim, { toValue: 1, useNativeDriver: true, friction: 3 }),
+                                Animated.timing(bigHeartAnim, { toValue: 0, duration: 500, delay: 200, useNativeDriver: true })
+                            ]).start();
+                        } else {
+                            togglePlay();
+                        }
+                        lastTap.current = now;
+                    }}>
+                        <View style={styles.videoWrapper}>
+                            <VideoView
+                                player={player}
+                                style={styles.media}
+                                contentFit="contain"
+                                nativeControls={false}
+                            />
+                            {!isPlaying && (
+                                <View style={styles.centerPlayIcon}>
+                                    <Play size={48} color="white" fill="white" />
+                                </View>
+                            )}
+                            <Animated.View style={[
+                                styles.bigHeartOverlay, 
+                                { 
+                                    opacity: bigHeartAnim,
+                                    transform: [
+                                        { scale: bigHeartAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.5] }) }
+                                    ]
+                                }
+                            ]}>
+                                <Heart size={100} color="#ff2d55" fill="#ff2d55" />
+                            </Animated.View>
+                        </View>
+                    </TouchableWithoutFeedback>
+                ) : activeUri ? (
+                    <TouchableWithoutFeedback onPress={() => {
+                        const now = Date.now();
+                        const DOUBLE_TAP_DELAY = 300;
+                        if (lastTap.current && (now - lastTap.current) < DOUBLE_TAP_DELAY) {
+                            if (!isLiked) handleLike();
+                            bigHeartAnim.setValue(0);
+                            Animated.sequence([
+                                Animated.spring(bigHeartAnim, { toValue: 1, useNativeDriver: true, friction: 3 }),
+                                Animated.timing(bigHeartAnim, { toValue: 0, duration: 500, delay: 200, useNativeDriver: true })
+                            ]).start();
+                        }
+                        lastTap.current = now;
+                    }}>
+                        <View style={styles.imageWrapper}>
+                            <Image
+                                source={{ uri: activeUri }}
+                                style={styles.media}
+                                resizeMode="contain"
+                            />
+                            <Animated.View style={[
+                                styles.bigHeartOverlay, 
+                                { 
+                                    opacity: bigHeartAnim,
+                                    transform: [
+                                        { scale: bigHeartAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.5] }) }
+                                    ]
+                                }
+                            ]}>
+                                <Heart size={100} color="#ff2d55" fill="#ff2d55" />
+                            </Animated.View>
+                        </View>
+                    </TouchableWithoutFeedback>
+                ) : null}
+            </View>
+
+            {/* Overlays */}
+            <View 
+                style={[
+                    styles.overlay, 
+                    { 
+                        paddingTop: insets.top + 10, 
+                        paddingBottom: Math.max(insets.bottom, 20),
+                    }
+                ]} 
+                pointerEvents="box-none"
+            >
+                {/* Header Actions */}
                 <View style={styles.topControls}>
                     <TouchableOpacity
-                        style={styles.closeButton}
-                        onPress={() => {
-                            if (router.canGoBack()) {
-                                router.back();
-                            } else {
-                                router.replace('/(tabs)');
-                            }
-                        }}
-                        hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+                        style={styles.circleButton}
+                        onPress={() => router.back()}
                     >
-                        <X size={28} color="white" />
+                        <X size={24} color="white" />
                     </TouchableOpacity>
 
-                    {type === 'video' && (
-                        <TouchableOpacity style={styles.muteButton} onPress={toggleMute}>
-                            {muted ? (
-                                <VolumeX size={24} color="white" />
-                            ) : (
-                                <Volume2 size={24} color="white" />
-                            )}
+                    <View style={styles.topRightActions}>
+                        {isVideo && (
+                            <TouchableOpacity style={styles.circleButton} onPress={toggleMute}>
+                                {muted ? <VolumeX size={20} color="white" /> : <Volume2 size={20} color="white" />}
+                            </TouchableOpacity>
+                        )}
+                        <TouchableOpacity style={styles.circleButton} onPress={handleDownload}>
+                            <Download size={20} color="white" />
                         </TouchableOpacity>
-                    )}
+                    </View>
                 </View>
 
-                {loading ? (
-                    <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color="white" />
-                    </View>
-                ) : (
-                    <View style={styles.contentOverlay}>
+                {/* Bottom Content Area */}
+                {!loading && (
+                    <View style={[styles.contentOverlay, isDesktop && styles.desktopContentOverlay]}>
                         <View style={styles.bottomInfo}>
                             <View style={styles.userInfo}>
                                 <Image
-                                    source={{ uri: post?.user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(post?.user?.name || 'User')}&background=random` }}
+                                    source={{ uri: post?.user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(post?.user?.name || 'V')}&background=random` }}
                                     style={styles.avatar}
                                 />
-                                <Text style={styles.username}>
-                                    {post?.user?.name || 'Unknown'}
-                                </Text>
-                            </View>
-                            {isEditing ? (
-                                <View style={{ width: '100%', marginBottom: 10 }}>
-                                    <TextInput
-                                        value={editedCaption}
-                                        onChangeText={setEditedCaption}
-                                        style={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white', borderRadius: 8, padding: 8, marginBottom: 8 }}
-                                        multiline
-                                        autoFocus
-                                    />
-                                    <View style={{ flexDirection: 'row', gap: 10 }}>
-                                        <TouchableOpacity onPress={handleUpdate} style={{ backgroundColor: 'white', padding: 6, borderRadius: 4 }}>
-                                            <Text style={{ fontWeight: 'bold' }}>Save</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity onPress={() => setIsEditing(false)} style={{ backgroundColor: 'rgba(0,0,0,0.5)', padding: 6, borderRadius: 4 }}>
-                                            <Text style={{ color: 'white' }}>Cancel</Text>
-                                        </TouchableOpacity>
-                                    </View>
+                                <View>
+                                    <Text style={styles.username}>{post?.user?.name || 'Vibe User'}</Text>
+                                    {post?.caption && (
+                                        <Text style={styles.caption} numberOfLines={showFullCaption ? undefined : 2}>
+                                            {post.caption}
+                                        </Text>
+                                    )}
                                 </View>
-                            ) : (
-                                post?.caption && (
-                                    <Text style={styles.caption}>
-                                        {!showFullCaption && post.caption.length > 50 ? `${post.caption.substring(0, 50)}... ` : post.caption}
-                                        {post.caption.length > 50 && (
-                                            <Text onPress={() => setShowFullCaption(!showFullCaption)} style={{ fontWeight: 'bold' }}>
-                                                {showFullCaption ? ' See Less' : ' See More'}
-                                            </Text>
-                                        )}
-                                    </Text>
-                                )
-                            )}
+                            </View>
                         </View>
 
                         <View style={styles.actionsColumn}>
                             <TouchableOpacity style={styles.actionItem} onPress={handleLike}>
-                                <Heart size={30} color={isLiked ? "#FF3B30" : "white"} fill={isLiked ? "#FF3B30" : "transparent"} />
-                                <Text style={styles.actionText}>
-                                    {likesCount}
-                                </Text>
+                                <View style={[styles.actionIconBg, isLiked && { backgroundColor: 'rgba(255, 59, 48, 0.2)' }]}>
+                                    <Heart size={24} color={isLiked ? "#FF3B30" : "white"} fill={isLiked ? "#FF3B30" : "transparent"} />
+                                </View>
+                                <Text style={styles.actionText}>{likesCount}</Text>
                             </TouchableOpacity>
+                            
                             <TouchableOpacity style={styles.actionItem} onPress={handleComment}>
-                                <MessageCircle size={30} color="white" />
-                                <Text style={styles.actionText}>
-                                    {post?.comments?.length || 0}
-                                </Text>
+                                <View style={styles.actionIconBg}>
+                                    <MessageCircle size={24} color="white" />
+                                </View>
+                                <Text style={styles.actionText}>{post?.comments?.length || 0}</Text>
                             </TouchableOpacity>
+                            
                             <TouchableOpacity style={styles.actionItem} onPress={handleShare}>
-                                <Send size={30} color="white" />
-                                <Text style={styles.actionText}>Share</Text>
+                                <View style={styles.actionIconBg}>
+                                    <Send size={24} color="white" />
+                                </View>
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.actionItem} onPress={handleDownload}>
-                                <Download size={30} color="white" />
-                                <Text style={styles.actionText}>Save</Text>
-                            </TouchableOpacity>
+
                             <TouchableOpacity style={styles.actionItem} onPress={handleMore}>
-                                <MoreHorizontal size={30} color="white" />
+                                <View style={styles.actionIconBg}>
+                                    <MoreHorizontal size={24} color="white" />
+                                </View>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -536,116 +536,143 @@ export default function MediaViewScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: 'black',
+        backgroundColor: '#000',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    mediaContainer: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#000',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    videoWrapper: {
+        width: '100%',
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    imageWrapper: {
+        width: '100%',
+        height: '100%',
         justifyContent: 'center',
         alignItems: 'center',
     },
     media: {
-        width: width,
-        height: height,
-        position: 'absolute',
+        width: '100%',
+        height: '100%',
     },
     overlay: {
-        flex: 1,
-        width: '100%',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
         justifyContent: 'space-between',
     },
     topControls: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        width: '100%',
-        paddingRight: 20,
+        paddingHorizontal: 20,
+        zIndex: 100,
     },
-    closeButton: {
-        marginLeft: 20,
-        marginTop: 10,
-        padding: 8,
-        backgroundColor: 'rgba(0,0,0,0.3)',
-        borderRadius: 20,
+    topRightActions: {
+        flexDirection: 'row',
+        gap: 12,
     },
-    muteButton: {
-        marginTop: 10,
-        padding: 8,
-        backgroundColor: 'rgba(0,0,0,0.3)',
-        borderRadius: 20,
-    },
-    videoWrapper: {
-        width: width,
-        height: height,
-        position: 'absolute',
-        justifyContent: 'center',
+    circleButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(0,0,0,0.4)',
         alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
     },
     centerPlayIcon: {
         position: 'absolute',
-        justifyContent: 'center',
-        alignItems: 'center',
         backgroundColor: 'rgba(0,0,0,0.3)',
-        borderRadius: 50,
-        padding: 20,
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     contentOverlay: {
+        paddingHorizontal: 20,
         flexDirection: 'row',
         alignItems: 'flex-end',
         justifyContent: 'space-between',
-        padding: 20,
-        paddingBottom: 40,
+        paddingBottom: 20,
+        maxWidth: 1200,
+        alignSelf: 'center',
         width: '100%',
+    },
+    desktopContentOverlay: {
+        paddingBottom: 40,
     },
     bottomInfo: {
         flex: 1,
-        marginRight: 20,
-        justifyContent: 'flex-end',
+        marginRight: 60,
     },
     userInfo: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 10,
-        gap: 10,
+        gap: 12,
     },
     avatar: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: 'white',
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.2)',
     },
     username: {
-        color: 'white',
-        fontWeight: 'bold',
+        color: '#fff',
         fontSize: 16,
+        fontWeight: '700',
+        textShadowColor: 'rgba(0,0,0,0.5)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 4,
     },
     caption: {
-        color: 'white',
+        color: 'rgba(255,255,255,0.9)',
         fontSize: 14,
-        lineHeight: 20,
+        marginTop: 4,
+        lineHeight: 18,
     },
     actionsColumn: {
         alignItems: 'center',
-        gap: 20,
-        marginBottom: 20,
+        gap: 16,
     },
     actionItem: {
         alignItems: 'center',
-        gap: 5,
+        gap: 4,
+    },
+    actionIconBg: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
     },
     actionText: {
-        color: 'white',
+        color: '#fff',
         fontSize: 12,
-        fontWeight: '600',
+        fontWeight: '700',
+    },
+    bigHeartOverlay: {
+        position: 'absolute',
+        zIndex: 10,
     },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    bigHeartOverlay: {
-        position: 'absolute',
-        alignSelf: 'center',
-        top: '40%',
-        zIndex: 100,
-        textShadowColor: 'rgba(0,0,0,0.3)',
-        textShadowOffset: { width: 0, height: 10 },
-        textShadowRadius: 20,
     }
 });

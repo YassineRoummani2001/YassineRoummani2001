@@ -1,18 +1,48 @@
-import { Music, Send, X } from 'lucide-react-native';
-import React from 'react';
-import { Dimensions, Image, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Music, Send, X, Heart } from 'lucide-react-native';
+import React, { useState } from 'react';
+import { 
+    Dimensions, 
+    Image, 
+    KeyboardAvoidingView, 
+    Modal, 
+    Platform, 
+    StyleSheet, 
+    Text, 
+    TouchableOpacity, 
+    View, 
+    TextInput,
+    TouchableWithoutFeedback,
+    Keyboard
+} from 'react-native';
+import { useThemeContext } from '@/context/ThemeContext';
+import { Ionicons } from '@expo/vector-icons';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 interface NoteViewerProps {
     visible: boolean;
     note: any;
     onClose: () => void;
-    onReply: () => void;
+    onReply: (text: string) => void;
 }
 
 export default function NoteViewer({ visible, note, onClose, onReply }: NoteViewerProps) {
+    const { colors, isDark } = useThemeContext();
+    const [replyText, setReplyText] = useState('');
+    const emojisPool = ['✨', '😈', '😭', '🔥', '❤️', '🙌', '💀', '💯', '🤩', '🫡', '🙏', '🥺', '😂', '🫠', '💅', '👀'];
+    const [quickEmojis] = useState(() => [...emojisPool].sort(() => 0.5 - Math.random()).slice(0, 3));
+
     if (!note) return null;
+
+    const user = typeof note.user === 'object' ? note.user : { name: 'User', username: 'user', avatar: '' };
+    const music = note.music;
+
+    const handleSend = () => {
+        if (replyText.trim()) {
+            onReply(replyText);
+            setReplyText('');
+        }
+    };
 
     return (
         <Modal
@@ -20,52 +50,93 @@ export default function NoteViewer({ visible, note, onClose, onReply }: NoteView
             transparent={true}
             visible={visible}
             onRequestClose={onClose}
+            statusBarTranslucent
         >
-            <View style={styles.overlay}>
-                <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
+            <TouchableWithoutFeedback onPress={onClose}>
+                <View style={styles.overlay}>
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        style={styles.keyboardView}
+                    >
+                        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                            <View style={[styles.content, { backgroundColor: isDark ? '#1a1a1a' : '#FFF' }]}>
+                                {/* Pull Handle */}
+                                <View style={[styles.pullHandle, { backgroundColor: isDark ? '#333' : '#E5E7EB' }]} />
 
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    style={styles.modalContainer}
-                >
-                    <View style={styles.content}>
-                        {/* Header */}
-                        <View style={styles.header}>
-                            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                                <X size={24} color="#000" />
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* User Info */}
-                        <View style={styles.userInfo}>
-                            <Image
-                                source={{ uri: note.user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(note.user?.name || '')}` }}
-                                style={styles.avatar}
-                            />
-                            <Text style={styles.name}>{note.user?.name}</Text>
-                            <Text style={styles.handle}>@{note.user?.username || note.user?.name?.toLowerCase().replace(/\s/g, '')}</Text>
-                        </View>
-
-                        {/* Note Content */}
-                        <View style={styles.noteCard}>
-                            <Text style={styles.noteText}>{note.content}</Text>
-
-                            {note.music && (
-                                <View style={styles.musicBadge}>
-                                    <Music size={14} color="#FFF" />
-                                    <Text style={styles.musicText}>{note.music.track} • {note.music.artist}</Text>
+                                {/* Header with avatar and name */}
+                                <View style={styles.header}>
+                                    <View style={styles.userInfoRow}>
+                                        <Text style={[styles.name, { color: colors.text }]}>{user.name}</Text>
+                                        <Text style={[styles.timeLabel, { color: colors.textSecondary }]}>• 1h</Text>
+                                    </View>
+                                    <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: isDark ? '#333' : '#F3F4F6' }]}>
+                                        <X size={20} color={colors.text} />
+                                    </TouchableOpacity>
                                 </View>
-                            )}
-                        </View>
 
-                        {/* Action */}
-                        <TouchableOpacity style={styles.replyButton} onPress={onReply}>
-                            <Text style={styles.replyText}>Reply to {note.user?.name}</Text>
-                            <Send size={18} color="#FFF" />
-                        </TouchableOpacity>
-                    </View>
-                </KeyboardAvoidingView>
-            </View>
+                                {/* Avatar and Bubble Card */}
+                                <View style={styles.mainContent}>
+                                    <View style={styles.avatarWrapper}>
+                                        <Image
+                                            source={{ uri: user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}` }}
+                                            style={styles.avatar}
+                                        />
+                                    </View>
+
+                                    <View style={[styles.noteCard, { backgroundColor: isDark ? '#262626' : '#F3F4F6' }]}>
+                                        {/* Music Badge if exists */}
+                                        {music && (
+                                            <View style={styles.musicRow}>
+                                                <View style={styles.musicIconContainer}>
+                                                    <View style={styles.musicPulse} />
+                                                    <Ionicons name="stop-circle" size={20} color={colors.text} />
+                                                </View>
+                                                <Text numberOfLines={1} style={[styles.musicText, { color: colors.text }]}>
+                                                    {music.track}, {music.artist || 'popme'}
+                                                </Text>
+                                            </View>
+                                        )}
+                                        
+                                        {!music && <Text style={[styles.noteText, { color: colors.text }]}>{note.content}</Text>}
+                                    </View>
+                                </View>
+
+                                {/* Input Bar */}
+                                <View style={styles.inputSection}>
+                                    <View style={[styles.inputContainer, { backgroundColor: isDark ? '#262626' : '#F9FAFB' }]}>
+                                        <TextInput
+                                            style={[styles.input, { color: colors.text }]}
+                                            placeholder={`Reply to ${user.username || 'user'}`}
+                                            placeholderTextColor={colors.textSecondary}
+                                            value={replyText}
+                                            onChangeText={setReplyText}
+                                            autoFocus={false}
+                                        />
+                                        <View style={styles.emojiList}>
+                                            {quickEmojis.slice(0, 3).map(emoji => (
+                                                <TouchableOpacity key={emoji} onPress={() => setReplyText(p => p + emoji)}>
+                                                    <Text style={styles.emoji}>{emoji}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    </View>
+                                    <TouchableOpacity style={styles.heartButton}>
+                                        <Heart size={24} color={colors.text} strokeWidth={2} />
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* Action Footer */}
+                                {replyText.length > 0 && (
+                                    <TouchableOpacity style={[styles.sendButton, { backgroundColor: colors.primary }]} onPress={handleSend}>
+                                        <Text style={styles.sendButtonText}>Send Reply</Text>
+                                        <Send size={18} color="#FFF" />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        </TouchableWithoutFeedback>
+                    </KeyboardAvoidingView>
+                </View>
+            </TouchableWithoutFeedback>
         </Modal>
     );
 }
@@ -73,101 +144,148 @@ export default function NoteViewer({ visible, note, onClose, onReply }: NoteView
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: 'rgba(0,0,0,0.6)',
         justifyContent: 'flex-end',
     },
-    backdrop: {
-        ...StyleSheet.absoluteFillObject,
-    },
-    modalContainer: {
-        backgroundColor: 'transparent',
-        justifyContent: 'flex-end',
+    keyboardView: {
+        width: '100%',
     },
     content: {
-        backgroundColor: '#FFF',
-        borderTopLeftRadius: 30,
-        borderTopRightRadius: 30,
-        padding: 24,
-        paddingBottom: 40,
-        alignItems: 'center',
-        minHeight: 400,
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+        width: '100%',
+    },
+    pullHandle: {
+        width: 40,
+        height: 5,
+        borderRadius: 3,
+        alignSelf: 'center',
+        marginBottom: 20,
     },
     header: {
-        width: '100%',
         flexDirection: 'row',
-        justifyContent: 'flex-end',
-        marginBottom: 10,
-    },
-    closeButton: {
-        padding: 8,
-        backgroundColor: '#F3F4F6',
-        borderRadius: 20,
-    },
-    userInfo: {
         alignItems: 'center',
-        marginBottom: 24,
+        justifyContent: 'space-between',
+        marginBottom: 20,
     },
-    avatar: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        marginBottom: 12,
-        borderWidth: 3,
-        borderColor: '#000',
+    userInfoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        flex: 1,
+        justifyContent: 'center',
+        marginLeft: 40, // offset close button
     },
     name: {
-        fontSize: 20,
+        fontSize: 16,
         fontWeight: '700',
-        color: '#000',
     },
-    handle: {
+    timeLabel: {
         fontSize: 14,
-        color: '#666',
-        marginTop: 2,
     },
-    noteCard: {
-        backgroundColor: '#F3F4F6',
-        borderRadius: 24,
-        padding: 24,
-        width: '100%',
+    closeButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         alignItems: 'center',
+        justifyContent: 'center',
+    },
+    mainContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
         marginBottom: 24,
     },
-    noteText: {
-        fontSize: 22,
-        fontWeight: '600',
-        color: '#000',
-        textAlign: 'center',
-        marginBottom: 16,
-        lineHeight: 30,
+    avatarWrapper: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        padding: 2,
+        borderWidth: 1.5,
+        borderColor: '#ddd',
     },
-    musicBadge: {
+    avatar: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 29,
+    },
+    noteCard: {
+        flex: 1,
+        borderRadius: 24,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        justifyContent: 'center',
+        minHeight: 52,
+    },
+    musicRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#000',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
+        gap: 10,
+    },
+    musicIconContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    musicPulse: {
+        position: 'absolute',
+        width: 32,
+        height: 32,
         borderRadius: 16,
-        gap: 6,
+        backgroundColor: 'rgba(0,0,0,0.05)',
     },
     musicText: {
-        color: '#FFF',
-        fontSize: 12,
+        fontSize: 15,
+        fontWeight: '700',
+        flex: 1,
+    },
+    noteText: {
+        fontSize: 16,
         fontWeight: '500',
     },
-    replyButton: {
+    inputSection: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#000',
-        width: '100%',
-        paddingVertical: 16,
-        borderRadius: 16,
-        justifyContent: 'center',
-        gap: 8,
+        gap: 12,
     },
-    replyText: {
+    inputContainer: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        height: 52,
+        borderRadius: 26,
+        paddingHorizontal: 16,
+    },
+    input: {
+        flex: 1,
+        fontSize: 15,
+        fontWeight: '500',
+    },
+    emojiList: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    emoji: {
+        fontSize: 22,
+    },
+    heartButton: {
+        padding: 4,
+    },
+    sendButton: {
+        marginTop: 16,
+        height: 52,
+        borderRadius: 26,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+    },
+    sendButtonText: {
         color: '#FFF',
         fontSize: 16,
-        fontWeight: '600',
+        fontWeight: '700',
     }
 });

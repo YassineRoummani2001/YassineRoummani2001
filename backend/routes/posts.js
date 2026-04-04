@@ -44,10 +44,10 @@ router.get('/reels', async (req, res) => {
     }
 });
 
-// @desc    Get trending hashtags
-// @route   GET /api/posts/trending-hashtags
+// @desc    Get all unique hashtags
+// @route   GET /api/posts/all-hashtags
 // @access  Public
-router.get('/trending-hashtags', async (req, res) => {
+router.get('/all-hashtags', async (req, res) => {
     try {
         const posts = await Post.find({ caption: { $regex: /#/ } });
         const hashtagCounts = {};
@@ -56,17 +56,17 @@ router.get('/trending-hashtags', async (req, res) => {
             const matches = post.caption.match(/#[\w]+/g);
             if (matches) {
                 matches.forEach(tag => {
-                    hashtagCounts[tag] = (hashtagCounts[tag] || 0) + 1;
+                    const normalized = tag.toLowerCase();
+                    hashtagCounts[normalized] = (hashtagCounts[normalized] || 0) + 1;
                 });
             }
         });
 
-        const sortedTags = Object.keys(hashtagCounts)
+        const allTags = Object.keys(hashtagCounts)
             .map(tag => ({ tag, count: hashtagCounts[tag] }))
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 5); // top 5
+            .sort((a, b) => b.count - a.count);
 
-        res.json(sortedTags);
+        res.json(allTags);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -362,6 +362,23 @@ router.put('/:id/share', protect, async (req, res) => {
     }
 });
 
+// @desc    Get comments for a post
+// @route   GET /api/posts/:id/comments
+// @access  Public
+router.get('/:id/comments', async (req, res) => {
+    try {
+        const post = await Post.findById(req.params.id)
+            .populate('comments.user', 'name handle avatar');
+            
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+        res.json(post.comments || []);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 // @desc    Add a comment
 // @route   POST /api/posts/:id/comment
 // @access  Private
@@ -402,7 +419,7 @@ router.post('/:id/comment', protect, async (req, res) => {
                     sendPushNotification(
                         recipientUser.expoPushToken,
                         `${senderName} commented: ${text.length > 20 ? text.substring(0, 20) + '...' : text}`,
-                        { postId: post._id, type: 'post' }
+                        { postId: post._id, type: post.type || 'post' }
                     );
                 }
             } catch (pushErr) {

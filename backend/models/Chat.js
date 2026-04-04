@@ -25,6 +25,31 @@ const chatSchema = new mongoose.Schema({
     type: Number, // Duration in milliseconds. 0 = off
     default: 0
   },
+  isGroup: {
+    type: Boolean,
+    default: false
+  },
+  groupName: {
+    type: String
+  },
+  groupAvatar: {
+    type: String
+  },
+  groupCoverImage: {
+    type: String
+  },
+  groupDescription: {
+    type: String,
+    default: ''
+  },
+  isMarketplace: {
+    type: Boolean,
+    default: false
+  },
+  admin: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
   updatedAt: {
     type: Date,
     default: Date.now

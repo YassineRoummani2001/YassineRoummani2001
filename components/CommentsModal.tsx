@@ -59,7 +59,9 @@ export default function CommentsModal({ visible, onClose, postId, initialComment
             const res = await fetch(`${API_BASE_URL}/api/posts/${postId}`);
             if (res.ok) {
                 const data = await res.json();
-                setComments(data.comments || []);
+                const rawComments = data.comments || [];
+                const sorted = [...rawComments].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                setComments(sorted);
             }
         } catch (error) {
             console.error("Error fetching comments", error);
@@ -84,7 +86,8 @@ export default function CommentsModal({ visible, onClose, postId, initialComment
 
             if (res.ok) {
                 const updatedComments = await res.json();
-                setComments(updatedComments);
+                const sorted = [...updatedComments].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                setComments(sorted);
                 setInputText('');
                 if (onCommentAdded) {
                     onCommentAdded(updatedComments.length);

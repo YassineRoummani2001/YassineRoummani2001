@@ -1,12 +1,14 @@
 import { SkeletonGridItem, SkeletonRow } from '@/components/Skeletons';
 import { API_BASE_URL } from '@/constants/Config';
+import { useThemeContext } from '@/context/ThemeContext';
 import { useTheme } from '@/hooks/useTheme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Search as SearchIcon, TrendingUp, X, Clock, User as UserIcon, Hash } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Platform, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Dimensions, Image, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const RECENT_SEARCHES_KEY = 'vibe_recent_searches';
@@ -16,23 +18,40 @@ const TRENDING_TOPICS = [
 ];
 
 export default function SearchScreen() {
-    const [searchQuery, setSearchQuery] = useState('');
+    const { q } = useLocalSearchParams();
+    const [searchQuery, setSearchQuery] = useState((q as string) || '');
     const [results, setResults] = useState<{ users: any[], posts: any[] }>({ users: [], posts: [] });
+    const [refreshing, setRefreshing] = useState(false);
+    const [suggestedUsers, setSuggestedUsers] = useState<any[]>([]);
     const [recentSearches, setRecentSearches] = useState<string[]>([]);
     const [isSearching, setIsSearching] = useState(false);
-    const [refreshing, setRefreshing] = useState(false);
-    
-    const colors = useTheme();
+
+    const { colors, isDark } = useThemeContext();
     const insets = useSafeAreaInsets();
     const router = useRouter();
-    const { width } = useWindowDimensions();
+    const { user } = (useTheme() as any) || {};
+    const width = Dimensions.get('window').width;
     const isDesktop = Platform.OS === 'web' && width > 768;
-    const styles = useMemo(() => createStyles(colors, insets, isDesktop), [colors, insets, isDesktop]);
+    const styles = useMemo(() => createStyles(colors, insets, isDesktop, isDark), [colors, insets, isDesktop, isDark]);
 
     // Load recent searches
     useEffect(() => {
         loadRecentSearches();
+        fetchSuggestedUsers();
     }, []);
+
+    const fetchSuggestedUsers = async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/users/all`);
+            if (res.ok) {
+                const data = await res.json();
+                // Filter out the current user if possible
+                setSuggestedUsers(data.filter((u: any) => u._id !== user?._id).slice(0, 10));
+            }
+        } catch (error) {
+            console.error('Error fetching suggested users:', error);
+        }
+    };
 
     const loadRecentSearches = async () => {
         try {
@@ -115,10 +134,41 @@ export default function SearchScreen() {
         }
     };
 
-    const getAvatarUri = (avatar?: string) => {
-        if (!avatar) return null;
-        if (avatar.startsWith('http')) return avatar;
-        return `${API_BASE_URL}${avatar.startsWith('/') ? '' : '/'}${avatar}`;
+    const getCorrectUrl = (uri: string) => {
+        if (!uri || typeof uri !== 'string') return 'https://via.placeholder.com/400';
+        if (uri.startsWith('blob:') || uri.startsWith('data:') || uri.startsWith('file:')) return uri;
+
+        if (uri.startsWith('http') && uri.includes('/uploads/')) {
+            const parts = uri.split('/uploads/');
+            return `${API_BASE_URL}/uploads/${parts[1]}`;
+        }
+        
+        if (uri.startsWith('http')) return uri;
+        if (uri.startsWith('/uploads/')) return `${API_BASE_URL}${uri}`;
+        if (uri.includes('/uploads/')) {
+            const parts = uri.split('/uploads/');
+            return `${API_BASE_URL}/uploads/${parts[1]}`;
+        }
+
+        return `${API_BASE_URL}${uri.startsWith('/') ? '' : '/'}${uri}`;
+    };
+
+    const GridVideoItem = ({ uri, style }: { uri: string, style: any }) => {
+        const player = useVideoPlayer(getCorrectUrl(uri), player => {
+            player.loop = true;
+            player.muted = true;
+        });
+
+        return (
+            <View style={[style, { overflow: 'hidden', backgroundColor: 'black' }]}>
+                <VideoView
+                    player={player}
+                    style={{ width: '100%', height: '100%' }}
+                    contentFit="cover"
+                    nativeControls={false}
+                />
+            </View>
+        );
     };
 
     return (
@@ -132,7 +182,7 @@ export default function SearchScreen() {
 
             {/* Search Bar */}
             <View style={[styles.searchBarWrapper, isDesktop && { paddingTop: 24, paddingBottom: 16 }]}>
-                <View style={[styles.searchBar, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
+                <View style={[styles.searchBar, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
                     <SearchIcon size={20} color={colors.textSecondary} />
                     <TextInput
                         placeholder="Search users or posts..."
@@ -146,6 +196,8 @@ export default function SearchScreen() {
                         autoFocus={isDesktop}
                         autoCapitalize="none"
                         autoCorrect={false}
+                        onSubmitEditing={() => saveRecentSearch(searchQuery)}
+                        returnKeyType="search"
                     />
                     {searchQuery.length > 0 && (
                         <TouchableOpacity onPress={() => {
@@ -160,6 +212,8 @@ export default function SearchScreen() {
 
             <ScrollView
                 contentContainerStyle={styles.content}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
@@ -183,22 +237,70 @@ export default function SearchScreen() {
                                         <Text style={{ color: colors.primary, fontWeight: '600' }}>Clear All</Text>
                                     </TouchableOpacity>
                                 </View>
-                                <View style={styles.recentList}>
+                                <View style={styles.historyContainer}>
                                     {recentSearches.map((item, index) => (
-                                        <View key={index} style={styles.recentItem}>
+                                        <TouchableOpacity 
+                                            key={index} 
+                                            style={styles.historyChip}
+                                            onPress={() => setSearchQuery(item)}
+                                        >
+                                            <Clock size={14} color={colors.textSecondary} />
+                                            <Text style={styles.historyText}>{item}</Text>
                                             <TouchableOpacity 
-                                                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}
-                                                onPress={() => setSearchQuery(item)}
+                                                onPress={(e) => {
+                                                    e.stopPropagation();
+                                                    removeRecentSearch(item);
+                                                }}
+                                                style={styles.removeHistory}
                                             >
-                                                <Clock size={16} color={colors.textSecondary} opacity={0.5} />
-                                                <Text style={styles.recentText}>{item}</Text>
+                                                <X size={12} color={colors.textSecondary} />
                                             </TouchableOpacity>
-                                            <TouchableOpacity onPress={() => removeRecentSearch(item)}>
-                                                <X size={16} color={colors.textSecondary} />
-                                            </TouchableOpacity>
-                                        </View>
+                                        </TouchableOpacity>
                                     ))}
                                 </View>
+                            </View>
+                        )}
+
+                        {/* Suggested Users */}
+                        {suggestedUsers.length > 0 && (
+                            <View style={styles.section}>
+                                <View style={styles.sectionTitleContainer}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                        <UserIcon size={20} color={colors.textSecondary} />
+                                        <Text style={styles.sectionTitle}>Discover People</Text>
+                                    </View>
+                                </View>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
+                                    {suggestedUsers.map((u) => (
+                                        <TouchableOpacity 
+                                            key={u._id} 
+                                            style={[styles.suggestedCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#fff', borderColor: colors.border }]}
+                                            onPress={() => router.push(`/user/${u._id}` as any)}
+                                        >
+                                            <View style={styles.suggestedAvatar}>
+                                                {u.avatar ? (
+                                                    <Image source={{ uri: getCorrectUrl(u.avatar) }} style={styles.avatarFull} />
+                                                ) : (
+                                                    <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary + '20' }]}>
+                                                       <UserIcon size={32} color={colors.primary} />
+                                                    </View>
+                                                )}
+                                            </View>
+                                            <Text style={[styles.suggestedName, { color: colors.text }]} numberOfLines={1}>{u.name}</Text>
+                                            <Text style={[styles.suggestedHandle, { color: colors.textSecondary }]} numberOfLines={1}>@{u.handle}</Text>
+                                            <TouchableOpacity 
+                                                style={[styles.followBtnMini, { backgroundColor: colors.primary }]}
+                                                onPress={(e) => {
+                                                    e.stopPropagation();
+                                                    // Follow logic or just navigate
+                                                    router.push(`/user/${u._id}` as any);
+                                                }}
+                                            >
+                                                <Text style={styles.followBtnText}>View</Text>
+                                            </TouchableOpacity>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
                             </View>
                         )}
 
@@ -245,15 +347,24 @@ export default function SearchScreen() {
                                             >
                                                 <View style={styles.avatar}>
                                                     {user.avatar ? (
-                                                        <Image source={{ uri: getAvatarUri(user.avatar) || '' }} style={styles.avatarImg} />
+                                                        <Image source={{ uri: getCorrectUrl(user.avatar) }} style={styles.avatarImg} />
                                                     ) : (
                                                         <UserIcon color="white" size={20} />
                                                     )}
                                                 </View>
                                                 <View style={{ flex: 1 }}>
-                                                    <Text style={styles.userName}>{user.name}</Text>
-                                                    <Text style={styles.userHandle}>{user.handle}</Text>
+                                                    <Text style={[styles.userName, { color: colors.text }]}>{user.name}</Text>
+                                                    <Text style={[styles.userHandle, { color: colors.textSecondary }]}>@{user.handle}</Text>
                                                 </View>
+                                                <TouchableOpacity 
+                                                    style={[styles.followBtnSmall, { backgroundColor: colors.primary }]}
+                                                    onPress={(e) => {
+                                                        e.stopPropagation();
+                                                        router.push(`/user/${user._id}` as any);
+                                                    }}
+                                                >
+                                                    <Text style={styles.followBtnText}>Profile</Text>
+                                                </TouchableOpacity>
                                             </TouchableOpacity>
                                         ))}
                                     </View>
@@ -261,7 +372,12 @@ export default function SearchScreen() {
 
                                 {results.posts.length > 0 && (
                                     <View style={[styles.section, { marginTop: 24 }]}>
-                                        <Text style={styles.resultHeader}>Posts</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                            <Text style={styles.resultHeader}>Posts</Text>
+                                            <View style={{ backgroundColor: colors.primary, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 }}>
+                                                <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>{results.posts.length}</Text>
+                                            </View>
+                                        </View>
                                         <View style={styles.postsGrid}>
                                             {results.posts.map((post) => (
                                                 <TouchableOpacity 
@@ -269,11 +385,15 @@ export default function SearchScreen() {
                                                     style={styles.postResult}
                                                     onPress={() => router.push(`/post/${post._id}`)}
                                                 >
-                                                    <Image 
-                                                        source={{ uri: getAvatarUri(post.uri || post.thumbnail) || '' }} 
-                                                        style={styles.postImg} 
-                                                    />
-                                                    {post.type === 'reel' && (
+                                                    {post.type === 'image' ? (
+                                                        <Image 
+                                                            source={{ uri: getCorrectUrl(post.uri || post.thumbnail || post.imageUrl || post.image) }} 
+                                                            style={styles.postImg} 
+                                                        />
+                                                    ) : (
+                                                        <GridVideoItem uri={post.uri || post.videoUri} style={styles.postImg} />
+                                                    )}
+                                                    {(post.type === 'reel' || post.type === 'video') && (
                                                         <View style={styles.reelBadge}>
                                                             <Hash size={12} color="white" />
                                                         </View>
@@ -298,7 +418,7 @@ export default function SearchScreen() {
     );
 }
 
-const createStyles = (colors: any, insets: any, isDesktop: boolean) => StyleSheet.create({
+const createStyles = (colors: any, insets: any, isDesktop: boolean, isDark: boolean) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background,
@@ -327,7 +447,7 @@ const createStyles = (colors: any, insets: any, isDesktop: boolean) => StyleShee
         borderRadius: 30,
         marginTop: 20,
         borderWidth: 1,
-        borderColor: colors.isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+        borderColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
     },
     searchInput: {
         flex: 1,
@@ -338,8 +458,8 @@ const createStyles = (colors: any, insets: any, isDesktop: boolean) => StyleShee
         fontWeight: '500',
     },
     content: {
-        flex: 1,
         paddingHorizontal: 20,
+        paddingBottom: 120, // Space for tab bar
     },
     section: {
         marginBottom: 32,
@@ -376,10 +496,10 @@ const createStyles = (colors: any, insets: any, isDesktop: boolean) => StyleShee
     tag: {
         paddingHorizontal: 18,
         paddingVertical: 10,
-        backgroundColor: colors.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+        backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
         borderRadius: 20,
         borderWidth: 1,
-        borderColor: colors.isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+        borderColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
     },
     tagText: {
         fontSize: 13,
@@ -456,5 +576,82 @@ const createStyles = (colors: any, insets: any, isDesktop: boolean) => StyleShee
     noResultsText: {
         color: colors.textSecondary,
         fontSize: 16,
-    }
+    },
+    historyContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 10,
+    },
+    historyChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+        gap: 8,
+        borderWidth: 1,
+        borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+    },
+    historyText: {
+        fontSize: 14,
+        color: colors.text,
+        fontWeight: '500',
+    },
+    removeHistory: {
+        marginLeft: 4,
+        padding: 2,
+    },
+    suggestedCard: {
+        width: 150,
+        padding: 16,
+        borderRadius: 20,
+        alignItems: 'center',
+        borderWidth: 1,
+    },
+    suggestedAvatar: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        marginBottom: 12,
+        overflow: 'hidden',
+    },
+    avatarFull: {
+        width: '100%',
+        height: '100%',
+    },
+    avatarPlaceholder: {
+        width: '100%',
+        height: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    suggestedName: {
+        fontSize: 14,
+        fontWeight: '800',
+        marginBottom: 2,
+        textAlign: 'center',
+    },
+    suggestedHandle: {
+        fontSize: 12,
+        marginBottom: 12,
+        textAlign: 'center',
+    },
+    followBtnMini: {
+        paddingHorizontal: 16,
+        paddingVertical: 6,
+        borderRadius: 12,
+        width: '100%',
+        alignItems: 'center',
+    },
+    followBtnSmall: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 12,
+    },
+    followBtnText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: '800',
+    },
 });

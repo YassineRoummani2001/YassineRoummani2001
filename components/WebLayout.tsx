@@ -23,48 +23,52 @@ export function WebLayout({ children }: { children: React.ReactNode }) {
     const isNotifications = pathname.includes('/notifications');
     const isReels = pathname.includes('/reels');
     const isCreate = pathname.includes('/create');
+    const isMarketplaceDetail = pathname.startsWith('/marketplace/') && pathname !== '/marketplace';
     const isHome = (pathname === '/' || pathname === '/(tabs)' || pathname === '/index') && !isCreate;
 
-    const showRightSidebar = isLargeScreen && width > 1200 && !isChat && !isReels;
+    const showRightSidebar = isLargeScreen && width > 1200 && !isReels && !isMarketplaceDetail;
     const sidebarWidth = 280;
     const rightSidebarWidth = 350;
 
     // Calculate dynamic widths for web
-    let feedMaxWidth: number | string = 650; // Increased base
+    let feedMaxWidth: any = 650;
     if (isReels) feedMaxWidth = '100%'; 
-    else if (isChat) feedMaxWidth = 1000;
+    else if (isChat) feedMaxWidth = 850;
+    else if (isMarketplaceDetail) feedMaxWidth = 1100;
     else if (isMarketplace) feedMaxWidth = 850;
     else if (isProfile) feedMaxWidth = 800; // So Profile fits with the Right Sidebar
 
-    const totalContentWidth = feedMaxWidth + (showRightSidebar ? rightSidebarWidth + 40 : 0);
+    const totalContentWidth = typeof feedMaxWidth === 'number' 
+        ? feedMaxWidth + (showRightSidebar ? rightSidebarWidth + 40 : 0)
+        : '100%';
 
     return (
-        <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.container as any, { backgroundColor: colors.background }]}>
             {isLargeScreen && (
-                <View style={[styles.sidebarArea, { width: sidebarWidth }]}>
+                <View style={[styles.sidebarArea as any, { width: sidebarWidth }]}>
                     <WebSidebar />
                 </View>
             )}
 
             <View style={[
-                styles.content,
+                styles.content as any,
                 isLargeScreen && { marginLeft: sidebarWidth },
                 !isLargeScreen && { paddingBottom: 60 },
             ]}>
                 {/* Center the content horizontally within the available space */}
                 <View style={[
-                    styles.centerWrapper,
+                    styles.centerWrapper as any,
                     {
                         maxWidth: totalContentWidth,
                         paddingHorizontal: isLargeScreen ? 40 : 0,
                     },
                 ]}>
-                    <View style={[styles.main, { maxWidth: feedMaxWidth }]}>
+                    <View style={[styles.main as any, { maxWidth: feedMaxWidth }]}>
                         {children}
                     </View>
 
                     {showRightSidebar && (
-                        <View style={[styles.rightSidebar, { width: rightSidebarWidth }]}>
+                        <View style={[styles.rightSidebar as any, { width: rightSidebarWidth }]}>
                             <DesktopRightSidebar />
                         </View>
                     )}
@@ -78,7 +82,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         height: Platform.OS === 'web' ? '100vh' as any : '100%',
-        overflow: Platform.OS === 'web' ? 'hidden' : 'visible',
+        overflow: 'hidden',
         flexDirection: 'row',
     },
     sidebarArea: {
@@ -95,24 +99,31 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingTop: 0,
         height: Platform.OS === 'web' ? '100vh' as any : '100%',
+        overflowX: 'hidden' as any,
+        overflowY: 'auto' as any,
     },
     centerWrapper: {
         flexDirection: 'row',
         width: '100%',
         justifyContent: 'center',
-        height: Platform.OS === 'web' ? '100vh' as any : '100%',
+        height: 'auto',
+        minHeight: '100%',
     },
     main: {
         flex: 1,
         width: '100%',
         backgroundColor: 'transparent',
-        height: Platform.OS === 'web' ? '100vh' as any : '100%',
+        height: 'auto',
+        minHeight: '100%',
     },
     rightSidebar: {
         marginLeft: 40,
         paddingTop: 20,
         flexShrink: 0,
-        height: Platform.OS === 'web' ? '100vh' as any : '100%',
-        overflow: Platform.OS === 'web' ? 'auto' : 'visible',
+        height: '100vh' as any,
+        position: 'sticky' as any,
+        top: 0,
+        overflowY: 'auto' as any,
+        overflowX: 'hidden' as any,
     },
 });

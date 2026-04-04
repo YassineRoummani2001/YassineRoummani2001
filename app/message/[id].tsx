@@ -16,6 +16,7 @@ import {
     ActivityIndicator,
     Alert,
     Animated,
+    Dimensions,
     FlatList,
     KeyboardAvoidingView,
     Modal,
@@ -227,12 +228,15 @@ const VoiceMessage = ({ uri, itemsDuration, isMe, colors }: { uri: string, items
 /* -------------------------------------------------------------------------- */
 
 export default function MessageScreen() {
-    const { id, name: paramName, avatar: paramAvatar, product } = useLocalSearchParams();
+    const params = useLocalSearchParams();
+    const { id, product, isGroup, name: paramName, avatar: paramAvatar } = params;
     const router = useRouter();
     const { user } = useUser() as any;
     const { colors, isDark } = useThemeContext();
     const { markChatAsRead, socket } = useMessages();
     const insets = useSafeAreaInsets();
+    const width = Dimensions.get('window').width;
+    const isDesktop = Platform.OS === 'web' && width > 768;
 
     // State
     const [messages, setMessages] = useState<any[]>([]);
@@ -283,10 +287,22 @@ export default function MessageScreen() {
 
             const init = async () => {
                 try {
-                    // Parallel Fetch: User Info & Find/Create Chat
+                    if (isGroup === 'true') {
+                        const chatRes = await ApiClient.get<any>(`/api/chats/${userId}`, { 'Authorization': `Bearer ${user.token}` });
+                        if (chatRes.success && chatRes.data) {
+                            setChatId(chatRes.data._id);
+                            setChat(chatRes.data);
+                            const mRes = await ApiClient.get<any[]>(`/api/chats/${chatRes.data._id}/messages?limit=50`, { 'Authorization': `Bearer ${user.token}` });
+                            if (mRes.success && mRes.data) {
+                                setMessages(mRes.data);
+                                if (mRes.data.length < 50) setHasMore(false);
+                            }
+                        }
+                    } else {
+                        // Parallel Fetch: User Info & Find/Create Chat
                     const [uRes, cRes] = await Promise.all([
                         ApiClient.get<any>(`/api/auth/user/${userId}`, { 'Authorization': `Bearer ${user.token}` }),
-                        ApiClient.post<any>('/api/chats', { userId: userId }, { 'Authorization': `Bearer ${user.token}` })
+                        ApiClient.post<any>('/api/chats', { userId: userId, isMarketplace: !!product }, { 'Authorization': `Bearer ${user.token}` })
                     ]);
 
                     if (uRes.success) setRecipient(uRes.data);
@@ -324,6 +340,7 @@ export default function MessageScreen() {
                                 }
                                 productSentRef.current = true;
                             } catch (e) { console.error("Error sending product:", e); }
+                        }
                         }
                     }
                 } catch (e) {
@@ -925,17 +942,36 @@ export default function MessageScreen() {
             <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
             {/* Header */}
-            <View style={[styles.header, { paddingTop: insets.top, backgroundColor: isDark ? '#000' : '#FFF', borderBottomColor: isDark ? '#262626' : '#F2F2F2' }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 4 }}>
-                    <TouchableOpacity onPress={() => router.back()} style={{ padding: 4 }}>
+            <View style={[styles.header, { 
+                paddingTop: isDesktop ? 0 : insets.top, 
+                height: isDesktop ? 60 : 70 + insets.top,
+                backgroundColor: isDark ? '#000' : '#FFF', 
+                borderBottomColor: isDark ? '#262626' : '#F2F2F2' 
+            }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 4, paddingLeft: isDesktop ? 10 : 0 }}>
+                    <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
                         <Ionicons name="arrow-back" size={24} color={colors.text} />
                     </TouchableOpacity>
 
-                    {recipient ? (
-                        <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }} onPress={() => router.push(`/message/user-info/${id}`)}>
-                            <AvatarImage uri={recipient.avatar} name={recipient.name} size={36} />
-                            <View style={{ marginLeft: 10, flex: 1 }}>
-                                <Text numberOfLines={1} style={{ fontSize: 16, fontWeight: '700', color: colors.text }}>{recipient.name}</Text>
+                    {isGroup === 'true' && chat ? (
+                        <TouchableOpacity 
+                            style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }} 
+                            onPress={() => router.push({ pathname: `/message/group-info/${chat._id}` } as any)}
+                        >
+                            <AvatarImage uri={chat.groupAvatar} name={chat.groupName} size={isDesktop ? 40 : 36} />
+                            <View style={{ marginLeft: 12, flex: 1 }}>
+                                <Text numberOfLines={1} style={{ fontSize: isDesktop ? 18 : 16, fontWeight: '700', color: colors.text }}>{chat.groupName}</Text>
+                                <Text numberOfLines={1} style={{ fontSize: 12, color: colors.textSecondary }}>{chat.participants?.length || 0} members</Text>
+                            </View>
+                        </TouchableOpacity>
+                    ) : recipient ? (
+                        <TouchableOpacity 
+                            style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }} 
+                            onPress={() => router.push(`/message/user-info/${userId}`)}
+                        >
+                            <AvatarImage uri={recipient.avatar} name={recipient.name} size={isDesktop ? 40 : 36} />
+                            <View style={{ marginLeft: 12, flex: 1 }}>
+                                <Text numberOfLines={1} style={{ fontSize: isDesktop ? 18 : 16, fontWeight: '700', color: colors.text }}>{recipient.name}</Text>
                                 <Text numberOfLines={1} style={{ fontSize: 12, color: colors.textSecondary }}>{isTyping ? 'Typing...' : (recipient.username || 'View profile')}</Text>
                             </View>
                         </TouchableOpacity>
@@ -946,7 +982,7 @@ export default function MessageScreen() {
                     )}
                 </View>
 
-                <View style={{ flexDirection: 'row', gap: 24, alignItems: 'center', paddingRight: 8 }}>
+                <View style={{ flexDirection: 'row', gap: isDesktop ? 28 : 24, alignItems: 'center', paddingRight: isDesktop ? 20 : 8 }}>
                     <TouchableOpacity><Ionicons name="call-outline" size={24} color={colors.text} /></TouchableOpacity>
                     <TouchableOpacity><Ionicons name="videocam-outline" size={26} color={colors.text} /></TouchableOpacity>
                 </View>

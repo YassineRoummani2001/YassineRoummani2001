@@ -1,6 +1,6 @@
 import { useThemeContext } from '@/context/ThemeContext';
 import React, { useEffect, useRef } from 'react';
-import { Animated, Dimensions, StyleSheet, View, Platform } from 'react-native';
+import { Animated, Dimensions, StyleSheet, View, Platform, ScrollView } from 'react-native';
 
 const { width } = Dimensions.get('window');
 const GRID_ITEM_SIZE = width / 3 - 2;
@@ -128,6 +128,45 @@ export function SkeletonMarketItem() {
                 <AnimatedView style={{ width: '60%', height: 12, borderRadius: 4 }} />
             </View>
         </View>
+    );
+}
+
+export function SkeletonFilters() {
+    return (
+        <View style={styles.filtersContainer}>
+            <AnimatedView style={styles.filterPillSkeleton} />
+            <AnimatedView style={styles.filterPillSkeleton} />
+            <AnimatedView style={[styles.filterPillSkeleton, { width: 80 }]} />
+            <AnimatedView style={styles.filterPillSkeleton} />
+        </View>
+    );
+}
+
+export function SkeletonNotes() {
+    const { colors } = useThemeContext();
+    return (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.notesContainer}>
+            {[1, 2, 3, 4, 5, 6].map(i => (
+                <View key={i} style={styles.noteItemSkeleton}>
+                    <View style={styles.noteAvatarWrapper}>
+                        <AnimatedView style={styles.noteAvatar} />
+                        <AnimatedView style={[styles.noteBubble, { borderColor: colors.background }]} />
+                    </View>
+                    <AnimatedView style={styles.noteName} />
+                </View>
+            ))}
+        </ScrollView>
+    );
+}
+
+export function SkeletonChat() {
+    return (
+        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+            <SkeletonNotes />
+            <View style={{ marginTop: 16 }}>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => <SkeletonRow key={i} />)}
+            </View>
+        </ScrollView>
     );
 }
 
@@ -318,4 +357,54 @@ const styles = StyleSheet.create({
         width: '100%',
         height: 180,
     },
+    // Filters
+    filtersContainer: {
+        flexDirection: 'row',
+        paddingHorizontal: 20,
+        gap: 8,
+        marginTop: 12,
+        marginBottom: 16,
+    },
+    filterPillSkeleton: {
+        width: 60,
+        height: 36,
+        borderRadius: 18,
+    },
+    // Notes
+    notesContainer: {
+        flexDirection: 'row',
+        paddingHorizontal: 16,
+        gap: 16,
+        paddingTop: 30,
+        paddingBottom: 10,
+    },
+    noteItemSkeleton: {
+        alignItems: 'center',
+        width: 72,
+    },
+    noteAvatarWrapper: {
+        width: 72,
+        height: 72,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    noteAvatar: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+    },
+    noteBubble: {
+        position: 'absolute',
+        top: -20,
+        width: 45,
+        height: 28,
+        borderRadius: 14,
+        borderWidth: 2.5,
+    },
+    noteName: {
+        width: 50,
+        height: 10,
+        borderRadius: 5,
+        marginTop: 10,
+    }
 });

@@ -19,7 +19,8 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
-    View
+    View,
+    useWindowDimensions
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -66,6 +67,8 @@ interface ReelItemProps {
 
 export default function ReelItem({ item, active, isMuted, width, height }: ReelItemProps) {
     const insets = useSafeAreaInsets();
+    const { width: windowWidth } = useWindowDimensions();
+    const isDesktop = Platform.OS === 'web' && windowWidth > 900;
     const router = useRouter();
     const { user, followUser } = (useUser() || {}) as any;
     const [followLoading, setFollowLoading] = useState(false);
@@ -503,141 +506,146 @@ export default function ReelItem({ item, active, isMuted, width, height }: ReelI
                 </TouchableOpacity>
             </View>
 
-            {/* GRADIENT OVERLAYS */}
-            <LinearGradient 
-                colors={['rgba(0,0,0,0.6)', 'transparent']} 
-                style={styles.topGradient} 
-            />
-            <LinearGradient 
-                colors={['transparent', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.85)']} 
-                style={styles.gradient} 
-            />
+            {/* EVERYTHING BELOW HIDDEN ON DESKTOP REELS PAGE */}
+            {!isDesktop && (
+                <>
+                    {/* GRADIENT OVERLAYS */}
+                    <LinearGradient 
+                        colors={['rgba(0,0,0,0.6)', 'transparent']} 
+                        style={styles.topGradient} 
+                    />
+                    <LinearGradient 
+                        colors={['transparent', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.85)']} 
+                        style={styles.gradient} 
+                    />
 
-            {/* LOADING INDICATOR */}
-            {(isBuffering || !isLoaded) && active && !hasError && (
-                <View style={styles.center}>
-                    <ActivityIndicator size="large" color="white" />
-                </View>
-            )}
-
-            {/* RIGHT ACTIONS */}
-            <View style={styles.rightActions}>
-
-                <TouchableOpacity onPress={toggleLike} style={styles.actionButton} activeOpacity={0.7}>
-                    <View style={styles.iconCircle}>
-                        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                            <Heart size={28} color={liked ? '#ff2d55' : 'white'} fill={liked ? '#ff2d55' : 'transparent'} strokeWidth={2.5} />
-                        </Animated.View>
-                    </View>
-                    <Text style={styles.actionText}>{likesCount > 1000 ? `${(likesCount / 1000).toFixed(1)}k` : likesCount}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity onPress={() => setShowComments(true)} style={styles.actionButton} activeOpacity={0.7}>
-                    <View style={styles.iconCircle}>
-                        <MessageCircle size={28} color="white" strokeWidth={2.5} />
-                    </View>
-                    <Text style={styles.actionText}>{commentsCount > 1000 ? `${(commentsCount / 1000).toFixed(1)}k` : commentsCount}</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity onPress={() => setShowShare(true)} style={styles.actionButton} activeOpacity={0.7}>
-                    <View style={styles.iconCircle}>
-                        <Send size={26} color="white" strokeWidth={2.5} />
-                    </View>
-                    <Text style={styles.actionText}>{Math.floor(likesCount / 4.5) > 1000 ? `${((likesCount / 4.5) / 1000).toFixed(1)}k` : Math.floor(likesCount / 4.5)}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity onPress={handleSaveReel} style={styles.actionButton} activeOpacity={0.7}>
-                    <View style={styles.iconCircle}>
-                        <Animated.View style={{ transform: [{ scale: saveScaleAnim }] }}>
-                            <Bookmark size={28} color={isSaved ? '#FACD00' : 'white'} fill={isSaved ? '#FACD00' : 'transparent'} strokeWidth={isSaved ? 0 : 2.5} />
-                        </Animated.View>
-                    </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity onPress={() => setShowOptions(true)} style={styles.actionButton} activeOpacity={0.7}>
-                    <View style={styles.iconCircle}>
-                        <MoreHorizontal size={26} color="white" strokeWidth={2.5} />
-                    </View>
-                </TouchableOpacity>
-            </View>
-
-            {/* BOTTOM INFO & USER PROFILE */}
-            <View style={[styles.bottomInfo, { bottom: insets.bottom + 115 }]}>
-                <View style={styles.userInfoRow}>
-                    <TouchableOpacity onPress={() => router.push(`/user/${author._id || author.id}`)} activeOpacity={0.8} style={styles.avatarWrapper}>
-                        <Image source={{ uri: avatarUri || 'https://via.placeholder.com/150' }} style={styles.profileAvatar} />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity onPress={() => router.push(`/user/${author._id || author.id}`)}>
-                        <Text style={styles.authorName}>{author.name || 'User'}</Text>
-                    </TouchableOpacity>
-
-                    {user?._id !== (author._id || author.id) && !isFollowing && !isRequested && (
-                        <TouchableOpacity 
-                            style={styles.followButtonInactive} 
-                            onPress={toggleFollow} 
-                            activeOpacity={0.8}
-                        >
-                            <Text style={styles.followButtonTextInactive}>
-                                Follow
-                            </Text>
-                        </TouchableOpacity>
-                    )}
-
-                    {isRequested && (
-                        <TouchableOpacity 
-                            style={[styles.followButtonInactive, { opacity: 0.8 }]} 
-                            onPress={toggleFollow} 
-                            activeOpacity={0.8}
-                        >
-                            <Text style={styles.followButtonTextInactive}>
-                                Requested
-                            </Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
-
-                <Text style={styles.caption} numberOfLines={2}>{item.caption || 'No caption provided'}</Text>
-
-                {/* Social Proof Section */}
-                <View style={styles.socialProof}>
-                    <View style={styles.stackedAvatars}>
-                        <Image source={{ uri: 'https://i.pravatar.cc/100?u=1' }} style={[styles.stackedAvatar, { zIndex: 3 }]} />
-                        <Image source={{ uri: 'https://i.pravatar.cc/100?u=2' }} style={[styles.stackedAvatar, { left: -8, zIndex: 2 }]} />
-                    </View>
-                    <Text style={styles.socialProofText}>
-                        Liked by <Text style={{ fontWeight: '700', color: '#fff' }}>vibe_user</Text> and <Text style={{ fontWeight: '700', color: '#fff' }}>{likesCount.toLocaleString()} others</Text>
-                    </Text>
-                </View>
-
-                {item.music && (
-                    <View style={styles.musicRow}>
-                        <Music size={14} color="white" />
-                        <View style={styles.musicTickerWrapper}>
-                            <Text style={styles.musicLabel} numberOfLines={1}>{item.music} · {author.name || 'Original Audio'}</Text>
+                    {/* LOADING INDICATOR */}
+                    {(isBuffering || !isLoaded) && active && !hasError && (
+                        <View style={styles.center}>
+                            <ActivityIndicator size="large" color="white" />
                         </View>
-                    </View>
-                )}
-            </View>
+                    )}
 
-            {/* COMMENT INPUT BAR (PREMIUM OVERLAY) */}
-            <TouchableOpacity 
-                style={[styles.commentBarOverlay, { bottom: insets.bottom + 20 }]}
-                activeOpacity={0.9}
-                onPress={() => setShowComments(true)}
-            >
-                <View style={styles.commentBarContent}>
-                    <View style={styles.commentBarInput}>
-                        <Text style={styles.commentBarPlaceholder}>Add a comment...</Text>
+                    {/* RIGHT ACTIONS */}
+                    <View style={styles.rightActions}>
+
+                        <TouchableOpacity onPress={toggleLike} style={styles.actionButton} activeOpacity={0.7}>
+                            <View style={styles.iconCircle}>
+                                <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                                    <Heart size={28} color={liked ? '#ff2d55' : 'white'} fill={liked ? '#ff2d55' : 'transparent'} strokeWidth={2.5} />
+                                </Animated.View>
+                            </View>
+                            <Text style={styles.actionText}>{likesCount > 1000 ? `${(likesCount / 1000).toFixed(1)}k` : likesCount}</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity onPress={() => setShowComments(true)} style={styles.actionButton} activeOpacity={0.7}>
+                            <View style={styles.iconCircle}>
+                                <MessageCircle size={28} color="white" strokeWidth={2.5} />
+                            </View>
+                            <Text style={styles.actionText}>{commentsCount > 1000 ? `${(commentsCount / 1000).toFixed(1)}k` : commentsCount}</Text>
+                        </TouchableOpacity>
+                        
+                        <TouchableOpacity onPress={() => setShowShare(true)} style={styles.actionButton} activeOpacity={0.7}>
+                            <View style={styles.iconCircle}>
+                                <Send size={26} color="white" strokeWidth={2.5} />
+                            </View>
+                            <Text style={styles.actionText}>{Math.floor(likesCount / 4.5) > 1000 ? `${((likesCount / 4.5) / 1000).toFixed(1)}k` : Math.floor(likesCount / 4.5)}</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity onPress={handleSaveReel} style={styles.actionButton} activeOpacity={0.7}>
+                            <View style={styles.iconCircle}>
+                                <Animated.View style={{ transform: [{ scale: saveScaleAnim }] }}>
+                                    <Bookmark size={28} color={isSaved ? '#FACD00' : 'white'} fill={isSaved ? '#FACD00' : 'transparent'} strokeWidth={isSaved ? 0 : 2.5} />
+                                </Animated.View>
+                            </View>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity onPress={() => setShowOptions(true)} style={styles.actionButton} activeOpacity={0.7}>
+                            <View style={styles.iconCircle}>
+                                <MoreHorizontal size={26} color="white" strokeWidth={2.5} />
+                            </View>
+                        </TouchableOpacity>
                     </View>
-                    <TouchableOpacity onPress={() => {}} style={styles.iconButton}>
-                         <Ionicons name="heart-outline" size={22} color="white" opacity={0.7} />
+
+                    {/* BOTTOM INFO & USER PROFILE */}
+                    <View style={[styles.bottomInfo, { bottom: insets.bottom + 115 }]}>
+                        <View style={styles.userInfoRow}>
+                            <TouchableOpacity onPress={() => router.push(`/user/${author._id || author.id}`)} activeOpacity={0.8} style={styles.avatarWrapper}>
+                                <Image source={{ uri: avatarUri || 'https://via.placeholder.com/150' }} style={styles.profileAvatar} />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity onPress={() => router.push(`/user/${author._id || author.id}`)}>
+                                <Text style={styles.authorName}>{author.name || 'User'}</Text>
+                            </TouchableOpacity>
+
+                            {user?._id !== (author._id || author.id) && !isFollowing && !isRequested && (
+                                <TouchableOpacity 
+                                    style={styles.followButtonInactive} 
+                                    onPress={toggleFollow} 
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={styles.followButtonTextInactive}>
+                                        Follow
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+
+                            {isRequested && (
+                                <TouchableOpacity 
+                                    style={[styles.followButtonInactive, { opacity: 0.8 }]} 
+                                    onPress={toggleFollow} 
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={styles.followButtonTextInactive}>
+                                        Requested
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        <Text style={styles.caption} numberOfLines={2}>{item.caption || 'No caption provided'}</Text>
+
+                        {/* Social Proof Section */}
+                        <View style={styles.socialProof}>
+                            <View style={styles.stackedAvatars}>
+                                <Image source={{ uri: 'https://i.pravatar.cc/100?u=1' }} style={[styles.stackedAvatar, { zIndex: 3 }]} />
+                                <Image source={{ uri: 'https://i.pravatar.cc/100?u=2' }} style={[styles.stackedAvatar, { left: -8, zIndex: 2 }]} />
+                            </View>
+                            <Text style={styles.socialProofText}>
+                                Liked by <Text style={{ fontWeight: '700', color: '#fff' }}>vibe_user</Text> and <Text style={{ fontWeight: '700', color: '#fff' }}>{likesCount.toLocaleString()} others</Text>
+                            </Text>
+                        </View>
+
+                        {item.music && (
+                            <View style={styles.musicRow}>
+                                <Music size={14} color="white" />
+                                <View style={styles.musicTickerWrapper}>
+                                    <Text style={styles.musicLabel} numberOfLines={1}>{item.music} · {author.name || 'Original Audio'}</Text>
+                                </View>
+                            </View>
+                        )}
+                    </View>
+
+                    {/* COMMENT INPUT BAR (PREMIUM OVERLAY) */}
+                    <TouchableOpacity 
+                        style={[styles.commentBarOverlay, { bottom: insets.bottom + 20 }]}
+                        activeOpacity={0.9}
+                        onPress={() => setShowComments(true)}
+                    >
+                        <View style={styles.commentBarContent}>
+                            <View style={styles.commentBarInput}>
+                                <Text style={styles.commentBarPlaceholder}>Add a comment...</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => {}} style={styles.iconButton}>
+                                 <Ionicons name="heart-outline" size={22} color="white" opacity={0.7} />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => {}} style={styles.iconButton}>
+                                 <Ionicons name="happy-outline" size={22} color="white" opacity={0.7} />
+                            </TouchableOpacity>
+                        </View>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => {}} style={styles.iconButton}>
-                         <Ionicons name="happy-outline" size={22} color="white" opacity={0.7} />
-                    </TouchableOpacity>
-                </View>
-            </TouchableOpacity>
+                </>
+            )}
 
             {/* PROGRESS BAR */}
             <VideoProgressBar 

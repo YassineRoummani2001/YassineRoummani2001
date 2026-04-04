@@ -2,7 +2,7 @@ import { API_BASE_URL } from '@/constants/Config';
 import { useThemeContext } from '@/context/ThemeContext';
 import { useUser } from '@/context/UserContext';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronRight, Play } from 'lucide-react-native';
+import { Play } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -13,25 +13,19 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
+    useWindowDimensions,
     View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width } = Dimensions.get('window');
-const COLUMN_COUNT = 3;
-const SPACING = 2; // Spacing between items
-const ITEM_SIZE = (width - (COLUMN_COUNT - 1) * SPACING) / COLUMN_COUNT;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const getCorrectUrl = (url: string) => {
     if (!url) return '';
     try {
         if (url.startsWith('/uploads/')) {
             const encodedPath = url.split('/').map(part => encodeURIComponent(part)).join('/');
-            // The split/join above might double encode slashes if not careful.
-            // Better to assume the backend might serve unencoded paths.
-            // But encodeURI is safer for full URLs/paths.
-            // However, React Native Images often dislike encoded slashes.
-            // Let's just fix the full URL construction + encodeURI if it has spaces.
             return encodeURI(`${API_BASE_URL}${url}`);
         }
         if (url.includes('/uploads/')) {
@@ -48,9 +42,16 @@ const getCorrectUrl = (url: string) => {
 export default function SharedMediaScreen() {
     const { id } = useLocalSearchParams();
     const router = useRouter();
-    const { user } = useUser();
+    const { user } = useUser() as any;
     const { colors, isDark } = useThemeContext();
     const insets = useSafeAreaInsets();
+    const { width } = useWindowDimensions();
+
+    const isDesktop = width > 768;
+    const COLUMN_COUNT = isDesktop ? 5 : 3;
+    const SPACING = 2;
+    const EFFECTIVE_WIDTH = isDesktop ? Math.min(width - 280 - 350 - 120, 850) : width;
+    const ITEM_SIZE = (EFFECTIVE_WIDTH - (COLUMN_COUNT - 1) * SPACING) / COLUMN_COUNT;
 
     const [media, setMedia] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -78,7 +79,7 @@ export default function SharedMediaScreen() {
     const handlePressMedia = (item: any) => {
         let uri = '';
         let type = item.type;
-        let postId = item.postId?._id || item.postId; // Post ID if available
+        let postId = item.postId?._id || item.postId;
 
         if (item.type === 'image') {
             uri = getCorrectUrl(item.content);
@@ -86,12 +87,10 @@ export default function SharedMediaScreen() {
             uri = getCorrectUrl(item.content);
         } else if ((item.type === 'reel' || item.type === 'post') && item.postId) {
             uri = getCorrectUrl(item.postId.videoUri || item.postId.uri);
-            // If it's a reel, type is 'video' for the viewer typically, or 'reel' if supported
             type = item.postId.videoUri ? 'video' : 'image';
         }
 
         if (uri) {
-            // Encode the URI to ensure it's safely passed as a query param
             router.push({
                 pathname: '/media-view',
                 params: {
@@ -110,8 +109,7 @@ export default function SharedMediaScreen() {
         if (item.type === 'image') {
             thumbnailUri = getCorrectUrl(item.content);
         } else if (item.type === 'video') {
-            thumbnailUri = getCorrectUrl(item.content); // Use video itself or thumbnail if you had one.
-            // Ideally backend should geneate thumbnails for videos
+            thumbnailUri = getCorrectUrl(item.content);
         } else if ((item.type === 'reel' || item.type === 'post') && item.postId) {
             thumbnailUri = getCorrectUrl(item.postId.thumbnail || item.postId.uri);
         }
@@ -120,7 +118,7 @@ export default function SharedMediaScreen() {
 
         return (
             <TouchableOpacity
-                style={styles.gridItem}
+                style={[styles.gridItem, { width: ITEM_SIZE, height: ITEM_SIZE }]}
                 onPress={() => handlePressMedia(item)}
                 activeOpacity={0.8}
             >
@@ -131,7 +129,7 @@ export default function SharedMediaScreen() {
                 />
                 {isVideo && (
                     <View style={styles.videoIcon}>
-                        <Play size={16} color="#fff" fill="#fff" />
+                        <Play size={14} color="#fff" fill="#fff" />
                     </View>
                 )}
             </TouchableOpacity>
@@ -141,12 +139,19 @@ export default function SharedMediaScreen() {
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
             <Stack.Screen options={{ headerShown: false }} />
-            <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} />
+            <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
             {/* Header */}
-            <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+            <View style={[
+                styles.header, 
+                { 
+                    paddingTop: isDesktop ? 12 : insets.top + 10,
+                    backgroundColor: isDark ? '#000' : '#FFF',
+                    borderBottomColor: colors.border
+                }
+            ]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <ChevronRight size={28} color={colors.text} style={{ transform: [{ rotate: '180deg' }] }} />
+                    <Ionicons name="arrow-back" size={26} color={colors.text} />
                 </TouchableOpacity>
                 <Text style={[styles.headerTitle, { color: colors.text }]}>Shared Media</Text>
                 <View style={{ width: 40 }} />
@@ -166,6 +171,7 @@ export default function SharedMediaScreen() {
                     renderItem={renderItem}
                     keyExtractor={(item) => item._id}
                     numColumns={COLUMN_COUNT}
+                    key={`grid-${COLUMN_COUNT}`} // Force re-render on column change
                     contentContainerStyle={styles.list}
                     columnWrapperStyle={{ gap: SPACING }}
                 />
@@ -185,14 +191,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(0,0,0,0.05)',
+        zIndex: 10,
     },
     backButton: {
         padding: 4,
     },
     headerTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 17,
+        fontWeight: '700',
+        letterSpacing: -0.3,
     },
     center: {
         flex: 1,
@@ -203,10 +210,9 @@ const styles = StyleSheet.create({
         padding: 0,
     },
     gridItem: {
-        width: ITEM_SIZE,
-        height: ITEM_SIZE,
-        marginBottom: SPACING,
-        backgroundColor: '#f0f0f0',
+        marginBottom: 2,
+        backgroundColor: '#1a1a1a',
+        overflow: 'hidden',
     },
     image: {
         width: '100%',
@@ -214,13 +220,15 @@ const styles = StyleSheet.create({
     },
     videoIcon: {
         position: 'absolute',
-        top: 6,
-        right: 6,
-        backgroundColor: 'rgba(0,0,0,0.4)',
+        top: 8,
+        right: 8,
+        backgroundColor: 'rgba(0,0,0,0.5)',
         borderRadius: 12,
         width: 24,
         height: 24,
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)',
     }
 });

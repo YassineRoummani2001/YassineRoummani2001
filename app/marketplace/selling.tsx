@@ -21,6 +21,7 @@ import {
     Zap
 } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
+import VibeConfirmModal from '@/components/VibeConfirmModal';
 import { ActivityIndicator, Alert, Image, RefreshControl, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -115,35 +116,34 @@ export default function SellingDashboard() {
         }
     }, [activeTab]);
 
+    const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
+    const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+
     const handleDelete = async (itemId: string) => {
-        Alert.alert(
-            "Delete Listing",
-            "Are you sure you want to delete this item? This action cannot be undone.",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Delete",
-                    style: "destructive",
-                    onPress: async () => {
-                        try {
-                            const res = await fetch(`${API_BASE_URL}/api/marketplace/${itemId}`, {
-                                method: 'DELETE',
-                                headers: {
-                                    'Authorization': `Bearer ${user?.token}`
-                                }
-                            });
-                            if (res.ok) {
-                                setUserItems(prev => prev.filter(i => i._id !== itemId));
-                            } else {
-                                Alert.alert("Error", "Failed to delete item");
-                            }
-                        } catch (error) {
-                            console.error('Error deleting item:', error);
-                        }
-                    }
+        setItemToDelete(itemId);
+        setDeleteModalVisible(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!itemToDelete) return;
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/marketplace/${itemToDelete}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${user?.token}`
                 }
-            ]
-        );
+            });
+            if (res.ok) {
+                setUserItems(prev => prev.filter(i => i._id !== itemToDelete));
+            } else {
+                Alert.alert("Error", "Failed to delete item");
+            }
+        } catch (error) {
+            console.error('Error deleting item:', error);
+        } finally {
+            setItemToDelete(null);
+            setDeleteModalVisible(false);
+        }
     };
 
     const handleShare = async (item: any) => {
@@ -192,16 +192,23 @@ export default function SellingDashboard() {
 
     };
 
-    const getCorrectUrl = (url: string) => {
-        if (!url || typeof url !== 'string') return 'https://ui-avatars.com/api/?name=User&background=random';
-        if (url.startsWith('blob:')) return 'https://ui-avatars.com/api/?name=User&background=random';
-        if (url.includes('/uploads/')) {
-            const uploadIndex = url.indexOf('/uploads/');
-            return `${API_BASE_URL}${url.substring(uploadIndex)}`;
+    const getCorrectUrl = (uri: string) => {
+        if (!uri || typeof uri !== 'string') return 'https://via.placeholder.com/400';
+        if (uri.startsWith('blob:') || uri.startsWith('data:') || uri.startsWith('file:')) return uri;
+
+        if (uri.startsWith('http') && uri.includes('/uploads/')) {
+            const parts = uri.split('/uploads/');
+            return `${API_BASE_URL}/uploads/${parts[1]}`;
         }
-        if (url.startsWith('data:')) return url;
-        if (url.startsWith('http')) return url;
-        return `${API_BASE_URL}/uploads/${url}`;
+        
+        if (uri.startsWith('http')) return uri;
+        if (uri.startsWith('/uploads/')) return `${API_BASE_URL}${uri}`;
+        if (uri.includes('/uploads/')) {
+            const parts = uri.split('/uploads/');
+            return `${API_BASE_URL}/uploads/${parts[1]}`;
+        }
+
+        return `${API_BASE_URL}/uploads/${uri}`;
     };
 
     const StatCard = ({ label, value, subtext, icon: Icon, onPress, highlight }: any) => (
@@ -590,6 +597,17 @@ export default function SellingDashboard() {
                     </>
                 )}
             </ScrollView>
+
+            <VibeConfirmModal
+                visible={isDeleteModalVisible}
+                onClose={() => setDeleteModalVisible(false)}
+                onConfirm={confirmDelete}
+                title="Delete Listing"
+                message="Are you sure you want to delete this item? This action cannot be undone."
+                confirmText="Delete"
+                isDestructive
+                icon={<Trash2 size={28} color="#FF3B30" />}
+            />
         </View>
     );
 }

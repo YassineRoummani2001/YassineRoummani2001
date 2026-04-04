@@ -27,7 +27,7 @@ type UserItem = {
 
 export default function FollowRequestsScreen() {
     const router = useRouter();
-    const { user, followUser } = (useUser() || {}) as any;
+    const { user, followUser, refreshUser } = (useUser() || {}) as any;
     const { colors, isDark } = useThemeContext();
     const insets = useSafeAreaInsets();
 
@@ -87,8 +87,9 @@ export default function FollowRequestsScreen() {
                     'Content-Type': 'application/json'
                 }
             });
-            // Trigger a user refresh to update followers count context
-            if (user.refreshUser) await user.refreshUser();
+            // Automatically follow them back as requested
+            if (followUser) await followUser(id);
+            if (refreshUser) await refreshUser();
         } catch (error) {
             console.error("Error confirming request:", error);
         }

@@ -10,7 +10,7 @@ export default function DesktopRightSidebar() {
     if (Platform.OS !== 'web') return null;
 
     const { colors, isDark } = useThemeContext();
-    const { user } = (useUser() || {}) as any;
+    const { user, followUser } = (useUser() || {}) as any;
     const router = useRouter();
     const [suggestedUsers, setSuggestedUsers] = useState<any[]>([]);
     const [hoveredUser, setHoveredUser] = useState<string | null>(null);
@@ -21,7 +21,8 @@ export default function DesktopRightSidebar() {
         { tag: '#music', count: 85 }
     ]);
     const [searchQuery, setSearchQuery] = useState('');
-    const [searchFilter, setSearchFilter] = useState<'all' | 'users'>('all');
+    const [activeFilter, setActiveFilter] = useState<'All' | 'New' | 'Old' | 'Follow' | 'Following'>('All');
+    const [allUsers, setAllUsers] = useState<any[]>([]);
 
     const handleSearch = () => {
         if (!searchQuery.trim()) return;
@@ -36,36 +37,78 @@ export default function DesktopRightSidebar() {
                 if (res.ok) {
                     const data = await res.json();
                     if (data && data.length > 0) {
-                        const filtered = data.filter((u: any) => u._id !== user?._id).slice(0, 5);
-                        setSuggestedUsers(filtered);
+                        setAllUsers(data);
                     }
                 }
             } catch (err) {
-                console.log('Error fetching suggestions', err);
+                console.log('Error fetching users', err);
             }
         };
 
         const fetchHashtags = async () => {
             try {
-                const res = await fetch(`${API_BASE_URL}/api/posts/trending-hashtags`);
+                const res = await fetch(`${API_BASE_URL}/api/posts/all-hashtags`);
                 if (res.ok) {
                     const data = await res.json();
                     if (data && data.length > 0) {
-                        setTrendingHashtags([...data, ...data, ...data]); 
+                        setTrendingHashtags(data);
                     }
                 }
             } catch (err) {
-                console.log('Error fetching trending hashtags', err);
+                console.log('Error fetching hashtags', err);
             }
         };
 
         fetchSuggestions();
-        fetchHashtags();
     }, [user?._id]);
 
-    const getValidUri = (uri: string) => {
-        if (!uri) return 'https://i.pravatar.cc/150';
+    const filteredUsers = React.useMemo(() => {
+        let result = allUsers.filter(u => u._id !== user?._id);
+
+        // Search query filter
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            result = result.filter(u => 
+                (u.name && u.name.toLowerCase().includes(q)) || 
+                (u.handle && u.handle.toLowerCase().includes(q))
+            );
+        }
+
+        // Active filter logic
+        switch (activeFilter) {
+            case 'New':
+                result = [...result].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+                break;
+            case 'Old':
+                result = [...result].sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
+                break;
+            case 'Follow':
+                result = result.filter(u => !user?.following?.some((f: any) => f === u._id || f._id === u._id));
+                break;
+            case 'Following':
+                result = result.filter(u => user?.following?.some((f: any) => f === u._id || f._id === u._id));
+                break;
+        }
+
+        return result.slice(0, 10); // Show top 10
+    }, [allUsers, user, searchQuery, activeFilter]);
+
+    const getCorrectUrl = (uri: string) => {
+        if (!uri || typeof uri !== 'string') return 'https://via.placeholder.com/150';
+        if (uri.startsWith('blob:') || uri.startsWith('data:') || uri.startsWith('file:')) return uri;
+
+        if (uri.startsWith('http') && uri.includes('/uploads/')) {
+            const parts = uri.split('/uploads/');
+            return `${API_BASE_URL}/uploads/${parts[1]}`;
+        }
+        
         if (uri.startsWith('http')) return uri;
+        if (uri.startsWith('/uploads/')) return `${API_BASE_URL}${uri}`;
+        if (uri.includes('/uploads/')) {
+            const parts = uri.split('/uploads/');
+            return `${API_BASE_URL}/uploads/${parts[1]}`;
+        }
+
         return `${API_BASE_URL}${uri.startsWith('/') ? '' : '/'}${uri}`;
     };
 
@@ -75,29 +118,36 @@ export default function DesktopRightSidebar() {
     return (
         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
             {/* Search Bar integration */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 24, gap: 8 }}>
-                <View style={[styles.searchSection, { flex: 1, marginBottom: 0, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', borderColor: cardBorder }]}>
+            <View style={{ marginBottom: 20 }}>
+                <View style={[styles.searchSection, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', borderColor: cardBorder }]}>
                     <Ionicons name="search-outline" size={20} color={colors.textSecondary} />
                     <TextInput 
                         style={[styles.searchText, { color: colors.text, flex: 1, outlineStyle: 'none' as any }]} 
-                        placeholder="Search Vibe"
+                        placeholder="Search users..."
                         placeholderTextColor={colors.textSecondary}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
-                        onSubmitEditing={handleSearch}
                     />
                 </View>
 
-                {/* Filter toggle */}
-                <TouchableOpacity 
-                    style={[
-                        styles.filterBtn, 
-                        { backgroundColor: searchFilter === 'users' ? colors.primary : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'), borderColor: cardBorder }
-                    ]}
-                    onPress={() => setSearchFilter(prev => prev === 'all' ? 'users' : 'all')}
-                >
-                    <Ionicons name="people" size={20} color={searchFilter === 'users' ? '#fff' : colors.textSecondary} />
-                </TouchableOpacity>
+                {/* Filter Chips */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterBar}>
+                    {['All', 'New', 'Old', 'Follow', 'Following'].map((f) => (
+                        <TouchableOpacity
+                            key={f}
+                            onPress={() => setActiveFilter(f as any)}
+                            style={[
+                                styles.filterChip,
+                                { borderColor: cardBorder },
+                                activeFilter === f && { backgroundColor: colors.primary, borderColor: colors.primary }
+                            ]}
+                        >
+                            <Text style={[styles.filterChipText, { color: activeFilter === f ? '#fff' : colors.textSecondary }]}>
+                                {f}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
             </View>
 
             {/* Suggested Users Card */}
@@ -109,7 +159,7 @@ export default function DesktopRightSidebar() {
                     </TouchableOpacity>
                 </View>
 
-                {suggestedUsers.map((u) => (
+                {filteredUsers.map((u) => (
                     <Pressable
                         key={u._id}
                         onHoverIn={() => setHoveredUser(u._id)}
@@ -123,7 +173,7 @@ export default function DesktopRightSidebar() {
                         ]}
                     >
                         <Image
-                            source={{ uri: getValidUri(u.avatar) }}
+                            source={{ uri: getCorrectUrl(u.avatar) }}
                             style={[styles.avatar, { borderColor: colors.primary + '30' }]}
                         />
                         <View style={styles.userMeta}>
@@ -136,11 +186,12 @@ export default function DesktopRightSidebar() {
                         </View>
                         {(() => {
                             const isFollowing = user?.following?.some((f: any) => f === u._id || f._id === u._id);
+                            const isRequested = user?.sentRequests?.includes(u._id);
                             return (
                                 <TouchableOpacity
                                     style={[
                                         styles.followBtn, 
-                                        isFollowing 
+                                        isFollowing || isRequested
                                             ? { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border }
                                             : { backgroundColor: colors.primary }
                                     ]}
@@ -151,10 +202,10 @@ export default function DesktopRightSidebar() {
                                 >
                                     <Text style={[
                                         styles.followBtnText, 
-                                        isFollowing 
+                                        isFollowing || isRequested
                                             ? { color: colors.text }
                                             : { color: 'white' }
-                                    ]}>{isFollowing ? 'Following' : 'Follow'}</Text>
+                                    ]}>{isFollowing ? 'Following' : isRequested ? 'Requested' : 'Follow'}</Text>
                                 </TouchableOpacity>
                             )
                         })()}
@@ -165,11 +216,11 @@ export default function DesktopRightSidebar() {
             {/* Trending Hashtags Card with sub-scroll */}
             <View style={[styles.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
                 <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 16 }]}>Trending</Text>
-                <View style={{ maxHeight: 300 }}>
+                <View style={{ height: 400 }}>
                     <ScrollView 
                         showsVerticalScrollIndicator={true} 
                         nestedScrollEnabled={true}
-                        contentContainerStyle={{ paddingRight: 10 }}
+                        contentContainerStyle={{ paddingRight: 12, paddingBottom: 20 }}
                     >
                         {trendingHashtags.map((item, index) => (
                             <Pressable 
@@ -180,6 +231,10 @@ export default function DesktopRightSidebar() {
                                 ]}
                                 onHoverIn={() => setHoveredTag(index)}
                                 onHoverOut={() => setHoveredTag(null)}
+                                onPress={() => {
+                                    const tag = item.tag.startsWith('#') ? item.tag : `#${item.tag}`;
+                                    router.push({ pathname: '/search', params: { q: tag } } as any);
+                                }}
                             >
                                 <Text style={[styles.tagText, { color: colors.text }]}>#{item.tag.replace('#', '')}</Text>
                                 <Text style={[styles.tagCount, { color: colors.textSecondary }]}>{item.count} posts</Text>
@@ -206,8 +261,23 @@ const styles = StyleSheet.create({
     container: {
         width: 350,
         height: '100%',
-        paddingVertical: 32,
+        paddingVertical: 12,
         paddingHorizontal: 20,
+    },
+    filterBar: {
+        flexDirection: 'row',
+        marginTop: 8,
+    },
+    filterChip: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 14,
+        borderWidth: 1,
+        marginRight: 8,
+    },
+    filterChipText: {
+        fontSize: 12,
+        fontWeight: '700',
     },
     searchSection: {
         flexDirection: 'row',
