@@ -45,6 +45,10 @@ const messageSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Message'
   },
+  noteRepliedTo: {
+    type: Object, // Stores content and potentially music info
+    required: false
+  },
   createdAt: {
     type: Date,
     default: Date.now

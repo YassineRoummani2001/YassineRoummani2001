@@ -269,6 +269,9 @@ export default function SearchScreen() {
                                         <UserIcon size={20} color={colors.textSecondary} />
                                         <Text style={styles.sectionTitle}>Discover People</Text>
                                     </View>
+                                    <TouchableOpacity onPress={() => router.push('/users-list')}>
+                                        <Text style={{ color: colors.primary, fontWeight: '600' }}>Show more</Text>
+                                    </TouchableOpacity>
                                 </View>
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
                                     {suggestedUsers.map((u) => (

@@ -718,7 +718,7 @@ export default function MessageScreen() {
         const reactionKeys = Object.keys(reactions);
         const hasReactions = reactionKeys.length > 0;
 
-        // Reply Block Component
+        // Reply Block (Message to Message)
         const ReplyBlock = () => {
             if (!item.replyTo) return null;
             const rMsg = item.replyTo;
@@ -727,15 +727,49 @@ export default function MessageScreen() {
 
             return (
                 <View style={{
-                    backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                    backgroundColor: isMe ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)',
                     borderLeftWidth: 3,
-                    borderLeftColor: colors.primary,
+                    borderLeftColor: isMe ? 'rgba(255,255,255,0.5)' : colors.primary,
                     padding: 6,
-                    marginBottom: 6,
+                    margin: 4,
+                    marginBottom: 2,
                     borderRadius: 4
                 }}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary, marginBottom: 2 }}>{rSender}</Text>
-                    <Text numberOfLines={1} style={{ fontSize: 11, color: colors.textSecondary }}>{rContent}</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: isMe ? 'white' : colors.primary, marginBottom: 2 }}>{rSender}</Text>
+                    <Text numberOfLines={1} style={{ fontSize: 11, color: isMe ? 'rgba(255,255,255,0.8)' : colors.textSecondary }}>{rContent}</Text>
+                </View>
+            );
+        };
+
+        // Note Reply Block
+        const NoteReplyBlock = () => {
+            if (!item.noteRepliedTo) return null;
+            const note = item.noteRepliedTo;
+            const noteContent = note.content || (note.music ? `🎵 ${note.music.track}` : 'Note');
+
+            return (
+                <View style={{
+                    backgroundColor: isMe ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)',
+                    borderLeftWidth: 3,
+                    borderLeftColor: isMe ? '#FFF' : colors.primary,
+                    padding: 8,
+                    margin: 4,
+                    marginBottom: 6,
+                    borderRadius: 8,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 10,
+                    minWidth: 160, // Fixed min width to avoid wrapping 'Replying to note'
+                }}>
+                    <View style={{ flex: 1 }}>
+                        <Text numberOfLines={1} style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', color: isMe ? 'rgba(255,255,255,0.7)' : colors.primary, marginBottom: 4, letterSpacing: 0.5 }}>
+                           Replying to note
+                        </Text>
+                        <Text numberOfLines={1} style={{ fontSize: 13, color: isMe ? '#FFF' : colors.text, fontWeight: '600' }}>
+                           {noteContent}
+                        </Text>
+                    </View>
+                    <Ionicons name="chatbubble-ellipses" size={16} color={isMe ? 'rgba(255,255,255,0.5)' : colors.textSecondary} />
                 </View>
             );
         };
@@ -747,14 +781,10 @@ export default function MessageScreen() {
                 style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '75%', marginVertical: 6 }}
             >
                 {(item.marketitemId || item.postId) ? (() => {
-                    // ... (existing market item render)
-                    // Just wrap existing return in <> to include ReplyBlock?
-                    // Actually, shared posts usually don't have replies attached nicely inside the bubble in standard UI,
-                    // but we can put it above the card.
+                    // Shared Item (Post/Market)
                     const isMarket = !!item.marketitemId;
                     const sharedItem = item.marketitemId || item.postId;
 
-                    // Safely extract image URL
                     const rawImageUrl = isMarket
                         ? (sharedItem.images?.[0] || sharedItem.image)
                         : (sharedItem.uri || sharedItem.videoUri);
@@ -766,14 +796,13 @@ export default function MessageScreen() {
                     return (
                         <View>
                             <ReplyBlock />
+                            <NoteReplyBlock />
                             <TouchableOpacity
                                 activeOpacity={0.9}
                                 onLongPress={() => setSelectedMessage(item)}
                                 onPress={() => {
-                                    if (isMarket) {
-                                        router.push(`/marketplace/${sharedItem._id}`);
-                                    } else {
-                                        // Navigate to Media View
+                                    if (isMarket) router.push(`/marketplace/${sharedItem._id}`);
+                                    else {
                                         router.push({
                                             pathname: '/media-view',
                                             params: {
@@ -794,15 +823,12 @@ export default function MessageScreen() {
                                     width: 220
                                 }}
                             >
-                                {/* Post Header (Owner) */}
                                 {owner && (
                                     <View style={{ flexDirection: 'row', alignItems: 'center', padding: 8, gap: 8 }}>
                                         <AvatarImage uri={owner.avatar} name={owner.name} size={24} />
                                         <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '600', color: colors.text, flex: 1 }}>{owner.name || owner.username}</Text>
                                     </View>
                                 )}
-
-                                {/* Image */}
                                 {imageUrl ? (
                                     <ExpoImage source={{ uri: imageUrl }} style={{ width: '100%', height: 220 }} contentFit="cover" />
                                 ) : (
@@ -810,12 +836,8 @@ export default function MessageScreen() {
                                         <Ionicons name="image-outline" size={40} color={colors.textSecondary} />
                                     </View>
                                 )}
-
-                                {/* Footer */}
                                 <View style={{ padding: 12 }}>
-                                    <Text numberOfLines={2} style={{ fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 8 }}>
-                                        {title}
-                                    </Text>
+                                    <Text numberOfLines={2} style={{ fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 8 }}>{title}</Text>
                                     <View style={{ backgroundColor: isDark ? '#000' : '#FFF', paddingVertical: 6, borderRadius: 8, alignItems: 'center' }}>
                                         <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary }}>View Details</Text>
                                     </View>
@@ -826,22 +848,17 @@ export default function MessageScreen() {
                 })() : item.type === 'audio' ? (
                     <View>
                         <ReplyBlock />
-                        <VoiceMessage
-                            uri={item.content}
-                            itemsDuration={item.duration}
-                            isMe={isMe}
-                            colors={colors}
-                        />
+                        <NoteReplyBlock />
+                        <VoiceMessage uri={item.content} itemsDuration={item.duration} isMe={isMe} colors={colors} />
                     </View>
                 ) : item.type === 'image' ? (
                     <View>
                         <ReplyBlock />
+                        <NoteReplyBlock />
                         <View style={{ borderRadius: 18, overflow: 'hidden', backgroundColor: isDark ? '#262626' : '#F2F2F2' }}>
                             {(() => {
                                 const validUri = getCorrectUrl(item.content);
-                                if (validUri) {
-                                    return <ExpoImage source={{ uri: validUri }} style={{ width: 220, height: 280, borderRadius: 18 }} contentFit="cover" />;
-                                }
+                                if (validUri) return <ExpoImage source={{ uri: validUri }} style={{ width: 220, height: 280, borderRadius: 18 }} contentFit="cover" />;
                                 return (
                                     <View style={{ width: 220, height: 280, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? '#333' : '#DDD' }}>
                                         <Ionicons name="image-outline" size={40} color={colors.textSecondary} />
@@ -858,37 +875,14 @@ export default function MessageScreen() {
                         borderBottomRightRadius: isMe ? 4 : 20,
                         borderBottomLeftRadius: isMe ? 20 : 4,
                         backgroundColor: isMe ? colors.primary : (isDark ? '#262626' : '#F2F2F2'),
-                        minWidth: 100 // Ensure space for reply
+                        minWidth: 100
                     }}>
-                        {/* Reply Block Inside Bubble if Text */}
-                        {item.replyTo && (
-                            <View style={{
-                                backgroundColor: isMe ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)',
-                                borderLeftWidth: 3,
-                                borderLeftColor: isMe ? 'rgba(255,255,255,0.5)' : colors.primary,
-                                padding: 6,
-                                margin: 4,
-                                marginBottom: 2,
-                                borderRadius: 4
-                            }}>
-                                <Text style={{ fontSize: 11, fontWeight: '700', color: isMe ? 'white' : colors.primary, marginBottom: 2 }}>
-                                    {item.replyTo.sender?.name || 'User'}
-                                </Text>
-                                <Text numberOfLines={1} style={{ fontSize: 11, color: isMe ? 'rgba(255,255,255,0.8)' : colors.textSecondary }}>
-                                    {item.replyTo.type === 'text' ? item.replyTo.content : (item.replyTo.type === 'audio' ? 'Voice Message' : 'Media')}
-                                </Text>
-                            </View>
-                        )}
+                        <ReplyBlock />
+                        <NoteReplyBlock />
 
-                        {isMe ? (
-                            <View style={{ padding: 12, paddingTop: item.replyTo ? 4 : 12, backgroundColor: colors.primary }}>
-                                <Text style={{ fontSize: 16, color: '#FFF' }}>{item.content}</Text>
-                            </View>
-                        ) : (
-                            <View style={{ padding: 12, paddingTop: item.replyTo ? 4 : 12 }}>
-                                <Text style={{ fontSize: 16, color: colors.text }}>{item.content}</Text>
-                            </View>
-                        )}
+                        <View style={{ padding: 12, paddingTop: (item.replyTo || item.noteRepliedTo) ? 4 : 12 }}>
+                            <Text style={{ fontSize: 16, color: isMe ? '#FFF' : colors.text }}>{item.content}</Text>
+                        </View>
                     </View>
                 )}
 

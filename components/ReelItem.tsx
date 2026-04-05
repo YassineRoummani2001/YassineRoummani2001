@@ -31,6 +31,7 @@ import Toast from 'react-native-toast-message';
 import ReelOptionsModal from './ReelOptionsModal';
 import ShareToUsersModal from './ShareToUsersModal';
 import VideoProgressBar from './VideoProgressBar';
+import LikersModal from './LikersModal';
 
 // Helper to construct valid URIs
 const getValidUri = (uri?: string) => {
@@ -266,6 +267,7 @@ export default function ReelItem({ item, active, isMuted, width, height }: ReelI
     const [showComments, setShowComments] = useState(false);
     const [showOptions, setShowOptions] = useState(false);
     const [showShare, setShowShare] = useState(false);
+    const [showLikers, setShowLikers] = useState(false);
 
     const scaleAnim = useRef(new Animated.Value(1)).current;
     const saveScaleAnim = useRef(new Animated.Value(1)).current;
@@ -606,15 +608,30 @@ export default function ReelItem({ item, active, isMuted, width, height }: ReelI
                         <Text style={styles.caption} numberOfLines={2}>{item.caption || 'No caption provided'}</Text>
 
                         {/* Social Proof Section */}
-                        <View style={styles.socialProof}>
-                            <View style={styles.stackedAvatars}>
-                                <Image source={{ uri: 'https://i.pravatar.cc/100?u=1' }} style={[styles.stackedAvatar, { zIndex: 3 }]} />
-                                <Image source={{ uri: 'https://i.pravatar.cc/100?u=2' }} style={[styles.stackedAvatar, { left: -8, zIndex: 2 }]} />
-                            </View>
-                            <Text style={styles.socialProofText}>
-                                Liked by <Text style={{ fontWeight: '700', color: '#fff' }}>vibe_user</Text> and <Text style={{ fontWeight: '700', color: '#fff' }}>{likesCount.toLocaleString()} others</Text>
-                            </Text>
-                        </View>
+                        {likesCount > 0 && (
+                            <TouchableOpacity 
+                                style={styles.socialProof}
+                                activeOpacity={0.8}
+                                onPress={() => setShowLikers(true)}
+                            >
+                                <View style={styles.stackedAvatars}>
+                                    {(item.latestLikers && item.latestLikers.length > 0) ? (
+                                        item.latestLikers.map((liker: any, idx: number) => (
+                                            <Image 
+                                                key={liker._id} 
+                                                source={{ uri: getValidUri(liker.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(liker.name || 'U')}&background=random` }} 
+                                                style={[styles.stackedAvatar, { left: idx === 0 ? 0 : -8, zIndex: 10 - idx }]} 
+                                            />
+                                        ))
+                                    ) : (
+                                        <Image source={{ uri: 'https://ui-avatars.com/api/?name=User&background=random' }} style={[styles.stackedAvatar, { zIndex: 3 }]} />
+                                    )}
+                                </View>
+                                <Text style={styles.socialProofText}>
+                                    Liked by <Text style={{ fontWeight: '700', color: '#fff' }}>{likesCount} {likesCount === 1 ? 'person' : 'people'}</Text>
+                                </Text>
+                            </TouchableOpacity>
+                        )}
 
                         {item.music && (
                             <View style={styles.musicRow}>
@@ -660,6 +677,7 @@ export default function ReelItem({ item, active, isMuted, width, height }: ReelI
             <CommentsModal visible={showComments} onClose={() => setShowComments(false)} postId={item._id} />
             <ReelOptionsModal visible={showOptions} onClose={() => setShowOptions(false)} postLink={`${API_BASE_URL}/reel/${item._id}`} onSave={handleSaveReel} onReport={() => { }} />
             <ShareToUsersModal visible={showShare} onClose={() => setShowShare(false)} post={item} />
+            <LikersModal visible={showLikers} onClose={() => setShowLikers(false)} postId={item._id} token={user?.token} />
         </View>
     );
 }

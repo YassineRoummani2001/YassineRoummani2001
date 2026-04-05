@@ -152,14 +152,20 @@ export default function ChatScreen() {
             })));
         };
         const handleNewMessage = () => fetchData();
+        const handleNoteUpdate = (updatedNote: any) => {
+            setNotes(prev => prev.map(n => n._id === updatedNote._id ? updatedNote : n));
+            if (selectedNote?._id === updatedNote._id) setSelectedNote(updatedNote);
+        };
 
         socket.on('user:status', handleStatus);
         socket.on('message:new', handleNewMessage);
+        socket.on('note:update', handleNoteUpdate);
         return () => {
             socket.off('user:status', handleStatus);
             socket.off('message:new', handleNewMessage);
+            socket.off('note:update', handleNoteUpdate);
         };
-    }, [socket, fetchData]);
+    }, [socket, fetchData, selectedNote?._id]);
 
     // Filter Logic
     const filteredChats = chats.filter(c => {
@@ -296,16 +302,15 @@ export default function ChatScreen() {
                                         });
 
                                         return (
-                                            <TouchableOpacity
-                                                onPress={() => {
-                                                    if (isMe) router.push('/notes/create');
-                                                    else if (note) setSelectedNote(note);
-                                                    else router.push(`/message/${item._id}`);
-                                                }}
-                                                style={{ alignItems: 'center', width: 72 }}
-                                                activeOpacity={0.85}
-                                            >
-                                                <View style={{ position: 'relative', marginBottom: 6 }}>
+                                            <View style={{ alignItems: 'center', width: 72 }}>
+                                                <TouchableOpacity
+                                                    onPress={() => {
+                                                        if (note) setSelectedNote(note);
+                                                        else if (!isMe) router.push(`/message/${item._id}`);
+                                                    }}
+                                                    activeOpacity={0.85}
+                                                    style={{ position: 'relative', marginBottom: 6 }}
+                                                >
                                                     <UserNoteBubble note={note} isDark={isDark} />
                                                     <Image
                                                         source={{
@@ -317,16 +322,38 @@ export default function ChatScreen() {
                                                             borderColor: note ? (isDark ? '#444' : '#555') : 'transparent',
                                                         }}
                                                     />
-                                                    {isMe ? (
-                                                        <View style={styles.plusBadge}><View style={styles.plusInner}><Ionicons name="add" size={14} color={colors.text} /></View></View>
-                                                    ) : (
-                                                        item.isOnline && <View style={[styles.onlineBadge, { borderColor: colors.background }]} />
+                                                    {isMe && !note && (
+                                                        <TouchableOpacity 
+                                                            onPress={(e) => {
+                                                                e.stopPropagation();
+                                                                router.push('/notes/create');
+                                                            }}
+                                                            style={styles.plusBadge}
+                                                        >
+                                                            <View style={styles.plusInner}>
+                                                                <Ionicons name="add" size={14} color={colors.text} />
+                                                            </View>
+                                                        </TouchableOpacity>
                                                     )}
-                                                </View>
+                                                    {isMe && note && (
+                                                        <TouchableOpacity 
+                                                            onPress={(e) => {
+                                                                e.stopPropagation();
+                                                                router.push('/notes/create');
+                                                            }}
+                                                            style={styles.plusBadge}
+                                                        >
+                                                            <View style={styles.plusInner}>
+                                                                <Ionicons name="add" size={14} color={colors.text} />
+                                                            </View>
+                                                        </TouchableOpacity>
+                                                    )}
+                                                    {!isMe && item.isOnline && <View style={[styles.onlineBadge, { borderColor: colors.background }]} />}
+                                                </TouchableOpacity>
                                                 <Text numberOfLines={1} style={{ fontSize: 11, marginTop: 4, color: isDark ? '#fff' : '#444', fontWeight: '500' }}>
                                                     {isMe ? 'Your note' : item.name?.split(' ')[0] || 'User'}
                                                 </Text>
-                                            </TouchableOpacity>
+                                            </View>
                                         );
                                     }}
                                 />
@@ -388,16 +415,72 @@ export default function ChatScreen() {
             <NoteViewer
                 visible={!!selectedNote}
                 note={selectedNote}
+                currentUser={user}
                 onClose={() => setSelectedNote(null)}
-                onReply={(text) => {
+                onReply={async (text) => {
                     if (selectedNote) {
-                        const userId = typeof selectedNote.user === 'object' ? selectedNote.user._id : selectedNote.user;
-                        setSelectedNote(null);
-                        // Redirect to chat with the pre-filled message (passing as param for now, the message screen should handle it)
-                        router.push({
-                            pathname: `/message/${userId}`,
-                            params: { initialMessage: text }
-                        } as any);
+                        const targetUser = typeof selectedNote.user === 'object' ? selectedNote.user : { _id: selectedNote.user };
+                        const userId = targetUser._id;
+                        
+                        try {
+                            // 1. Create or get chat
+                            const chatRes = await fetch(`${API_BASE_URL}/api/chats`, {
+                                method: 'POST',
+                                headers: { 
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${user.token}` 
+                                },
+                                body: JSON.stringify({ userId })
+                            });
+                            
+                            if (chatRes.ok) {
+                                const chatData = await chatRes.json();
+                                // 2. Send message
+                                const formData = new FormData();
+                                formData.append('content', text);
+                                formData.append('type', 'text');
+                                
+                                // Include note details
+                                const noteInfo: any = {};
+                                if (selectedNote.content) noteInfo.content = selectedNote.content;
+                                if (selectedNote.music) noteInfo.music = selectedNote.music;
+                                
+                                if (Object.keys(noteInfo).length > 0) {
+                                    formData.append('noteRepliedTo', JSON.stringify(noteInfo));
+                                }
+
+                                await fetch(`${API_BASE_URL}/api/chats/${chatData._id}/messages`, {
+                                    method: 'POST',
+                                    headers: { 'Authorization': `Bearer ${user.token}` },
+                                    body: formData
+                                });
+
+                                setSelectedNote(null);
+                                router.push(`/message/${userId}`);
+                            }
+                        } catch (error) {
+                            console.error('Error replying to note:', error);
+                        }
+                    }
+                }}
+                onLike={async () => {
+                    if (selectedNote) {
+                        try {
+                            const res = await ApiClient.post<any>(`/api/notes/${selectedNote._id}/like`, {}, {
+                                'Authorization': `Bearer ${user.token}`
+                            });
+                            if (res.success) {
+                                // Fetch all notes and update the selected one
+                                const notesRes = await ApiClient.get<any>('/api/notes', { 'Authorization': `Bearer ${user.token}` });
+                                if (notesRes.success && notesRes.data) {
+                                    setNotes(notesRes.data);
+                                    const updated = notesRes.data.find((n: any) => n._id === selectedNote._id);
+                                    if (updated) setSelectedNote(updated);
+                                }
+                            }
+                        } catch (error) {
+                            console.error('Error liking note:', error);
+                        }
                     }
                 }}
             />
@@ -454,10 +537,24 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     plusBadge: {
-        position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 3,
+        position: 'absolute', 
+        bottom: 0, 
+        right: 0, 
+        width: 28, 
+        height: 28, 
+        borderRadius: 14, 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        borderWidth: 3,
+        zIndex: 10,
     },
     plusInner: {
-        width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+        width: 22, 
+        height: 22, 
+        borderRadius: 11, 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        backgroundColor: '#007AFF', // Standard Blue for "Add"
     },
     onlineBadge: {
         position: 'absolute', bottom: 2, right: 2, width: 14, height: 14, borderRadius: 7, backgroundColor: '#10B981', borderWidth: 2,

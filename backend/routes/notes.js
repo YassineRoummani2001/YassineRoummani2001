@@ -43,9 +43,35 @@ router.get('/', protect, async (req, res) => {
         
         const notes = await Note.find({
             user: { $in: [...following, req.user._id] }
-        }).populate('user', 'name avatar username');
+        })
+        .populate('user', 'name avatar username')
+        .populate('likes.user', 'name avatar username');
         
         res.json(notes);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Toggle Like Note
+router.post('/:id/like', protect, async (req, res) => {
+    try {
+        const note = await Note.findById(req.params.id);
+        if (!note) return res.status(404).json({ message: "Note not found" });
+
+        const likeIndex = note.likes.findIndex(l => l.user.toString() === req.user._id.toString());
+        if (likeIndex > -1) {
+            note.likes.splice(likeIndex, 1);
+        } else {
+            note.likes.push({ user: req.user._id });
+        }
+
+        const savedNote = await note.save();
+        const populatedNote = await Note.findById(savedNote._id)
+            .populate('user', 'name avatar username')
+            .populate('likes.user', 'name avatar username');
+
+        res.json(populatedNote);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

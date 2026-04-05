@@ -214,6 +214,7 @@ router.post('/:chatId/messages', protect, upload.single('file'), async (req, res
             duration: duration,
             postId: req.body.postId,
             marketitemId: req.body.marketitemId,
+            noteRepliedTo: req.body.noteRepliedTo ? JSON.parse(req.body.noteRepliedTo) : null,
             replyTo: req.body.replyTo,
             expireAt: expireAt
         });

@@ -1,21 +1,21 @@
+import { SkeletonPost, SkeletonStory } from '@/components/Skeletons';
 import { API_BASE_URL } from '@/constants/Config';
 import { useMessages } from '@/context/MessagesContext';
 import { useNotifications } from '@/context/NotificationContext';
 import { useThemeContext } from '@/context/ThemeContext';
-import { lazyLoad, MinimalLoader } from '@/utils/lazyLoad';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useIsFocused } from '@react-navigation/native';
+import { lazyLoad } from '@/utils/lazyLoad';
 import { Ionicons } from '@expo/vector-icons';
+import { useIsFocused } from '@react-navigation/native';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Platform, RefreshControl, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { FlatList, Platform, RefreshControl, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SkeletonPost, SkeletonStory } from '@/components/Skeletons';
 
 
 // Lazy load heavy components
 const FeedPost = lazyLoad(() => import('@/components/FeedPost'), <SkeletonPost />);
-const StoryList = lazyLoad(() => import('@/components/StoryList'), 
+const StoryList = lazyLoad(() => import('@/components/StoryList'),
   <View style={{ flexDirection: 'row', padding: 16, backgroundColor: 'transparent' }}>
     {[1, 2, 3, 4, 5].map(i => <SkeletonStory key={i} />)}
   </View>
@@ -133,19 +133,19 @@ export default function HomeScreen() {
     const isVideo = item.type === 'reel' || item.type === 'video' || (item.uri && /\.(mp4|mov|m4v|webm)$/i.test(item.uri));
     return (
       <View style={isDesktop ? { width: '100%', maxWidth: 480, alignSelf: 'center', marginBottom: 20 } : undefined}>
-          <FeedPost
-            onDelete={handlePostDelete}
-            active={isFocused && viewableItems.includes(item._id)}
-            post={{
-              ...item,
-              id: item._id, // Ensure ID consistency
-              isVideo: !!isVideo,
-              videoUri: isVideo ? item.uri : undefined,
-              image: !isVideo ? item.uri : item.coverImage,
-              likes: item.likes || [],
-              comments: item.comments || [],
-            }}
-          />
+        <FeedPost
+          onDelete={handlePostDelete}
+          active={isFocused && viewableItems.includes(item._id)}
+          post={{
+            ...item,
+            id: item._id, // Ensure ID consistency
+            isVideo: !!isVideo,
+            videoUri: isVideo ? item.uri : undefined,
+            image: !isVideo ? item.uri : item.coverImage,
+            likes: item.likes || [],
+            comments: item.comments || [],
+          }}
+        />
       </View>
     );
   }, [viewableItems, handlePostDelete, isFocused, isDesktop]);
@@ -208,12 +208,12 @@ export default function HomeScreen() {
   }));
 
   const badgeAnimatedStyle = useAnimatedStyle(() => ({
-     transform: [{ scale: badgeScale.value }]
+    transform: [{ scale: badgeScale.value }]
   }));
 
   return (
     <View style={[
-      styles.container, 
+      styles.container,
       { paddingTop: isDesktop ? 0 : insets.top, backgroundColor: colors.background }
     ]}>
       {/* Header */}

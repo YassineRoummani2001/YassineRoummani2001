@@ -15,12 +15,20 @@ router.get('/', async (req, res) => {
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
 
-        const posts = await Post.find()
-            .populate('user', 'name handle avatar') // Populate user details
-            .populate('comments.user', 'name handle avatar') // Populate comment authors
-            .sort({ createdAt: -1 }) // Newest first
+        const postsRaw = await Post.find()
+            .populate('user', 'name handle avatar')
+            .populate('comments.user', 'name handle avatar')
+            .sort({ createdAt: -1 })
             .skip(skip)
-            .limit(limit);
+            .limit(limit)
+            .lean();
+
+        // Attach latest likers manually to avoid breaking likes count
+        const posts = await Promise.all(postsRaw.map(async (p) => {
+            const latestLikers = await User.find({ _id: { $in: p.likes.slice(-3) } })
+                .select('name avatar handle');
+            return { ...p, latestLikers: latestLikers.reverse() };
+        }));
 
         res.json(posts);
     } catch (err) {
@@ -33,10 +41,17 @@ router.get('/', async (req, res) => {
 // @access  Public
 router.get('/reels', async (req, res) => {
     try {
-        const reels = await Post.find({ type: { $in: ['reel', 'video'] } })
+        const reelsRaw = await Post.find({ type: { $in: ['reel', 'video'] } })
             .populate('user', 'name handle avatar')
             .populate('comments.user', 'name handle avatar')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .lean();
+
+        const reels = await Promise.all(reelsRaw.map(async (r) => {
+             const latestLikers = await User.find({ _id: { $in: r.likes.slice(-3) } })
+                .select('name avatar handle');
+            return { ...r, latestLikers: latestLikers.reverse() };
+        }));
 
         res.json(reels);
     } catch (err) {
@@ -473,6 +488,23 @@ router.put('/:id/view', async (req, res) => {
             { new: true }
         );
         res.json({ views: post.views });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// @desc    Get users who liked a post
+// @route   GET /api/posts/:id/likers
+// @access  Public
+router.get('/:id/likers', async (req, res) => {
+    try {
+        const post = await Post.findById(req.params.id)
+            .populate('likes', 'name avatar handle');
+            
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+        res.json(post.likes || []);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

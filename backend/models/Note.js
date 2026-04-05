@@ -9,6 +9,10 @@ const noteSchema = new mongoose.Schema({
     cover: String,
     previewUrl: String
   },
+  likes: [{ 
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    createdAt: { type: Date, default: Date.now }
+  }],
   createdAt: { type: Date, default: Date.now, expires: '24h' } // Auto delete after 24h
 });
 
