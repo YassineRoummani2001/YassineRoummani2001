@@ -20,6 +20,7 @@ import { useThemeContext } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { formatDistanceToNow } from 'date-fns';
 import { useRouter } from 'expo-router';
+import { ActivityIndicator } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -129,7 +130,18 @@ export default function NoteViewer({ visible, note, currentUser, onClose, onRepl
                                 <View style={styles.header}>
                                     <View style={styles.userInfoRow}>
                                         <Text style={[styles.name, { color: colors.text }]}>{user.name}</Text>
-                                        <Text style={[styles.timeLabel, { color: colors.textSecondary }]}>• 1h</Text>
+                                        <Text style={[styles.timeLabel, { color: colors.textSecondary }]}>
+                                            • {note.createdAt ? formatDistanceToNow(new Date(note.createdAt), { addSuffix: false })
+                                                .replace('about ', '')
+                                                .replace(' minutes', 'm')
+                                                .replace(' minute', 'm')
+                                                .replace(' hours', 'h')
+                                                .replace(' hour', 'h')
+                                                .replace(' days', 'd')
+                                                .replace(' day', 'd')
+                                                .replace(' less than a minute', 'now') 
+                                                : 'now'}
+                                        </Text>
                                     </View>
                                     <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: isDark ? '#333' : '#F3F4F6' }]}>
                                         <X size={20} color={colors.text} />
@@ -230,7 +242,7 @@ export default function NoteViewer({ visible, note, currentUser, onClose, onRepl
                                             
                                             <ScrollView 
                                                 style={{ maxHeight: 200, marginTop: 12 }} 
-                                                showsVerticalScrollIndicator={false}
+                                                showsVerticalScrollIndicator={true}
                                                 nestedScrollEnabled
                                             >
                                                 <View style={styles.likesList}>

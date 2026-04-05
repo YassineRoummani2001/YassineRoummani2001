@@ -265,12 +265,20 @@ export default function MarketItemDetailScreen() {
                             showsHorizontalScrollIndicator={false}
                             keyExtractor={(_, index) => index.toString()}
                             onScroll={(e) => setCurrentImageIndex(Math.round(e.nativeEvent.contentOffset.x / width))}
+                            scrollEventThrottle={16}
                             renderItem={({ item: img }) => (
                                 <Image source={{ uri: getCorrectUrl(img) }} style={{ width, height: width * 1.25 }} resizeMode="cover" />
                             )}
                         />
+                        {/* Mobile Indicators */}
+                        <View style={[styles.galleryIndicators, { bottom: 20 }]}>
+                            {galleryItems.length > 1 && galleryItems.map((_: any, i: number) => (
+                                <View key={i} style={[styles.dot, i === currentImageIndex && styles.activeDot]} />
+                            ))}
+                        </View>
+                        
                         <View style={styles.mobileHeader}>
-                            <TouchableOpacity style={styles.glassBtn} onPress={() => router.push('/(tabs)/marketplace' as any)}><ArrowLeft size={24} color="#fff" /></TouchableOpacity>
+                            <TouchableOpacity style={styles.glassBtn} onPress={() => router.back()}><ArrowLeft size={24} color="#fff" /></TouchableOpacity>
                             <View style={{ flexDirection: 'row', gap: 12 }}>
                                 <TouchableOpacity style={styles.glassBtn}><Share2 size={20} color="#fff" /></TouchableOpacity>
                                 <TouchableOpacity style={styles.glassBtn} onPress={handleSave}><Heart size={20} color={isSaved ? "#FF3B30" : "#fff"} fill={isSaved ? "#FF3B30" : "transparent"} /></TouchableOpacity>
