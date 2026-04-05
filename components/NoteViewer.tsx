@@ -14,7 +14,8 @@ import {
     TouchableWithoutFeedback,
     Keyboard,
     ScrollView,
-    Animated
+    Animated,
+    useWindowDimensions
 } from 'react-native';
 import { useThemeContext } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,7 +23,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator } from 'react-native';
 
-const { width, height } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window') || { width: 0, height: 0 };
 
 interface NoteViewerProps {
     visible: boolean;
@@ -36,7 +37,7 @@ interface NoteViewerProps {
 export default function NoteViewer({ visible, note, currentUser, onClose, onReply, onLike }: NoteViewerProps) {
     const router = useRouter();
     const { colors, isDark } = useThemeContext();
-    const { width: windowWidth, height: windowHeight } = Dimensions.get('window');
+    const { width: windowWidth, height: windowHeight } = useWindowDimensions();
     const isDesktop = Platform.OS === 'web' && windowWidth > 768;
     const [replyText, setReplyText] = useState('');
     const emojisPool = [

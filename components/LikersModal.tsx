@@ -10,7 +10,8 @@ import {
     ActivityIndicator,
     TouchableWithoutFeedback,
     Platform,
-    Dimensions
+    Dimensions,
+    useWindowDimensions
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { X } from 'lucide-react-native';
@@ -46,7 +47,7 @@ export default function LikersModal({ visible, onClose, postId, token }: LikersM
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const { width: windowWidth } = Dimensions.get('window');
+    const { width: windowWidth } = useWindowDimensions();
     const isDesktop = Platform.OS === 'web' && windowWidth > 900;
 
     useEffect(() => {

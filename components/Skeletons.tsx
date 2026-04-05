@@ -2,7 +2,7 @@ import { useThemeContext } from '@/context/ThemeContext';
 import React, { useEffect, useRef } from 'react';
 import { Animated, Dimensions, StyleSheet, View, Platform, ScrollView } from 'react-native';
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get('window') || { width: 0 };
 const GRID_ITEM_SIZE = width / 3 - 2;
 
 const AnimatedView = ({ style }: { style: any }) => {

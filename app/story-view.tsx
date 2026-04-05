@@ -10,7 +10,7 @@ import { Alert, Animated, Dimensions, Image, KeyboardAvoidingView, Modal, Platfo
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import VibeConfirmModal from '@/components/VibeConfirmModal';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window') || { width: 0, height: 0 };
 const isDesktop = SCREEN_WIDTH > 768;
 
 export default function StoryViewScreen() {

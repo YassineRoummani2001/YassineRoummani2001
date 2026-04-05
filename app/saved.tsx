@@ -1,9 +1,8 @@
 import { API_BASE_URL } from '@/constants/Config';
 import { useUser } from '@/context/UserContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-
-import { ArrowLeft, Clapperboard, Grid3X3, Layers } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
+import { ArrowLeft, Clapperboard, Grid3X3, Layers, Plus, Search } from 'lucide-react-native';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import {
     ActivityIndicator,
     FlatList,
@@ -13,24 +12,34 @@ import {
     Text,
     TouchableOpacity,
     useWindowDimensions,
-    View
+    View,
+    Platform,
+    StatusBar,
+    ScrollView
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
+import Animated, { FadeInUp, FadeInDown, Layout } from 'react-native-reanimated';
 
 import { useThemeContext } from '@/context/ThemeContext';
 
 export default function SavedScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
+    const insets = useSafeAreaInsets();
     const { user } = (useUser() || {}) as any;
-    const { width } = useWindowDimensions();
-    const { colors } = useThemeContext();
+    const { width: windowWidth } = useWindowDimensions();
+    const isDesktop = Platform.OS === 'web' && windowWidth > 768;
+    // Central content area width matches WebLayout.tsx logic
+    const contentWidth = isDesktop ? Math.min(windowWidth - 320, 650) : windowWidth;
+    const { colors, isDark } = useThemeContext();
 
     // 0: All (Posts), 1: Reels
     const [activeTab, setActiveTab] = useState(params.tab === 'reels' ? 1 : 0);
     const [savedPosts, setSavedPosts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -66,103 +75,155 @@ export default function SavedScreen() {
         }
     };
 
-    const getFilteredPosts = useCallback(() => {
-        if (activeTab === 0) return savedPosts;
-        return savedPosts.filter(p => p.type === 'reel' || p.type === 'video');
-    }, [activeTab, savedPosts]);
+    const getFilteredPosts = useMemo(() => {
+        let filtered = savedPosts;
+        if (activeTab === 1) {
+            filtered = savedPosts.filter(p => p.type === 'reel' || p.type === 'video');
+        }
+        
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            filtered = filtered.filter(p => p.caption?.toLowerCase().includes(q));
+        }
+        
+        return filtered;
+    }, [activeTab, savedPosts, searchQuery]);
 
-    const renderGridItem = useCallback(({ item }: { item: any }) => {
+    const renderGridItem = useCallback(({ item, index }: { item: any, index: number }) => {
         const isVideo = item.type === 'reel' || item.type === 'video' || item.uri?.endsWith('.mp4');
-        const itemSize = width / 3;
+        const gap = 1;
+        const columns = activeTab === 0 ? 4 : 3;
+        const itemSize = (contentWidth / columns) - (gap * 2);
 
         return (
-            <TouchableOpacity
-                style={[styles.gridItem, { width: itemSize, height: itemSize * 1.3, backgroundColor: colors.background }]}
-                activeOpacity={0.8}
-                onPress={() => router.push({
-                    pathname: '/media-view',
-                    params: {
-                        type: isVideo ? 'video' : 'image',
-                        postId: item._id
-                    }
-                })}
+            <Animated.View 
+                entering={FadeInUp.delay(index * 50).springify().damping(12)}
+                layout={Layout.springify()}
             >
-                {isVideo ? (
-                    <View style={{ flex: 1, backgroundColor: 'black' }}>
-                        {/* Simple image thumbnail for video to improve grid performance instead of heavy player */}
-                        <Image
-                            source={{ uri: item.image || item.uri }} /* Fallback to uri if image not present */
-                            style={styles.gridImage}
-                            resizeMode="cover"
-                        />
+                <TouchableOpacity
+                    style={[
+                        styles.gridItem, 
+                        { 
+                            width: itemSize, 
+                            height: activeTab === 0 ? itemSize : itemSize * 1.4, 
+                            margin: gap 
+                        }
+                    ]}
+                    activeOpacity={0.9}
+                    onPress={() => router.push({
+                        pathname: '/media-view',
+                        params: {
+                            type: isVideo ? 'video' : 'image',
+                            postId: item._id,
+                            uri: item.uri || item.image
+                        }
+                    })}
+                >
+                    <Image
+                        source={{ uri: item.image || item.uri }}
+                        style={styles.gridImage}
+                        resizeMode="cover"
+                    />
+                    {isVideo && (
                         <View style={styles.reelIconOverlay}>
-                            <Clapperboard size={16} color="white" />
+                            <Clapperboard size={14} color="white" fill="rgba(255,255,255,0.2)" />
                         </View>
+                    )}
+                    <View style={styles.itemOverlay}>
+                         <View style={styles.itemShadow} />
                     </View>
-                ) : (
-                    <Image source={{ uri: item.uri || item.image }} style={styles.gridImage} resizeMode="cover" />
-                )}
-            </TouchableOpacity>
+                </TouchableOpacity>
+            </Animated.View>
         );
-    }, [width, router, colors]);
+    }, [contentWidth, activeTab, router, colors]);
 
     const ListHeader = () => (
-        <View style={{ backgroundColor: colors.background }}>
-            {/* Header Title Section */}
-            <View style={styles.titleSection}>
-                <Text style={[styles.pageTitle, { color: colors.text }]}>Saved</Text>
-                <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>
-                    {savedPosts.length} {savedPosts.length === 1 ? 'post' : 'posts'} saved
-                </Text>
+        <View style={{ marginTop: 10 }}>
+            {/* My Collections Section preview */}
+            <View style={styles.collectionsHeader}>
+                <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>Collections</Text>
+                <TouchableOpacity style={styles.newColBtn}>
+                   <Plus size={16} color={colors.primary} />
+                   <Text style={[styles.newColText, { color: colors.primary }]}>New</Text>
+                </TouchableOpacity>
             </View>
+            
+            <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                contentContainerStyle={styles.collectionsScroll}
+            >
+                {/* Default collection */}
+                <TouchableOpacity style={styles.collectionCard}>
+                    <View style={[styles.collectionPreview, { backgroundColor: isDark ? '#222' : '#f0f0f0' }]}>
+                        {savedPosts.slice(0, 4).map((p, i) => (
+                            <Image 
+                                key={i}
+                                source={{ uri: p.image || p.uri }} 
+                                style={[styles.previewThumb, { width: 34, height: 34 }]} 
+                            />
+                        ))}
+                        {savedPosts.length === 0 && <Layers size={24} color={colors.textSecondary} />}
+                    </View>
+                    <Text style={[styles.collName, { color: colors.text }]}>All Items</Text>
+                    <Text style={[styles.collCount, { color: colors.textSecondary }]}>{savedPosts.length} items</Text>
+                </TouchableOpacity>
+                
+                {/* Visual placeholder for more collections */}
+                {['Design', 'Music', 'Ideas'].map((name, i) => (
+                    <TouchableOpacity key={i} style={styles.collectionCard} disabled>
+                        <View style={[styles.collectionPreview, { backgroundColor: isDark ? '#1a1a1a' : '#f8f8f8', opacity: 0.5 }]}>
+                             <Layers size={20} color={colors.textSecondary} />
+                        </View>
+                        <Text style={[styles.collName, { color: colors.textSecondary }]}>{name}</Text>
+                        <Text style={[styles.collCount, { color: colors.textSecondary }]}>0 items</Text>
+                    </TouchableOpacity>
+                ))}
+            </ScrollView>
 
-            {/* Custom Tabs */}
-            <View style={[styles.tabContainer, { backgroundColor: colors.background }]}>
-                <View style={[styles.tabRow, { borderBottomColor: colors.border }]}>
-                    <TouchableOpacity
-                        style={[styles.tabButton, activeTab === 0 && styles.tabButtonActive]}
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+            {/* Tab Navigation */}
+            <View style={styles.tabContainer}>
+                <View style={styles.tabPillContainer}>
+                    <TouchableOpacity 
+                        style={[styles.tabPill, activeTab === 0 && { backgroundColor: isDark ? '#fff' : '#000' }]}
                         onPress={() => setActiveTab(0)}
                     >
-                        <Grid3X3 color={activeTab === 0 ? colors.text : colors.textSecondary} size={22} />
-                        <Text style={[styles.tabText, { color: activeTab === 0 ? colors.text : colors.textSecondary }]}>All Posts</Text>
+                        <Grid3X3 size={18} color={activeTab === 0 ? (isDark ? '#000' : '#fff') : colors.textSecondary} />
+                        <Text style={[styles.tabPillText, { color: activeTab === 0 ? (isDark ? '#000' : '#fff') : colors.textSecondary }]}>Posts</Text>
                     </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.tabButton, activeTab === 1 && styles.tabButtonActive]}
+                    <TouchableOpacity 
+                        style={[styles.tabPill, activeTab === 1 && { backgroundColor: isDark ? '#fff' : '#000' }]}
                         onPress={() => setActiveTab(1)}
                     >
-                        <Clapperboard color={activeTab === 1 ? colors.text : colors.textSecondary} size={22} />
-                        <Text style={[styles.tabText, { color: activeTab === 1 ? colors.text : colors.textSecondary }]}>Reels</Text>
+                        <Clapperboard size={18} color={activeTab === 1 ? (isDark ? '#000' : '#fff') : colors.textSecondary} />
+                        <Text style={[styles.tabPillText, { color: activeTab === 1 ? (isDark ? '#000' : '#fff') : colors.textSecondary }]}>Reels</Text>
                     </TouchableOpacity>
-                </View>
-                {/* Animated Indicator Line */}
-                <View style={styles.indicatorTrack}>
-                    <View style={[
-                        styles.indicatorLine,
-                        {
-                            width: '50%',
-                            backgroundColor: colors.text,
-                            transform: [{ translateX: activeTab === 0 ? 0 : width / 2 }] // Simple translation
-                        }
-                    ]} />
                 </View>
             </View>
         </View>
     );
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-            {/* Navigation Header */}
-            <View style={[styles.navHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <ArrowLeft size={24} color={colors.text} />
-                </TouchableOpacity>
-                <Text style={[styles.navHeaderTitle, { color: colors.text }]}>Collections</Text>
-                <TouchableOpacity style={styles.backButton}>
-                    {/* Placeholder for future "New Collection" or similar */}
-                    <Layers size={24} color="transparent" />
-                </TouchableOpacity>
-            </View>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+            <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+            
+            {/* Premium Sticky Header */}
+            <BlurView intensity={80} tint={isDark ? 'dark' : 'light'} style={[styles.stickyHeader, { paddingTop: insets.top }]}>
+                <View style={styles.headerContent}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
+                        <ArrowLeft size={24} color={colors.text} />
+                    </TouchableOpacity>
+                    <View style={styles.headerTitleWrap}>
+                        <Text style={[styles.navHeaderTitle, { color: colors.text }]}>Saved Content</Text>
+                        <Text style={[styles.navHeaderSub, { color: colors.textSecondary }]}>{getFilteredPosts.length} matches</Text>
+                    </View>
+                    <TouchableOpacity style={styles.iconBtn}>
+                        <Search size={22} color={colors.text} />
+                    </TouchableOpacity>
+                </View>
+            </BlurView>
 
             {loading ? (
                 <View style={styles.loadingContainer}>
@@ -170,37 +231,45 @@ export default function SavedScreen() {
                 </View>
             ) : (
                 <FlatList
-                    data={getFilteredPosts()}
+                    key={`grid-${activeTab === 0 ? 4 : 3}`}
+                    data={getFilteredPosts}
                     keyExtractor={(item, index) => item._id || index.toString()}
                     renderItem={renderGridItem}
-                    numColumns={3}
+                    numColumns={activeTab === 0 ? 4 : 3}
                     ListHeaderComponent={ListHeader}
                     ListEmptyComponent={
-                        <View style={styles.emptyState}>
-                            <View style={[styles.emptyIconContainer, { backgroundColor: colors.gray }]}>
-                                {activeTab === 0 ? <Grid3X3 size={32} color={colors.textSecondary} /> : <Clapperboard size={32} color={colors.textSecondary} />}
+                        <Animated.View entering={FadeInDown} style={styles.emptyState}>
+                            <View style={[styles.emptyIconContainer, { backgroundColor: colors.gray + '20' }]}>
+                                {activeTab === 0 ? <Grid3X3 size={40} color={colors.primary} /> : <Clapperboard size={40} color={colors.primary} />}
                             </View>
-                            <Text style={[styles.emptyStateText, { color: colors.text }]}>
-                                {activeTab === 0 ? 'No saved posts yet' : 'No saved reels yet'}
+                            <Text style={[styles.emptyStateTitle, { color: colors.text }]}>
+                                No {activeTab === 0 ? 'posts' : 'reels'} yet
                             </Text>
-                            <Text style={[styles.emptySubText, { color: colors.textSecondary }]}>
-                                {activeTab === 0 ? 'When you save posts, they will appear here.' : 'Videos and Reels you save will appear here.'}
+                            <Text style={[styles.emptyStateSub, { color: colors.textSecondary }]}>
+                                {activeTab === 0 ? 'Save your favorite posts to see them here!' : 'Browse reels and save the ones you love.'}
                             </Text>
-                        </View>
+                            <TouchableOpacity 
+                                style={[styles.exploreBtn, { backgroundColor: colors.primary }]}
+                                onPress={() => router.push('/reels')}
+                            >
+                                <Text style={styles.exploreText}>Explore Content</Text>
+                            </TouchableOpacity>
+                        </Animated.View>
                     }
-                    contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}
+                    contentContainerStyle={{ paddingBottom: 100, paddingTop: insets.top + 80 }}
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
                             onRefresh={onRefresh}
                             colors={[colors.primary]}
                             tintColor={colors.primary}
+                            progressViewOffset={insets.top + 80}
                         />
                     }
                     showsVerticalScrollIndicator={false}
                 />
             )}
-        </SafeAreaView>
+        </View>
     );
 }
 
@@ -208,85 +277,158 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    navHeader: {
+    stickyHeader: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 100,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: 'rgba(128,128,128,0.2)',
+    },
+    headerContent: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
+        paddingHorizontal: 12,
+        paddingBottom: 12,
+        paddingTop: 8,
     },
-    backButton: {
-        padding: 4,
+    headerTitleWrap: {
+        alignItems: 'center',
     },
     navHeaderTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    titleSection: {
-        paddingHorizontal: 20,
-        paddingTop: 24,
-        paddingBottom: 20,
-    },
-    pageTitle: {
-        fontSize: 30,
+        fontSize: 17,
         fontWeight: '800',
-        marginBottom: 4,
-        letterSpacing: -0.5,
+        letterSpacing: -0.3,
     },
-    pageSubtitle: {
-        fontSize: 14,
+    navHeaderSub: {
+        fontSize: 11,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+        opacity: 0.7,
+        marginTop: 1,
+    },
+    iconBtn: {
+        padding: 8,
+        borderRadius: 20,
+    },
+    collectionsHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'baseline',
+        paddingHorizontal: 20,
+        marginBottom: 12,
+    },
+    sectionLabel: {
+        fontSize: 13,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    newColBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    newColText: {
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    collectionsScroll: {
+        paddingHorizontal: 16,
+        paddingBottom: 24,
+        gap: 16,
+    },
+    collectionCard: {
+        alignItems: 'center',
+        width: 80,
+    },
+    collectionPreview: {
+        width: 80,
+        height: 80,
+        borderRadius: 24,
+        marginBottom: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        borderWidth: 1,
+        borderColor: 'rgba(128,128,128,0.1)',
+    },
+    previewThumb: {
+        margin: 1,
+        borderRadius: 4,
+    },
+    collName: {
+        fontSize: 13,
+        fontWeight: '700',
+        marginBottom: 1,
+    },
+    collCount: {
+        fontSize: 11,
         fontWeight: '500',
     },
+    divider: {
+        height: 1,
+        marginHorizontal: 20,
+        marginBottom: 20,
+        opacity: 0.3,
+    },
     tabContainer: {
-        // bg comes from theme
+        paddingHorizontal: 20,
+        marginBottom: 12,
     },
-    tabRow: {
+    tabPillContainer: {
         flexDirection: 'row',
-        borderBottomWidth: 1,
+        backgroundColor: 'rgba(128,128,128,0.1)',
+        padding: 4,
+        borderRadius: 16,
+        gap: 4,
     },
-    tabButton: {
+    tabPill: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 14,
+        paddingVertical: 10,
+        borderRadius: 12,
         gap: 8,
     },
-    tabButtonActive: {
-        // bg color optional
-    },
-    tabText: {
+    tabPillText: {
         fontSize: 14,
-        fontWeight: '600',
-    },
-    tabTextActive: {
-        // color comes from theme
-    },
-    indicatorTrack: {
-        width: '100%',
-        height: 2,
-        backgroundColor: 'transparent',
-        position: 'absolute',
-        bottom: 0,
-    },
-    indicatorLine: {
-        height: 2,
+        fontWeight: '700',
     },
     gridItem: {
-        padding: 1,
+        borderRadius: 4,
+        overflow: 'hidden',
+        position: 'relative',
     },
     gridImage: {
         width: '100%',
         height: '100%',
+        backgroundColor: '#111',
     },
     reelIconOverlay: {
         position: 'absolute',
         top: 8,
         right: 8,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        padding: 4,
-        borderRadius: 4,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        padding: 5,
+        borderRadius: 8,
+        zIndex: 5,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.15)',
+    },
+    itemOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        zIndex: 2,
+    },
+    itemShadow: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.03)',
     },
     loadingContainer: {
         flex: 1,
@@ -294,27 +436,45 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     emptyState: {
-        paddingTop: 80,
+        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: 40,
+        paddingTop: 60,
     },
     emptyIconContainer: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
+        width: 100,
+        height: 100,
+        borderRadius: 50,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 16,
+        marginBottom: 24,
     },
-    emptyStateText: {
-        fontSize: 18,
-        fontWeight: '600',
+    emptyStateTitle: {
+        fontSize: 22,
+        fontWeight: '800',
         marginBottom: 8,
-    },
-    emptySubText: {
-        fontSize: 14,
         textAlign: 'center',
-        lineHeight: 20,
+    },
+    emptyStateSub: {
+        fontSize: 15,
+        textAlign: 'center',
+        lineHeight: 22,
+        marginBottom: 32,
+    },
+    exploreBtn: {
+        paddingHorizontal: 32,
+        paddingVertical: 14,
+        borderRadius: 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 5,
+    },
+    exploreText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: '700',
     },
 });

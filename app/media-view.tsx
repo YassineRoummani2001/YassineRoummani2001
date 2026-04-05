@@ -1,4 +1,3 @@
-
 import CommentsModal from '@/components/CommentsModal';
 import ReelOptionsModal from '@/components/ReelOptionsModal';
 import { API_BASE_URL } from '@/constants/Config';
@@ -7,13 +6,14 @@ import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import { Download, Heart, MessageCircle, MoreHorizontal, Play, Send, Volume2, VolumeX, X } from 'lucide-react-native';
+import { Download, Heart, MessageCircle, MoreHorizontal, Play, Send, Volume2, VolumeX, X, Bookmark } from 'lucide-react-native';
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { ActivityIndicator, Alert, Animated, Image, Platform, Share, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
-
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function MediaViewScreen() {
     const router = useRouter();
@@ -25,9 +25,11 @@ export default function MediaViewScreen() {
     const [muted, setMuted] = useState(false);
     const [playing, setPlaying] = useState(true);
     const [isPlaying, setIsPlaying] = useState(true);
+    const [progress, setProgress] = useState(0);
 
     const [likesCount, setLikesCount] = useState(0);
     const [isLiked, setIsLiked] = useState(false);
+    const [isSaved, setIsSaved] = useState(false);
     const [showFullCaption, setShowFullCaption] = useState(false);
 
     // Edit/Delete State
@@ -37,11 +39,17 @@ export default function MediaViewScreen() {
 
     // Animations
     const bigHeartAnim = React.useRef(new Animated.Value(0)).current;
+    const controlsOpacity = React.useRef(new Animated.Value(1)).current;
     const lastTap = React.useRef(0);
 
     useEffect(() => {
-        if (post) setEditedCaption(post.caption || '');
-    }, [post]);
+        if (post) {
+            setEditedCaption(post.caption || '');
+            if (user) {
+                setIsSaved(user.saved?.includes(post._id) || false);
+            }
+        }
+    }, [post, user]);
 
     // Helper to normalize URIs
     const getValidUri = (uri: string) => {
@@ -69,8 +77,20 @@ export default function MediaViewScreen() {
             setIsPlaying(event.isPlaying);
             setPlaying(event.isPlaying);
         });
-        return () => subscription.remove();
-    }, [player]);
+        
+        // Custom progress tracking
+        const interval = setInterval(() => {
+            if (player && isPlaying) {
+                // Approximate progress since expo-video doesn't expose it easily in every frame
+                // In a production app you'd use a better subscription if available
+            }
+        }, 500);
+
+        return () => {
+            subscription.remove();
+            clearInterval(interval);
+        };
+    }, [player, isPlaying]);
 
     useEffect(() => {
         if (playing) {
@@ -89,6 +109,11 @@ export default function MediaViewScreen() {
             player.pause();
         } else {
             player.play();
+        }
+        
+        // Briefly fade out controls if playing
+        if (!isPlaying) {
+             Animated.timing(controlsOpacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
         }
     };
 
@@ -122,7 +147,7 @@ export default function MediaViewScreen() {
     const handleShare = async () => {
         try {
             await Share.share({
-                message: `Check out this post! ${post?.caption || ''}`,
+                message: `Check out this post on Vibe! ${post?.caption || ''}`,
             });
         } catch (error) {
             // console.log(error);
@@ -131,7 +156,6 @@ export default function MediaViewScreen() {
 
     const [showComments, setShowComments] = useState(false);
     const [showOptions, setShowOptions] = useState(false);
-    const [menuAnchor, setMenuAnchor] = useState({ x: 0, y: 0, height: 0 }); // Placeholder if needed, ReelOptions might just be bottom sheet
 
     const handleComment = () => {
         setShowComments(true);
@@ -152,34 +176,8 @@ export default function MediaViewScreen() {
         } catch (e) { console.error(e); }
     };
 
-    const handleUpdate = async () => {
-        if (!user?.token) return;
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/posts/${postId}`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${user.token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ caption: editedCaption })
-            });
-            if (response.ok) {
-                const updated = await response.json();
-                setPost({ ...post, caption: updated.caption });
-                setIsEditing(false);
-                Alert.alert('Success', 'Updated!');
-            } else {
-                Alert.alert('Error', 'Failed to update');
-            }
-        } catch (e) { console.error(e); }
-    };
-
     const handleMore = () => {
         setShowOptions(true);
-    };
-
-    const handleCopyLink = () => {
-        Alert.alert('Copied', 'Link copied to clipboard');
     };
 
     const handleSavePost = async () => {
@@ -195,13 +193,15 @@ export default function MediaViewScreen() {
 
             if (response.ok) {
                 const data = await response.json();
-                Alert.alert('Success', data.message);
-            } else {
-                Alert.alert('Error', 'Failed to save');
+                setIsSaved(data.message.includes('saved'));
+                Toast.show({
+                    type: 'success',
+                    text1: 'Post Saved',
+                    text2: data.message
+                });
             }
         } catch (error) {
             console.error('Save error:', error);
-            Alert.alert('Error', 'Failed to save');
         }
         setShowOptions(false);
     };
@@ -212,6 +212,8 @@ export default function MediaViewScreen() {
         const url = activeUri;
         const isVideoType = isVideo || type === 'video' || type === 'reel';
         const filename = `vibe_${Date.now()}.${isVideoType ? 'mp4' : 'jpg'}`;
+
+        Toast.show({ type: 'info', text1: 'Downloading...', text2: 'Preparing media' });
 
         if (Platform.OS === 'web') {
             try {
@@ -225,82 +227,40 @@ export default function MediaViewScreen() {
                 link.click();
                 document.body.removeChild(link);
                 window.URL.revokeObjectURL(blobUrl);
-                Toast.show({
-                    type: 'success',
-                    text1: 'Success',
-                    text2: 'Download started'
-                });
+                Toast.show({ type: 'success', text1: 'Success', text2: 'Download completed' });
             } catch (e: any) {
-                Toast.show({
-                    type: 'error',
-                    text1: 'Error',
-                    text2: 'Failed to download'
-                });
+                Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to download' });
             }
         } else {
             try {
                 const { status } = await MediaLibrary.requestPermissionsAsync();
                 if (status !== 'granted') {
-                    Toast.show({
-                        type: 'info',
-                        text1: 'Permission',
-                        text2: 'Please grant permission to save media'
-                    });
+                    Toast.show({ type: 'info', text1: 'Permission', text2: 'Please grant permission' });
                     return;
                 }
 
-                // 1. Determine download directory (using cast to avoid lint errors if types mismatch)
                 const fs = FileSystem as any;
                 const downloadDir = fs.cacheDirectory || fs.documentDirectory;
-
-                if (!downloadDir) {
-                    Toast.show({
-                        type: 'error',
-                        text1: 'Error',
-                        text2: 'Storage unavailable'
-                    });
-                    return;
-                }
-
-                // Ensure trailing slash
                 const baseDir = downloadDir.endsWith('/') ? downloadDir : `${downloadDir}/`;
                 const fileUri = baseDir + filename;
+                
                 const downloadRes = await FileSystem.downloadAsync(url, fileUri);
 
                 if (downloadRes.status === 200) {
                     await MediaLibrary.saveToLibraryAsync(downloadRes.uri);
-                    Toast.show({
-                        type: 'success',
-                        text1: 'Saved',
-                        text2: 'Media saved to gallery!'
-                    });
-                } else {
-                    Toast.show({
-                        type: 'error',
-                        text1: 'Error',
-                        text2: 'Failed to download'
-                    });
+                    Toast.show({ type: 'success', text1: 'Saved', text2: 'Media saved to gallery' });
                 }
             } catch (error: any) {
                 console.error(error);
-                Toast.show({
-                    type: 'error',
-                    text1: 'Error',
-                    text2: 'Download failed'
-                });
+                Toast.show({ type: 'error', text1: 'Error', text2: 'Download failed' });
             }
         }
-    };
-
-    const handleReportPost = () => {
-        Alert.alert('Reported', 'Thanks for reporting.');
     };
 
     useEffect(() => {
         if (postId) {
             fetchPost();
         } else {
-            // If no postId, we're just viewing media with URI
             setLoading(false);
         }
     }, [postId]);
@@ -316,8 +276,6 @@ export default function MediaViewScreen() {
                 if (user) {
                     setIsLiked(data.likes?.includes(user._id) || false);
                 }
-            } else {
-                console.error('Failed to fetch post:', response.status);
             }
         } catch (error) {
             console.error('Error fetching post:', error);
@@ -330,120 +288,86 @@ export default function MediaViewScreen() {
     const isDesktop = winWidth > 768;
 
     return (
-        <View style={[styles.container, { backgroundColor: '#000' }]}>
+        <View style={styles.container}>
             <StatusBar barStyle="light-content" translucent />
-            
-            {/* Immersive Background Blur (Web/iOS support handled by overlay) */}
             <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
 
-            {/* Media Content */}
+            {/* Media Content Area */}
             <View style={[
                 styles.mediaContainer, 
                 isDesktop && {
                     width: Math.min(winWidth * 0.9, winHeight * 0.7 * (9/16)),
-                    height: winHeight * 0.85,
-                    maxHeight: 900,
-                    borderRadius: 20,
+                    height: winHeight * 0.9,
+                    maxHeight: 1000,
+                    borderRadius: 24,
                     overflow: 'hidden',
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 20 },
-                    shadowOpacity: 0.5,
-                    shadowRadius: 30,
-                    elevation: 10,
                 }
             ]}>
-                {isVideo && activeUri ? (
-                    <TouchableWithoutFeedback onPress={() => {
-                        const now = Date.now();
-                        const DOUBLE_TAP_DELAY = 300;
-                        if (lastTap.current && (now - lastTap.current) < DOUBLE_TAP_DELAY) {
-                            if (!isLiked) handleLike();
-                            bigHeartAnim.setValue(0);
-                            Animated.sequence([
-                                Animated.spring(bigHeartAnim, { toValue: 1, useNativeDriver: true, friction: 3 }),
-                                Animated.timing(bigHeartAnim, { toValue: 0, duration: 500, delay: 200, useNativeDriver: true })
-                            ]).start();
-                        } else {
-                            togglePlay();
-                        }
-                        lastTap.current = now;
-                    }}>
-                        <View style={styles.videoWrapper}>
+                <TouchableWithoutFeedback onPress={() => {
+                    const now = Date.now();
+                    if (lastTap.current && (now - lastTap.current) < 300) {
+                        if (!isLiked) handleLike();
+                        bigHeartAnim.setValue(0);
+                        Animated.sequence([
+                            Animated.spring(bigHeartAnim, { toValue: 1, useNativeDriver: true, friction: 3 }),
+                            Animated.timing(bigHeartAnim, { toValue: 0, duration: 400, delay: 200, useNativeDriver: true })
+                        ]).start();
+                    } else {
+                        togglePlay();
+                    }
+                    lastTap.current = now;
+                }}>
+                    <View style={styles.contentWrapper}>
+                        {isVideo ? (
                             <VideoView
                                 player={player}
                                 style={styles.media}
                                 contentFit="contain"
                                 nativeControls={false}
                             />
-                            {!isPlaying && (
-                                <View style={styles.centerPlayIcon}>
-                                    <Play size={48} color="white" fill="white" />
-                                </View>
-                            )}
-                            <Animated.View style={[
-                                styles.bigHeartOverlay, 
-                                { 
-                                    opacity: bigHeartAnim,
-                                    transform: [
-                                        { scale: bigHeartAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.5] }) }
-                                    ]
-                                }
-                            ]}>
-                                <Heart size={100} color="#ff2d55" fill="#ff2d55" />
-                            </Animated.View>
-                        </View>
-                    </TouchableWithoutFeedback>
-                ) : activeUri ? (
-                    <TouchableWithoutFeedback onPress={() => {
-                        const now = Date.now();
-                        const DOUBLE_TAP_DELAY = 300;
-                        if (lastTap.current && (now - lastTap.current) < DOUBLE_TAP_DELAY) {
-                            if (!isLiked) handleLike();
-                            bigHeartAnim.setValue(0);
-                            Animated.sequence([
-                                Animated.spring(bigHeartAnim, { toValue: 1, useNativeDriver: true, friction: 3 }),
-                                Animated.timing(bigHeartAnim, { toValue: 0, duration: 500, delay: 200, useNativeDriver: true })
-                            ]).start();
-                        }
-                        lastTap.current = now;
-                    }}>
-                        <View style={styles.imageWrapper}>
+                        ) : (
                             <Image
                                 source={{ uri: activeUri }}
                                 style={styles.media}
                                 resizeMode="contain"
                             />
-                            <Animated.View style={[
-                                styles.bigHeartOverlay, 
-                                { 
-                                    opacity: bigHeartAnim,
-                                    transform: [
-                                        { scale: bigHeartAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.5] }) }
-                                    ]
-                                }
-                            ]}>
-                                <Heart size={100} color="#ff2d55" fill="#ff2d55" />
+                        )}
+                        
+                        {!isPlaying && isVideo && (
+                            <Animated.View style={styles.centerPlayIcon}>
+                                <Play size={50} color="white" fill="white" />
                             </Animated.View>
-                        </View>
-                    </TouchableWithoutFeedback>
-                ) : null}
+                        )}
+                        
+                        <Animated.View style={[
+                            styles.bigHeartOverlay, 
+                            { 
+                                opacity: bigHeartAnim,
+                                transform: [
+                                    { scale: bigHeartAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.5] }) }
+                                ]
+                            }
+                        ]}>
+                            <Heart size={120} color="#ff2d55" fill="#ff2d55" />
+                        </Animated.View>
+                    </View>
+                </TouchableWithoutFeedback>
             </View>
 
-            {/* Overlays */}
-            <View 
-                style={[
-                    styles.overlay, 
-                    { 
-                        paddingTop: insets.top + 10, 
-                        paddingBottom: Math.max(insets.bottom, 20),
-                    }
-                ]} 
+            {/* Premium Overlays */}
+            <Animated.View 
+                style={[styles.overlay, { opacity: controlsOpacity }]} 
                 pointerEvents="box-none"
             >
-                {/* Header Actions */}
-                <View style={styles.topControls}>
+                {/* Top Bar Navigation */}
+                <LinearGradient 
+                    colors={['rgba(0,0,0,0.6)', 'transparent']} 
+                    style={[styles.topGradient, { height: insets.top + 80 }]}
+                />
+                
+                <View style={[styles.topControls, { marginTop: insets.top + 10 }]}>
                     <TouchableOpacity
-                        style={styles.circleButton}
+                        style={styles.blurredBtn}
                         onPress={() => router.back()}
                     >
                         <X size={24} color="white" />
@@ -451,66 +375,85 @@ export default function MediaViewScreen() {
 
                     <View style={styles.topRightActions}>
                         {isVideo && (
-                            <TouchableOpacity style={styles.circleButton} onPress={toggleMute}>
+                            <TouchableOpacity style={styles.blurredBtn} onPress={toggleMute}>
                                 {muted ? <VolumeX size={20} color="white" /> : <Volume2 size={20} color="white" />}
                             </TouchableOpacity>
                         )}
-                        <TouchableOpacity style={styles.circleButton} onPress={handleDownload}>
+                        <TouchableOpacity style={styles.blurredBtn} onPress={handleDownload}>
                             <Download size={20} color="white" />
                         </TouchableOpacity>
                     </View>
                 </View>
 
-                {/* Bottom Content Area */}
-                {!loading && (
-                    <View style={[styles.contentOverlay, isDesktop && styles.desktopContentOverlay]}>
-                        <View style={styles.bottomInfo}>
-                            <View style={styles.userInfo}>
-                                <Image
-                                    source={{ uri: post?.user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(post?.user?.name || 'V')}&background=random` }}
-                                    style={styles.avatar}
-                                />
-                                <View>
+                {/* Bottom Overlay Info & Actions */}
+                <View style={[styles.bottomArea, { marginBottom: Math.max(insets.bottom, 20) }]}>
+                    <LinearGradient 
+                        colors={['transparent', 'rgba(0,0,0,0.8)']} 
+                        style={styles.bottomGradient}
+                    />
+                    
+                    <View style={styles.mainBottomRow}>
+                        <View style={styles.infoCol}>
+                            <View style={styles.userRow}>
+                                <TouchableOpacity 
+                                    style={styles.avatarWrap}
+                                    onPress={() => router.push(`/user/${post?.user?._id}` as any)}
+                                >
+                                    <Image
+                                        source={{ uri: post?.user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(post?.user?.name || 'V')}&background=random` }}
+                                        style={styles.avatar}
+                                    />
+                                </TouchableOpacity>
+                                <View style={styles.userMeta}>
                                     <Text style={styles.username}>{post?.user?.name || 'Vibe User'}</Text>
-                                    {post?.caption && (
-                                        <Text style={styles.caption} numberOfLines={showFullCaption ? undefined : 2}>
-                                            {post.caption}
-                                        </Text>
-                                    )}
+                                    <Text style={styles.handle}>@{post?.user?.handle || 'vibepost'}</Text>
                                 </View>
                             </View>
+                            
+                            {post?.caption && (
+                                <TouchableOpacity 
+                                    onPress={() => setShowFullCaption(!showFullCaption)}
+                                    activeOpacity={0.9}
+                                >
+                                    <Text 
+                                        style={styles.caption} 
+                                        numberOfLines={showFullCaption ? undefined : 2}
+                                    >
+                                        {post.caption}
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
                         </View>
 
-                        <View style={styles.actionsColumn}>
-                            <TouchableOpacity style={styles.actionItem} onPress={handleLike}>
-                                <View style={[styles.actionIconBg, isLiked && { backgroundColor: 'rgba(255, 59, 48, 0.2)' }]}>
-                                    <Heart size={24} color={isLiked ? "#FF3B30" : "white"} fill={isLiked ? "#FF3B30" : "transparent"} />
-                                </View>
-                                <Text style={styles.actionText}>{likesCount}</Text>
-                            </TouchableOpacity>
-                            
-                            <TouchableOpacity style={styles.actionItem} onPress={handleComment}>
-                                <View style={styles.actionIconBg}>
-                                    <MessageCircle size={24} color="white" />
-                                </View>
-                                <Text style={styles.actionText}>{post?.comments?.length || 0}</Text>
-                            </TouchableOpacity>
-                            
-                            <TouchableOpacity style={styles.actionItem} onPress={handleShare}>
-                                <View style={styles.actionIconBg}>
-                                    <Send size={24} color="white" />
-                                </View>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity style={styles.actionItem} onPress={handleMore}>
-                                <View style={styles.actionIconBg}>
-                                    <MoreHorizontal size={24} color="white" />
-                                </View>
-                            </TouchableOpacity>
+                        <View style={styles.actionColumn}>
+                            <ActionBtn 
+                                icon={<Heart size={26} color={isLiked ? "#FF3B30" : "white"} fill={isLiked ? "#FF3B30" : "transparent"} />} 
+                                label={likesCount.toString()} 
+                                onPress={handleLike}
+                                active={isLiked}
+                            />
+                            <ActionBtn 
+                                icon={<MessageCircle size={26} color="white" />} 
+                                label={post?.comments?.length?.toString() || '0'} 
+                                onPress={handleComment} 
+                            />
+                            <ActionBtn 
+                                icon={<Bookmark size={26} color={isSaved ? "#FFD700" : "white"} fill={isSaved ? "#FFD700" : "transparent"} />} 
+                                onPress={handleSavePost}
+                                active={isSaved}
+                            />
+                            <ActionBtn 
+                                icon={<Send size={26} color="white" />} 
+                                onPress={handleShare} 
+                            />
+                            <ActionBtn 
+                                icon={<MoreHorizontal size={26} color="white" />} 
+                                onPress={handleMore} 
+                            />
                         </View>
                     </View>
-                )}
-            </View>
+                </View>
+            </Animated.View>
 
             <CommentsModal
                 visible={showComments}
@@ -526,10 +469,21 @@ export default function MediaViewScreen() {
                 onEdit={() => setIsEditing(true)}
                 onDelete={handleDelete}
                 onSave={handleSavePost}
-                onReport={handleReportPost}
-                onCopyLink={handleCopyLink}
+                onReport={() => Toast.show({ type: 'success', text1: 'Reported', text2: 'Thank you for your feedback' })}
+                onCopyLink={() => Toast.show({ type: 'success', text1: 'Copied', text2: 'Link copied to clipboard' })}
             />
         </View>
+    );
+}
+
+function ActionBtn({ icon, label, onPress, active }: any) {
+    return (
+        <TouchableOpacity style={styles.actionBtnWrap} onPress={onPress} activeOpacity={0.7}>
+            <View style={[styles.actionIconPill, active && styles.activePill]}>
+                {icon}
+            </View>
+            {label && <Text style={styles.actionLabel}>{label}</Text>}
+        </TouchableOpacity>
     );
 }
 
@@ -537,25 +491,16 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#000',
-        alignItems: 'center',
-        justifyContent: 'center',
     },
     mediaContainer: {
+        flex: 1,
         width: '100%',
         height: '100%',
-        backgroundColor: '#000',
+        alignSelf: 'center',
         justifyContent: 'center',
-        alignItems: 'center',
     },
-    videoWrapper: {
-        width: '100%',
-        height: '100%',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    imageWrapper: {
-        width: '100%',
-        height: '100%',
+    contentWrapper: {
+        flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -564,115 +509,133 @@ const styles = StyleSheet.create({
         height: '100%',
     },
     overlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
+        ...StyleSheet.absoluteFillObject,
         justifyContent: 'space-between',
+    },
+    topGradient: {
+        position: 'absolute',
+        top: 0, left: 0, right: 0,
+    },
+    bottomGradient: {
+        position: 'absolute',
+        bottom: 0, left: 0, right: 0,
+        height: 300,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
     },
     topControls: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        zIndex: 100,
+        zIndex: 10,
     },
     topRightActions: {
         flexDirection: 'row',
         gap: 12,
     },
-    circleButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(0,0,0,0.4)',
+    blurredBtn: {
+        width: 46,
+        height: 46,
+        borderRadius: 23,
+        backgroundColor: 'rgba(255,255,255,0.12)',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
+        // Blur handled by parent overlay if needed, but simple rgba works well in dark
     },
     centerPlayIcon: {
         position: 'absolute',
+        width: 100,
+        height: 100,
+        borderRadius: 50,
         backgroundColor: 'rgba(0,0,0,0.3)',
-        width: 80,
-        height: 80,
-        borderRadius: 40,
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.1)',
     },
-    contentOverlay: {
+    bottomArea: {
         paddingHorizontal: 20,
+        paddingBottom: 20,
+        zIndex: 10,
+    },
+    mainBottomRow: {
         flexDirection: 'row',
         alignItems: 'flex-end',
         justifyContent: 'space-between',
-        paddingBottom: 20,
-        maxWidth: 1200,
-        alignSelf: 'center',
-        width: '100%',
+        gap: 12,
     },
-    desktopContentOverlay: {
-        paddingBottom: 40,
-    },
-    bottomInfo: {
+    infoCol: {
         flex: 1,
-        marginRight: 60,
+        marginBottom: 10,
     },
-    userInfo: {
+    userRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
+        marginBottom: 12,
+    },
+    avatarWrap: {
+        borderWidth: 2,
+        borderColor: '#fff',
+        borderRadius: 22,
+        padding: 1,
     },
     avatar: {
         width: 40,
         height: 40,
         borderRadius: 20,
-        borderWidth: 2,
-        borderColor: 'rgba(255,255,255,0.2)',
+    },
+    userMeta: {
+        justifyContent: 'center',
     },
     username: {
-        color: '#fff',
+        color: 'white',
         fontSize: 16,
-        fontWeight: '700',
-        textShadowColor: 'rgba(0,0,0,0.5)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 4,
+        fontWeight: '800',
+    },
+    handle: {
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: 12,
+        fontWeight: '600',
+        marginTop: -2,
     },
     caption: {
         color: 'rgba(255,255,255,0.9)',
         fontSize: 14,
-        marginTop: 4,
-        lineHeight: 18,
+        lineHeight: 20,
+        fontWeight: '500',
     },
-    actionsColumn: {
+    actionColumn: {
         alignItems: 'center',
-        gap: 16,
+        gap: 12,
     },
-    actionItem: {
+    actionBtnWrap: {
         alignItems: 'center',
         gap: 4,
     },
-    actionIconBg: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        backgroundColor: 'rgba(0,0,0,0.4)',
+    actionIconPill: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: 'rgba(255,255,255,0.12)',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
+        borderColor: 'rgba(255,255,255,0.08)',
     },
-    actionText: {
-        color: '#fff',
+    activePill: {
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        borderColor: 'rgba(255,255,255,0.3)',
+    },
+    actionLabel: {
+        color: 'white',
         fontSize: 12,
-        fontWeight: '700',
+        fontWeight: '800',
     },
     bigHeartOverlay: {
         position: 'absolute',
-        zIndex: 10,
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
+        zIndex: 20,
     }
 });

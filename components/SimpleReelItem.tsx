@@ -7,7 +7,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT } = Dimensions.get('window') || { height: 0 };
 
 const getValidUri = (uri?: string) => {
     if (!uri) return '';
