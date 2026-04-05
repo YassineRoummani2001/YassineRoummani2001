@@ -1,7 +1,7 @@
 import { Colors } from '@/constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useMemo, useState } from 'react';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, Platform } from 'react-native';
 
 type ThemeType = 'light' | 'dark';
 
@@ -79,6 +79,43 @@ export function CustomThemeProvider({ children }: { children: React.ReactNode })
     };
 
     const isDark = theme === 'dark';
+
+    // Injection of matching scrollbar color for web
+    React.useEffect(() => {
+        if (Platform.OS === 'web') {
+            const styleId = 'custom-scrollbar-style';
+            let styleTag = document.getElementById(styleId);
+            if (!styleTag) {
+                styleTag = document.createElement('style');
+                styleTag.id = styleId;
+                document.head.appendChild(styleTag);
+            }
+
+            const trackColor = isDark ? '#1a1a1a' : '#f0f0f0';
+            const thumbHoverColor = primaryColor + 'cc'; // Slight transparency on hover
+
+            styleTag.innerHTML = `
+                ::-webkit-scrollbar {
+                    width: 8px;
+                    height: 8px;
+                }
+                ::-webkit-scrollbar-track {
+                    background: ${trackColor};
+                }
+                ::-webkit-scrollbar-thumb {
+                    background: ${primaryColor}99;
+                    border-radius: 10px;
+                }
+                ::-webkit-scrollbar-thumb:hover {
+                    background: ${primaryColor};
+                }
+                * {
+                  scrollbar-width: thin;
+                  scrollbar-color: ${primaryColor}99 ${trackColor};
+                }
+            `;
+        }
+    }, [isDark, primaryColor]);
 
     // Memoize colors to prevent unnecessary re-renders
     const colors = useMemo(() => {
