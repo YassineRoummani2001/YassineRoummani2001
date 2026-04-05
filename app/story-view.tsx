@@ -416,15 +416,15 @@ export default function StoryViewScreen() {
                     <Image 
                         source={{ uri: storyUri }} 
                         style={styles.ambientBlur}
-                        blurRadius={80}
+                        blurRadius={100}
                     />
-                    <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} />
+                    <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.65)' }]} />
                 </View>
             )}
 
             {/* Navigation Arrows for Desktop */}
             {isDesktop && (
-                <View style={styles.desktopNav}>
+                <View style={styles.desktopNav} pointerEvents="box-none">
                     <TouchableOpacity 
                         onPress={handlePrevStory} 
                         style={[styles.navCircle, currentStoryIndex === 0 && { opacity: 0.3 }]}
@@ -525,6 +525,7 @@ export default function StoryViewScreen() {
                 <LinearGradient
                     colors={['rgba(0,0,0,0.5)', 'transparent', 'rgba(0,0,0,0.4)']}
                     style={styles.gradient}
+                    pointerEvents="box-none"
                 >
                     {/* Progress Bar */}
                     <View style={[styles.progressContainer, { paddingTop: insets.top > 0 ? insets.top + 10 : 16 }]}>
@@ -701,6 +702,55 @@ export default function StoryViewScreen() {
                     </View>
                 </View>
             </Modal>
+            
+            {/* Options Modal */}
+            <Modal
+                visible={showOptions}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => {
+                    setShowOptions(false);
+                    setIsPaused(false);
+                }}
+            >
+                <View style={styles.modalOverlay}>
+                    <TouchableOpacity 
+                        style={styles.modalDismiss} 
+                        onPress={() => {
+                            setShowOptions(false);
+                            setIsPaused(false);
+                        }} 
+                    />
+                    <View style={styles.optionsModalContent}>
+                        <View style={styles.optionHeader}>
+                            <View style={{ width: 40, height: 4, backgroundColor: '#DDD', borderRadius: 2, marginBottom: 12 }} />
+                            <Text style={styles.optionHeaderTitle}>Story Options</Text>
+                        </View>
+
+                        <TouchableOpacity 
+                            style={styles.optionItem}
+                            onPress={() => {
+                                setShowOptions(false);
+                                handleDeleteStory();
+                            }}
+                        >
+                            <Trash2 size={24} color="#FF3B30" />
+                            <Text style={[styles.optionText, styles.dangerText]}>Delete Story</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={styles.optionItem}
+                            onPress={() => {
+                                setShowOptions(false);
+                                setIsPaused(false);
+                            }}
+                        >
+                            <X size={24} color="#000" />
+                            <Text style={styles.optionText}>Cancel</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
             <VibeConfirmModal 
                 visible={isDeleteModalVisible}
                 onClose={() => {
@@ -721,7 +771,7 @@ export default function StoryViewScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#050505',
+        backgroundColor: '#0F1014',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -750,23 +800,25 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: SCREEN_WIDTH * 0.15,
+        paddingHorizontal: 40,
         zIndex: 10,
     },
     navCircle: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        backgroundColor: 'rgba(255,255,255,0.15)',
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: 'rgba(255,255,255,0.1)',
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)',
-    },
+        borderColor: 'rgba(255,255,255,0.15)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
+    } as any,
     storyFrame: {
         width: SCREEN_WIDTH,
         height: SCREEN_HEIGHT,
-        backgroundColor: '#000',
+        backgroundColor: '#121212',
         zIndex: 5,
     },
     image: {
@@ -903,6 +955,7 @@ const styles = StyleSheet.create({
     modalOverlay: {
         flex: 1,
         justifyContent: 'flex-end',
+        alignItems: 'center', // Center children horizontally
         backgroundColor: 'rgba(0,0,0,0.5)',
     },
     // New Styles for Glass UI
@@ -982,6 +1035,14 @@ const styles = StyleSheet.create({
         borderTopRightRadius: 20,
         height: '50%',
         padding: 16,
+        ...(Platform.OS === 'web' && SCREEN_WIDTH > 768 ? {
+            width: 600,
+            maxWidth: '90%',
+            marginBottom: 20,
+            borderRadius: 24,
+        } : {
+            width: '100%',
+        })
     },
     optionsModalContent: {
         backgroundColor: 'white',
@@ -989,6 +1050,14 @@ const styles = StyleSheet.create({
         borderTopRightRadius: 24,
         padding: 24,
         paddingBottom: 40,
+        ...(Platform.OS === 'web' && SCREEN_WIDTH > 768 ? {
+            width: 600,
+            maxWidth: '90%',
+            marginBottom: 20,
+            borderRadius: 24,
+        } : {
+            width: '100%',
+        })
     },
     optionHeader: {
         alignItems: 'center',

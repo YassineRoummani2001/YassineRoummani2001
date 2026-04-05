@@ -123,9 +123,8 @@ export function CustomThemeProvider({ children }: { children: React.ReactNode })
         return {
             ...baseColors,
             primary: primaryColor,
-            tint: isDark ? '#FFFFFF' : primaryColor, // tint logic from Colors.ts
-            // Update other derived colors if necessary
-            tabIconSelected: isDark ? '#FFFFFF' : primaryColor,
+            tint: primaryColor, 
+            tabIconSelected: primaryColor,
         };
     }, [isDark, primaryColor]);
 

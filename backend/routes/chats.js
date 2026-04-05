@@ -87,6 +87,20 @@ router.post('/group', protect, async (req, res) => {
             admin: req.user._id
         });
         
+        // Create system message and update chat
+        await Message.create({
+            chatId: chat._id,
+            sender: req.user._id,
+            content: `created the group "${name}"`,
+            type: 'system'
+        });
+
+        await Chat.findByIdAndUpdate(chat._id, {
+            lastMessage: `Action: Group created`,
+            lastMessageSender: req.user._id,
+            updatedAt: Date.now()
+        });
+
         const fullChat = await Chat.findById(chat._id).populate('participants', 'name handle avatar');
         res.status(201).json(fullChat);
     } catch (err) {
@@ -535,6 +549,28 @@ router.put('/:chatId', protect, async (req, res) => {
             { chatId: chat._id },
             { $set: updateData }
         );
+
+        // Create system messages for updates
+        const updates = [];
+        if (groupName) updates.push('group name');
+        if (groupAvatar) updates.push('group avatar');
+        if (groupCoverImage) updates.push('group cover');
+        if (groupDescription !== undefined) updates.push('group description');
+        
+        if (updates.length > 0) {
+            await Message.create({
+                chatId: chat._id,
+                sender: req.user._id,
+                content: `updated the ${updates.join(', ')}`,
+                type: 'system'
+            });
+
+            await Chat.findByIdAndUpdate(chat._id, {
+                lastMessage: `Action: Group updated`,
+                lastMessageSender: req.user._id,
+                updatedAt: Date.now()
+            });
+        }
         
         const fullChat = await Chat.findById(chat._id).populate('participants', 'name handle avatar username bio');
         res.json(fullChat);
@@ -566,7 +602,26 @@ router.post('/:chatId/participants', protect, async (req, res) => {
 
         await chat.save();
         
-        // Update group model as well if necessary, but group model only has admin, name, avatar
+        // Get names of added users
+        const User = require('../models/User');
+        const addedUsersList = await User.find({ _id: { $in: userIds } }, 'name');
+        const addedNames = addedUsersList.map(u => u.name).join(', ');
+        
+        if (addedNames) {
+            await Message.create({
+                chatId: chat._id,
+                sender: req.user._id,
+                content: `added ${addedNames} to the group`,
+                type: 'system'
+            });
+
+            await Chat.findByIdAndUpdate(chat._id, {
+                lastMessage: `Action: New members added`,
+                lastMessageSender: req.user._id,
+                updatedAt: Date.now()
+            });
+        }
+
         const fullChat = await Chat.findById(chat._id).populate('participants', 'name handle avatar username bio');
         res.json(fullChat);
     } catch (err) {
@@ -603,6 +658,44 @@ router.post('/:chatId/leave', protect, async (req, res) => {
         await chat.save();
         res.json({ message: 'Left group' });
     } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Delete a chat permanently (Hard delete from database)
+router.delete('/:chatId', protect, async (req, res) => {
+    try {
+        const chat = await Chat.findById(req.params.chatId);
+        if (!chat) {
+            return res.status(404).json({ message: 'Chat not found' });
+        }
+
+        // Verify participant
+        const isParticipant = chat.participants.some(p => p.toString() === req.user._id.toString());
+        if (!isParticipant) {
+            return res.status(403).json({ message: 'Not authorized to delete this chat' });
+        }
+
+        // 1. Delete all messages in the chat
+        await Message.deleteMany({ chatId: req.params.chatId });
+
+        // 2. If it's a group, delete from Group collection
+        if (chat.isGroup) {
+            try {
+                const Group = require('../models/Group');
+                await Group.findOneAndDelete({ chatId: chat._id });
+            } catch (err) {
+                console.error('Group delete error:', err);
+                // Continue even if Group delete fails
+            }
+        }
+
+        // 3. Delete the chat itself
+        await Chat.findByIdAndDelete(req.params.chatId);
+
+        res.json({ message: 'Chat permanently deleted from database' });
+    } catch (err) {
+        console.error('Chat delete route error:', err);
         res.status(500).json({ message: err.message });
     }
 });

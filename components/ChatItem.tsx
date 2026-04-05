@@ -10,6 +10,7 @@ interface ChatItemProps {
     unread?: number;
     online?: boolean;
     onPress: () => void;
+    onLongPress?: () => void;
     isDark: boolean;
     lastMessageSender?: string;
 }
@@ -22,6 +23,7 @@ const ChatItem = memo(({
     unread = 0,
     online = false,
     onPress,
+    onLongPress,
     isDark,
     lastMessageSender
 }: ChatItemProps) => {
@@ -44,6 +46,7 @@ const ChatItem = memo(({
     return (
         <Pressable
             onPress={onPress}
+            onLongPress={onLongPress}
             android_ripple={{ color: isDark ? '#333' : '#EEE' }}
             style={({ pressed }) => [
                 styles.container,

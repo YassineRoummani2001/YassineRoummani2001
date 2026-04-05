@@ -18,6 +18,7 @@ import {
     Animated,
     Dimensions,
     FlatList,
+    Keyboard,
     KeyboardAvoidingView,
     Modal,
     Platform,
@@ -241,6 +242,16 @@ export default function MessageScreen() {
     // State
     const [messages, setMessages] = useState<any[]>([]);
     const [inputText, setInputText] = useState('');
+    const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+    useEffect(() => {
+        const showSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboardVisible(true));
+        const hideSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboardVisible(false));
+        return () => {
+            showSub.remove();
+            hideSub.remove();
+        };
+    }, []);
 
     // Safely handle id param which can be string or array
     const userId = Array.isArray(id) ? id[0] : id;
@@ -713,6 +724,40 @@ export default function MessageScreen() {
     const renderMessageItem = ({ item }: { item: any }) => {
         if (!item || !user) return null;
 
+        if (item.type === 'system') {
+            const isMeAction = item.sender?._id === user._id || item.sender === user._id;
+            return (
+                <View style={{ width: '100%', alignItems: 'center', marginVertical: 14 }}>
+                    <View style={{ 
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                        paddingHorizontal: 20,
+                        paddingVertical: 8,
+                        borderRadius: 20,
+                        maxWidth: '85%',
+                        borderWidth: 1,
+                        borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'
+                    }}>
+                        <Text style={{ 
+                            fontSize: 12, 
+                            color: colors.textSecondary, 
+                            textAlign: 'center', 
+                            lineHeight: 18,
+                            fontWeight: '500'
+                        }}>
+                            <Text style={{ fontWeight: '700', color: colors.text }}>
+                                {isMeAction ? 'You' : (item.sender?.name || 'Someone')}
+                            </Text> {item.content}
+                        </Text>
+                        {item.content?.includes('created the group') && (
+                            <Text style={{ fontSize: 10, color: colors.textSecondary, textAlign: 'center', marginTop: 3, opacity: 0.7, fontWeight: '600' }}>
+                                {new Date(item.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </Text>
+                        )}
+                    </View>
+                </View>
+            );
+        }
+
         const isMe = item.sender?._id === user._id || item.sender === user._id;
         const reactions = item.reactions || {};
         const reactionKeys = Object.keys(reactions);
@@ -986,7 +1031,7 @@ export default function MessageScreen() {
             <KeyboardAvoidingView
                 style={{ flex: 1, backgroundColor: chat?.theme || colors.background }}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+                keyboardVerticalOffset={0}
             >
                 <View style={{ flex: 1 }}>
                     <FlatList
@@ -1035,7 +1080,7 @@ export default function MessageScreen() {
                     backgroundColor: isDark ? '#000' : '#FFF',
                     borderTopColor: isDark ? '#262626' : '#F2F2F2',
                     borderTopWidth: 1,
-                    paddingBottom: insets.bottom + 10,
+                    paddingBottom: Platform.OS === 'ios' ? (keyboardVisible ? 10 : insets.bottom + 10) : 10,
                 }}>
                     {/* Replying To Banner */}
                     {replyingTo && (
@@ -1128,60 +1173,104 @@ export default function MessageScreen() {
             {/* Long Press Modal */}
             <Modal visible={!!selectedMessage} transparent animationType="fade" onRequestClose={() => setSelectedMessage(null)}>
                 <TouchableWithoutFeedback onPress={() => setSelectedMessage(null)}>
-                    <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+                    <View style={{ 
+                        flex: 1, 
+                        backgroundColor: 'rgba(0,0,0,0.4)', 
+                        justifyContent: 'center', 
+                        alignItems: 'center' 
+                    }}>
                         <TouchableWithoutFeedback>
                             <View style={{
-                                width: '80%', backgroundColor: isDark ? '#1a1a1a' : '#FFF',
-                                borderRadius: 16, padding: 20, gap: 16,
-                                shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 3.84, elevation: 5
+                                width: isDesktop ? 450 : '85%', 
+                                backgroundColor: isDark ? '#1a1a1a' : '#FFF',
+                                borderRadius: 24, 
+                                padding: isDesktop ? 24 : 20, 
+                                gap: 4,
+                                shadowColor: "#000", 
+                                shadowOffset: { width: 0, height: 10 }, 
+                                shadowOpacity: 0.3, 
+                                shadowRadius: 20, 
+                                elevation: 8,
+                                borderWidth: isDark ? 1 : 0,
+                                borderColor: '#333'
                             }}>
                                 {/* Reactions */}
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
-                                    {['❤️', '😂', '😮', '😢', '👍'].map(emoji => (
-                                        <TouchableOpacity key={emoji} onPress={() => handleAction('react', emoji)} style={{ padding: 8 }}>
-                                            <Text style={{ fontSize: 24 }}>{emoji}</Text>
+                                <View style={{ 
+                                    flexDirection: 'row', 
+                                    flexWrap: 'wrap',
+                                    justifyContent: 'center', 
+                                    gap: isDesktop ? 12 : 8,
+                                    marginBottom: 16
+                                }}>
+                                    {['❤️', '😂', '😮', '😢', '👍', '🙏', '🔥', '✨', '👏', '😠'].map(emoji => (
+                                        <TouchableOpacity 
+                                            key={emoji} 
+                                            onPress={() => handleAction('react', emoji)} 
+                                            style={{ 
+                                                padding: 8,
+                                                borderRadius: 12,
+                                                backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)'
+                                            }}
+                                        >
+                                            <Text style={{ fontSize: isDesktop ? 28 : 24 }}>{emoji}</Text>
                                         </TouchableOpacity>
                                     ))}
                                 </View>
+                                
+                                <View style={{ height: 1, backgroundColor: isDark ? '#333' : '#F2F2F2', marginVertical: 8, marginHorizontal: -20 }} />
 
-                                <View style={{ height: 1, backgroundColor: isDark ? '#333' : '#EEE' }} />
-
-                                {/* Actions */}
-                                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 }} onPress={() => handleAction('reply')}>
-                                    <Ionicons name="arrow-undo-outline" size={20} color={colors.text} />
-                                    <Text style={{ fontSize: 16, color: colors.text, fontWeight: '500' }}>Reply</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 }} onPress={() => handleAction('copy')}>
-                                    <Ionicons name="copy-outline" size={20} color={colors.text} />
-                                    <Text style={{ fontSize: 16, color: colors.text, fontWeight: '500' }}>Copy</Text>
-                                </TouchableOpacity>
-
-                                {selectedMessage?.type === 'image' && (
-                                    <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 }} onPress={() => handleAction('download')}>
-                                        <Ionicons name="cloud-download-outline" size={20} color={colors.text} />
-                                        <Text style={{ fontSize: 16, color: colors.text, fontWeight: '500' }}>Save Image</Text>
+                                {/* Actions Group */}
+                                <View style={{ marginTop: 8 }}>
+                                    <TouchableOpacity style={styles.actionRow} onPress={() => handleAction('reply')}>
+                                        <View style={[styles.actionIcon, { backgroundColor: isDark ? '#262626' : '#F9F9F9' }]}>
+                                            <Ionicons name="arrow-undo-outline" size={20} color={colors.text} />
+                                        </View>
+                                        <Text style={[styles.actionText, { color: colors.text }]}>Reply</Text>
                                     </TouchableOpacity>
-                                )}
 
-                                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 }} onPress={() => handleAction('forward')}>
-                                    <Ionicons name="arrow-redo-outline" size={20} color={colors.text} />
-                                    <Text style={{ fontSize: 16, color: colors.text, fontWeight: '500' }}>Forward</Text>
-                                </TouchableOpacity>
-
-                                {(selectedMessage?.sender?._id === user?._id || selectedMessage?.sender === user?._id) && selectedMessage?.type === 'text' && (
-                                    <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 }} onPress={() => handleAction('edit')}>
-                                        <Ionicons name="pencil-outline" size={20} color={colors.text} />
-                                        <Text style={{ fontSize: 16, color: colors.text, fontWeight: '500' }}>Edit</Text>
+                                    <TouchableOpacity style={styles.actionRow} onPress={() => handleAction('copy')}>
+                                        <View style={[styles.actionIcon, { backgroundColor: isDark ? '#262626' : '#F9F9F9' }]}>
+                                            <Ionicons name="copy-outline" size={20} color={colors.text} />
+                                        </View>
+                                        <Text style={[styles.actionText, { color: colors.text }]}>Copy Text</Text>
                                     </TouchableOpacity>
-                                )}
 
-                                {(selectedMessage?.sender?._id === user?._id || selectedMessage?.sender === user?._id) && (
-                                    <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 }} onPress={() => handleAction('delete')}>
-                                        <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-                                        <Text style={{ fontSize: 16, color: '#FF3B30', fontWeight: '500' }}>Delete Message</Text>
+                                    {selectedMessage?.type === 'image' && (
+                                        <TouchableOpacity style={styles.actionRow} onPress={() => handleAction('download')}>
+                                            <View style={[styles.actionIcon, { backgroundColor: isDark ? '#262626' : '#F9F9F9' }]}>
+                                                <Ionicons name="cloud-download-outline" size={20} color={colors.text} />
+                                            </View>
+                                            <Text style={[styles.actionText, { color: colors.text }]}>Save Image</Text>
+                                        </TouchableOpacity>
+                                    )}
+
+                                    <TouchableOpacity style={styles.actionRow} onPress={() => handleAction('forward')}>
+                                        <View style={[styles.actionIcon, { backgroundColor: isDark ? '#262626' : '#F9F9F9' }]}>
+                                            <Ionicons name="arrow-redo-outline" size={20} color={colors.text} />
+                                        </View>
+                                        <Text style={[styles.actionText, { color: colors.text }]}>Forward</Text>
                                     </TouchableOpacity>
-                                )}
+
+                                    {(selectedMessage?.sender?._id === user?._id || selectedMessage?.sender === user?._id) && selectedMessage?.type === 'text' && (
+                                        <TouchableOpacity style={styles.actionRow} onPress={() => handleAction('edit')}>
+                                            <View style={[styles.actionIcon, { backgroundColor: isDark ? '#262626' : '#F9F9F9' }]}>
+                                                <Ionicons name="pencil-outline" size={20} color={colors.text} />
+                                            </View>
+                                            <Text style={[styles.actionText, { color: colors.text }]}>Edit Message</Text>
+                                        </TouchableOpacity>
+                                    )}
+
+                                    <View style={{ height: 1, backgroundColor: isDark ? '#333' : '#F2F2F2', marginVertical: 8 }} />
+
+                                    {(selectedMessage?.sender?._id === user?._id || selectedMessage?.sender === user?._id) && (
+                                        <TouchableOpacity style={styles.actionRow} onPress={() => handleAction('delete')}>
+                                            <View style={[styles.actionIcon, { backgroundColor: 'rgba(255, 59, 48, 0.1)' }]}>
+                                                <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+                                            </View>
+                                            <Text style={[styles.actionText, { color: '#FF3B30', fontWeight: '600' }]}>Delete Message</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
                             </View>
                         </TouchableWithoutFeedback>
                     </View>
@@ -1230,5 +1319,24 @@ const styles = StyleSheet.create({
     },
     iconWrapper: {
         width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 0
+    },
+    actionRow: {
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        gap: 16, 
+        paddingVertical: 10,
+        paddingHorizontal: 8,
+        borderRadius: 12,
+    },
+    actionIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    actionText: {
+        fontSize: 16, 
+        fontWeight: '500'
     }
 });

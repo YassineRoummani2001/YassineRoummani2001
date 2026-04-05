@@ -30,9 +30,9 @@ const dark = {
     border: '#333333',
     glass: 'rgba(20,20,20,0.9)',
     glassWhite: 'rgba(255,255,255,0.1)',
-    tint: common.white,
+    tint: common.primary,
     tabIconDefault: '#ccc',
-    tabIconSelected: common.white,
+    tabIconSelected: common.primary,
 };
 
 export const Colors = {

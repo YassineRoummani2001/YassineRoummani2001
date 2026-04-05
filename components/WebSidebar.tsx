@@ -1,22 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Platform, Pressable, Image, useWindowDimensions } from 'react-native';
-import { useRouter, usePathname } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { useThemeContext } from '@/context/ThemeContext';
 import { useUser } from '@/context/AuthContext';
-import Animated, { 
-    useAnimatedStyle, 
-    useSharedValue, 
-    withSpring, 
+import { useThemeContext } from '@/context/ThemeContext';
+import { Ionicons } from '@expo/vector-icons';
+import { usePathname, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { Image, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import Animated, {
     interpolate,
-    Extrapolate
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring
 } from 'react-native-reanimated';
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 
 export default function WebSidebar() {
     const { width: windowWidth } = useWindowDimensions();
-    
+
     if (Platform.OS !== 'web' || windowWidth < 768) return null;
 
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
@@ -43,7 +42,7 @@ export default function WebSidebar() {
     };
 
     return (
-        <View 
+        <View
             style={[
                 styles.sidebar,
                 {
@@ -63,7 +62,7 @@ export default function WebSidebar() {
                 <View style={[styles.logoIconBg, { backgroundColor: colors.primary, shadowColor: colors.primary }]}>
                     <Ionicons name="flash" size={24} color="white" />
                 </View>
-                <Text style={[styles.logoText, { color: isDark ? '#fff' : '#111' }]}>
+                <Text style={[styles.logoText, { color: colors.primary, marginLeft: 8 }]}>
                     Vibe
                 </Text>
             </Pressable>
@@ -72,16 +71,12 @@ export default function WebSidebar() {
             <View style={styles.menuContainer}>
                 {menuItems.map((item) => {
                     const active = isActive(item.path);
-                    const isHovered = hoveredItem === item.name;
 
                     return (
-                        <MenuItem 
+                        <MenuItem
                             key={item.name}
                             item={item}
                             active={active}
-                            isHovered={isHovered}
-                            onHoverIn={() => setHoveredItem(item.name)}
-                            onHoverOut={() => setHoveredItem(null)}
                             onPress={() => router.push(item.path as any)}
                             colors={colors}
                             isDark={isDark}
@@ -95,14 +90,12 @@ export default function WebSidebar() {
             {/* User Card (Bottom) */}
             {user && (
                 <View style={styles.bottomSection}>
-                     <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]} />
-                    <AnimatedPressable
+                    <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]} />
+                    <Pressable
                         onPress={() => router.push('/(tabs)/profile' as any)}
-                        onHoverIn={() => setHoveredItem('user-card')}
-                        onHoverOut={() => setHoveredItem(null)}
                         style={[
                             styles.userCard,
-                            { 
+                            {
                                 backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.4)',
                                 borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
                             }
@@ -113,7 +106,7 @@ export default function WebSidebar() {
                             style={styles.userAvatar}
                         />
                         <View style={styles.userInfoWrapper}>
-                             <View style={styles.userInfo}>
+                            <View style={styles.userInfo}>
                                 <Text style={[styles.userName, { color: isDark ? '#fff' : '#111' }]} numberOfLines={1}>
                                     {user.name || 'User'}
                                 </Text>
@@ -123,33 +116,20 @@ export default function WebSidebar() {
                             </View>
                             <Ionicons name="ellipsis-horizontal" size={18} color={isDark ? '#999' : '#666'} />
                         </View>
-                    </AnimatedPressable>
+                    </Pressable>
                 </View>
             )}
         </View>
     );
 }
 
-function MenuItem({ item, active, isHovered, onHoverIn, onHoverOut, onPress, colors, isDark }: any) {
-    const scale = useSharedValue(1);
-    
-    useEffect(() => {
-        scale.value = withSpring(isHovered ? 1.04 : 1, { damping: 12 });
-    }, [isHovered]);
-
-    const animatedStyle = useAnimatedStyle(() => ({
-        transform: [{ scale: scale.value }],
-    }));
-
+function MenuItem({ item, active, onPress, colors, isDark }: any) {
     return (
-        <AnimatedPressable
+        <Pressable
             onPress={onPress}
-            onHoverIn={onHoverIn}
-            onHoverOut={onHoverOut}
             style={[
                 styles.menuItem,
-                animatedStyle,
-                active && { 
+                active && {
                     backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.85)',
                     shadowColor: colors.primary,
                     shadowOffset: { width: 0, height: 4 },
@@ -158,8 +138,7 @@ function MenuItem({ item, active, isHovered, onHoverIn, onHoverOut, onPress, col
                     elevation: 10,
                     borderWidth: 1.5,
                     borderColor: colors.primary,
-                },
-                isHovered && !active && { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.3)' },
+                }
             ]}
         >
             <View style={styles.menuIconWrap}>
@@ -176,7 +155,7 @@ function MenuItem({ item, active, isHovered, onHoverIn, onHoverOut, onPress, col
             ]}>
                 {item.name}
             </Text>
-        </AnimatedPressable>
+        </Pressable>
     );
 }
 
@@ -228,7 +207,7 @@ const styles = StyleSheet.create({
     logoIconBg: {
         width: 48,
         height: 48,
-        borderRadius: 14,
+        borderRadius: 24,
         alignItems: 'center',
         justifyContent: 'center',
         shadowOffset: { width: 0, height: 4 },

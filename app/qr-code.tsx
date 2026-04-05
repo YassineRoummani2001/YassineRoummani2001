@@ -129,7 +129,7 @@ export default function QrCodeScreen() {
     const renderMyCode = () => (
         <View style={styles.contentContainer}>
             <View style={[styles.card, { backgroundColor: isDark ? '#1A1A1A' : 'white' }]}>
-                <View style={styles.avatarContainer}>
+                <View style={[styles.avatarContainer, { backgroundColor: isDark ? '#333' : 'white' }]}>
                     <Image
                         source={{ uri: user.avatar || 'https://i.pravatar.cc/150?u=fake' }}
                         style={styles.avatar}
@@ -211,15 +211,15 @@ export default function QrCodeScreen() {
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <ArrowLeft size={24} color={colors.text} />
                 </TouchableOpacity>
-                <View style={styles.tabContainer}>
+                <View style={[styles.tabContainer, { backgroundColor: isDark ? '#1A1A1A' : '#F2F2F2' }]}>
                     <TouchableOpacity
-                        style={[styles.tab, activeTab === 'my-code' && styles.activeTab]}
+                        style={[styles.tab, activeTab === 'my-code' && [styles.activeTab, { backgroundColor: isDark ? '#333' : 'white' }]]}
                         onPress={() => setActiveTab('my-code')}
                     >
                         <Text style={[styles.tabText, activeTab === 'my-code' ? { color: colors.text, fontWeight: 'bold' } : { color: colors.textSecondary }]}>My Code</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                        style={[styles.tab, activeTab === 'scan' && styles.activeTab]}
+                        style={[styles.tab, activeTab === 'scan' && [styles.activeTab, { backgroundColor: isDark ? '#333' : 'white' }]]}
                         onPress={() => setActiveTab('scan')}
                     >
                         <Text style={[styles.tabText, activeTab === 'scan' ? { color: colors.text, fontWeight: 'bold' } : { color: colors.textSecondary }]}>Scan</Text>
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
     },
     tabContainer: {
         flexDirection: 'row',
-        backgroundColor: '#F2F2F2', // Light gray background
+        backgroundColor: '#F2F2F2', 
         borderRadius: 25,
         padding: 4,
     },

@@ -9,14 +9,17 @@ import {
     Image as ImageIcon,
     PaintBucket,
     Send,
+    Smile,
     Type,
     Video as VideoIcon,
     X
 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
+    Animated,
     Image,
     KeyboardAvoidingView,
+    PanResponder,
     Platform,
     ScrollView,
     StatusBar,
@@ -43,6 +46,25 @@ export default function StoryCreateScreen() {
     const [bgColor, setBgColor] = useState(COLORS[0]);
     const [textColor, setTextColor] = useState('white');
     const [fontFamily, setFontFamily] = useState('System');
+    const [showMediaEmojis, setShowMediaEmojis] = useState(false);
+
+    // Dragging Logic
+    const pan = React.useRef(new Animated.ValueXY()).current;
+    const panResponder = React.useRef(
+        PanResponder.create({
+            onMoveShouldSetPanResponder: () => true,
+            onPanResponderGrant: () => {
+                // @ts-ignore
+                pan.setOffset({ x: pan.x._value, y: pan.y._value });
+            },
+            onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
+            onPanResponderRelease: () => {
+                pan.flattenOffset();
+            },
+        })
+    ).current;
+
+    const commonEmojis = ['❤️', '🔥', '😂', '😍', '✨', '🙌', '😢', '💯', '🙏', '🌈', '🍕', '🎉'];
 
     const player = useVideoPlayer(mode === 'video' && media ? media.uri : null, player => {
         player.loop = true;
@@ -243,6 +265,19 @@ export default function StoryCreateScreen() {
 
                     {/* Toolbar - Pushed up by Keyboard */}
                     <View style={styles.toolbarContainer}>
+                        {/* Emoji Row */}
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 50, marginBottom: 12 }} contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}>
+                            {commonEmojis.map(e => (
+                                <TouchableOpacity
+                                    key={e}
+                                    onPress={() => setText(prev => prev + e)}
+                                    style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 20 }}
+                                >
+                                    <Text style={{ fontSize: 20 }}>{e}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+
                         {/* Font Picker */}
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.fontRow} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
                             {FONTS.map(f => (
@@ -325,16 +360,39 @@ export default function StoryCreateScreen() {
                 )}
 
                 {/* Overlay Interface */}
-                <View style={styles.previewOverlay}>
-                    <TextInput
-                        value={overlayText}
-                        onChangeText={setOverlayText}
-                        placeholder="Add a caption..."
-                        placeholderTextColor="rgba(255,255,255,0.8)"
-                        style={styles.captionInput}
-                        multiline
-                        textAlignVertical="center"
-                    />
+                <View style={styles.previewOverlay} pointerEvents="box-none">
+                    <Animated.View
+                        {...panResponder.panHandlers}
+                        style={[
+                            pan.getLayout(),
+                            { width: '100%', alignItems: 'center' }
+                        ]}
+                    >
+                        <TextInput
+                            value={overlayText}
+                            onChangeText={setOverlayText}
+                            placeholder="Add a caption..."
+                            placeholderTextColor="rgba(255,255,255,0.8)"
+                            style={styles.captionInput}
+                            multiline
+                            textAlignVertical="center"
+                        />
+                    </Animated.View>
+
+                    {/* Emoji Shortcut in Preview */}
+                    <View style={{ position: 'absolute', bottom: 100, left: 0, right: 0 }}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}>
+                            {commonEmojis.map(e => (
+                                <TouchableOpacity
+                                    key={e}
+                                    onPress={() => setOverlayText(prev => prev + e)}
+                                    style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 22, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
+                                >
+                                    <Text style={{ fontSize: 20 }}>{e}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
                 </View>
             </View>
 

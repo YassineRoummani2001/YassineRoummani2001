@@ -25,13 +25,26 @@ import {
 } from 'react-native';
 import AddParticipantModal from '@/components/AddParticipantModal';
 import ConfirmModal from '@/components/ConfirmModal';
+import ProcessingModal from '@/components/ProcessingModal';
+import ImageConfirmModal from '@/components/ImageConfirmModal';
+import { uploadFile } from '@/utils/uploadHelper';
+import * as FileSystem from 'expo-file-system';
 
 const getCorrectUrl = (url: string | undefined | null) => {
     if (!url || typeof url !== 'string') return undefined;
-    const clean = url.trim();
+    let clean = url.trim();
     if (clean.length === 0) return undefined;
-    if (/^(https?|file|data):/i.test(clean)) return clean;
-    return `${API_BASE_URL}/uploads/${clean.replace(/\\/g, '/')}`;
+    
+    // If it's a localhost URL from web, strip it so it can be re-prefixed with current API_BASE_URL
+    if (clean.includes('localhost:5000') || clean.includes('127.0.0.1:5000')) {
+        clean = clean.split('/uploads/')[1] || clean;
+    }
+
+    if (/^(https?|file|data):/i.test(clean) && !clean.includes('localhost')) return clean;
+    
+    // Clean potential /uploads/ prefix if it's already there
+    const filename = clean.replace('/uploads/', '').replace(/^\//, '');
+    return `${API_BASE_URL}/uploads/${filename.replace(/\\/g, '/')}`;
 };
 
 export default function GroupInfoScreen() {
@@ -53,6 +66,13 @@ export default function GroupInfoScreen() {
     const [isAddModalVisible, setIsAddModalVisible] = useState(false);
     const [isLeaveModalVisible, setIsLeaveModalVisible] = useState(false);
     const [isClearModalVisible, setIsClearModalVisible] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadMessage, setUploadMessage] = useState("Downloading image...");
+
+    const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false);
+    const [pendingImage, setPendingImage] = useState<{ uri: string, type: 'avatar' | 'cover' } | null>(null);
+
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
     useEffect(() => {
         if (groupData?.mutedBy) {
@@ -108,59 +128,75 @@ export default function GroupInfoScreen() {
         });
 
         if (!result.canceled) {
-            uploadImage(result.assets[0].uri, type);
+            const asset = result.assets[0];
+            const uri = asset.uri;
+            
+            // Check file size
+            let fileSize = asset.fileSize;
+            
+            if (!fileSize && Platform.OS !== 'web' && uri.startsWith('file:')) {
+                try {
+                    const fileInfo = await FileSystem.getInfoAsync(uri);
+                    if (fileInfo.exists) fileSize = fileInfo.size;
+                } catch (e) {
+                    console.warn("Failed to get file info:", e);
+                }
+            } else if (!fileSize && Platform.OS === 'web' && uri.startsWith('blob:')) {
+                try {
+                    const response = await fetch(uri);
+                    const blob = await response.blob();
+                    fileSize = blob.size;
+                } catch (e) {
+                    console.warn("Failed to get blob size:", e);
+                }
+            }
+
+            if (fileSize && fileSize > MAX_FILE_SIZE) {
+                Alert.alert("Image Too Large", `The selected image is too big (${(fileSize / (1024 * 1024)).toFixed(1)}MB). Maximum size is 10MB.`);
+                return;
+            }
+
+            setPendingImage({ uri, type });
+            setIsConfirmModalVisible(true);
         }
+    };
+
+    const confirmGroupImageUpload = () => {
+        if (!pendingImage) return;
+        uploadImage(pendingImage.uri, pendingImage.type);
+        setIsConfirmModalVisible(false);
+        setPendingImage(null);
     };
 
     const uploadImage = async (uri: string, type: 'avatar' | 'cover') => {
         setUpdating(type);
+        setIsUploading(true);
+        setUploadMessage("Downloading image...");
+
         try {
-            const formData = new FormData();
-            
-            if (Platform.OS === 'web') {
-                const response = await fetch(uri);
-                const blob = await response.blob();
-                formData.append('image', blob, `upload_${type}.jpg`);
-            } else {
-                const filename = uri.split('/').pop() || 'upload.jpg';
-                const match = /\.(\w+)$/.exec(filename);
-                const fileType = match ? `image/${match[1]}` : 'image/jpeg';
+            // Use the cross-platform uploadFile helper
+            const uploadedUrl = await uploadFile(uri, currentUser.token, 'image');
 
-                formData.append('image', {
-                    uri,
-                    name: filename,
-                    type: fileType,
-                } as any);
-            }
-
-            const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, {
-                method: 'POST',
-                headers: { 
-                    'Authorization': `Bearer ${currentUser.token}`,
-                    'Accept': 'application/json'
-                },
-                body: formData,
-            });
-
-            if (uploadRes.ok) {
-                const uploadData = await uploadRes.json();
+            if (uploadedUrl) {
+                // Update the chat document with the new image URL
+                const fieldName = type === 'avatar' ? 'groupAvatar' : 'groupCoverImage';
                 const updateRes = await ApiClient.put<any>(`/api/chats/${id}`, 
-                    { [type === 'avatar' ? 'groupAvatar' : 'groupCoverImage']: uploadData.url }, 
+                    { [fieldName]: uploadedUrl }, 
                     { 'Authorization': `Bearer ${currentUser.token}` }
                 );
+
                 if (updateRes.success) {
                     setGroupData(updateRes.data);
+                } else {
+                    Alert.alert("Error", "Failed to update group data in database");
                 }
-            } else {
-                const errData = await uploadRes.json();
-                console.error("Upload error response:", errData);
-                Alert.alert("Error", errData.message || "Failed to upload image");
             }
         } catch (error) {
             console.error("Upload error:", error);
-            Alert.alert("Error", "Failed to update image");
+            Alert.alert("Error", "Failed to upload or update image. Please try again.");
         } finally {
             setUpdating(null);
+            setIsUploading(false);
         }
     };
 
@@ -540,6 +576,22 @@ export default function GroupInfoScreen() {
                 confirmText="Clear"
                 onConfirm={onClearChatConfirm}
                 onCancel={() => setIsClearModalVisible(false)}
+            />
+
+            <ProcessingModal 
+                visible={isUploading} 
+                message={uploadMessage} 
+            />
+
+            <ImageConfirmModal
+                visible={isConfirmModalVisible}
+                imageUri={pendingImage?.uri || null}
+                title={`Confirm Group ${pendingImage?.type === 'avatar' ? 'Avatar' : 'Cover Image'}`}
+                onConfirm={confirmGroupImageUpload}
+                onCancel={() => {
+                    setIsConfirmModalVisible(false);
+                    setPendingImage(null);
+                }}
             />
         </SafeAreaView>
     );

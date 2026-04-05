@@ -1,6 +1,7 @@
 import ChatItem from '@/components/ChatItem';
 import CreateGroupModal from '@/components/CreateGroupModal';
 import NewChatModal from '@/components/NewChatModal';
+import ConfirmModal from '@/components/ConfirmModal';
 import NoteViewer from '@/components/NoteViewer';
 import { SkeletonChat } from '@/components/Skeletons';
 import { API_BASE_URL } from '@/constants/Config';
@@ -103,6 +104,8 @@ export default function ChatScreen() {
     const [selectedNote, setSelectedNote] = useState<any>(null);
     const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'groups' | 'marketplace'>('all');
     const [showGroupModal, setShowGroupModal] = useState(false);
+    const [selectedChatForDelete, setSelectedChatForDelete] = useState<any>(null);
+    const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
 
     // Fetch Data
     const fetchData = useCallback(async () => {
@@ -198,6 +201,33 @@ export default function ChatScreen() {
             .replace(' days', 'd')
             .replace(' day', 'd')
             .replace(' less than a minute', 'now');
+    };
+
+    const handleDeleteChat = async () => {
+        if (!selectedChatForDelete || !user?.token || !user?._id) return;
+        
+        const chatIdToRemove = selectedChatForDelete._id;
+        const previousChats = [...chats];
+
+        // 1. Optimistic Update (Immediate disappearance)
+        setChats(prev => prev.filter(c => c._id !== chatIdToRemove));
+        setIsDeleteModalVisible(false);
+        setSelectedChatForDelete(null);
+
+        try {
+            const res = await ApiClient.delete(`/api/chats/${chatIdToRemove}`, {
+                'Authorization': `Bearer ${user.token}`
+            });
+            
+            if (!res.success) {
+                // Restore if failed
+                setChats(previousChats);
+            }
+        } catch (error) {
+            console.error('Delete chat error:', error);
+            // Restore on error
+            setChats(previousChats);
+        }
     };
 
     const filters = [
@@ -394,6 +424,10 @@ export default function ChatScreen() {
                                         router.push(`/message/${other?._id}`);
                                     }
                                 }}
+                                onLongPress={() => {
+                                    setSelectedChatForDelete(item);
+                                    setIsDeleteModalVisible(true);
+                                }}
                                 isDark={isDark}
                             />
                         );
@@ -482,6 +516,19 @@ export default function ChatScreen() {
                             console.error('Error liking note:', error);
                         }
                     }
+                }}
+            />
+
+            <ConfirmModal
+                visible={isDeleteModalVisible}
+                title="Delete Chat?"
+                message={`Are you sure you want to delete this chat? This action cannot be undone.`}
+                confirmText="Delete"
+                isDestructive={true}
+                onConfirm={handleDeleteChat}
+                onCancel={() => {
+                    setIsDeleteModalVisible(false);
+                    setSelectedChatForDelete(null);
                 }}
             />
         </SafeAreaView>

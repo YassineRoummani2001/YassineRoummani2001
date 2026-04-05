@@ -92,7 +92,7 @@ export default function SavedScreen() {
     const renderGridItem = useCallback(({ item, index }: { item: any, index: number }) => {
         const isVideo = item.type === 'reel' || item.type === 'video' || item.uri?.endsWith('.mp4');
         const gap = 1;
-        const columns = activeTab === 0 ? 4 : 3;
+        const columns = 4;
         const itemSize = (contentWidth / columns) - (gap * 2);
 
         return (
@@ -105,7 +105,7 @@ export default function SavedScreen() {
                         styles.gridItem, 
                         { 
                             width: itemSize, 
-                            height: activeTab === 0 ? itemSize : itemSize * 1.4, 
+                            height: itemSize, 
                             margin: gap 
                         }
                     ]}
@@ -142,10 +142,6 @@ export default function SavedScreen() {
             {/* My Collections Section preview */}
             <View style={styles.collectionsHeader}>
                 <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>Collections</Text>
-                <TouchableOpacity style={styles.newColBtn}>
-                   <Plus size={16} color={colors.primary} />
-                   <Text style={[styles.newColText, { color: colors.primary }]}>New</Text>
-                </TouchableOpacity>
             </View>
             
             <ScrollView 
@@ -219,9 +215,7 @@ export default function SavedScreen() {
                         <Text style={[styles.navHeaderTitle, { color: colors.text }]}>Saved Content</Text>
                         <Text style={[styles.navHeaderSub, { color: colors.textSecondary }]}>{getFilteredPosts.length} matches</Text>
                     </View>
-                    <TouchableOpacity style={styles.iconBtn}>
-                        <Search size={22} color={colors.text} />
-                    </TouchableOpacity>
+                    <View style={{ width: 40 }} />
                 </View>
             </BlurView>
 
@@ -231,11 +225,11 @@ export default function SavedScreen() {
                 </View>
             ) : (
                 <FlatList
-                    key={`grid-${activeTab === 0 ? 4 : 3}`}
+                    key={`grid-4`}
                     data={getFilteredPosts}
                     keyExtractor={(item, index) => item._id || index.toString()}
                     renderItem={renderGridItem}
-                    numColumns={activeTab === 0 ? 4 : 3}
+                    numColumns={4}
                     ListHeaderComponent={ListHeader}
                     ListEmptyComponent={
                         <Animated.View entering={FadeInDown} style={styles.emptyState}>

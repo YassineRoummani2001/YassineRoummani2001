@@ -10,21 +10,28 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ConfirmationModal from '../components/ConfirmationModal';
+import ProcessingModal from '../components/ProcessingModal';
+import ImageConfirmModal from '../components/ImageConfirmModal';
+import { uploadFile } from '@/utils/uploadHelper';
+import * as FileSystem from 'expo-file-system';
 
 // Helper to normalize URIs (Copied from ProfileScreen for consistency)
 const getCorrectUrl = (url: string) => {
     if (!url || typeof url !== 'string') return '';
-    if (url.startsWith('blob:')) return '';
-    if (url.startsWith('data:')) return url;
-    if (url.startsWith('http')) return url;
+    let clean = url.trim();
+    if (clean.length === 0 || clean.startsWith('blob:')) return '';
+    if (clean.startsWith('data:')) return clean;
     
-    // Force use of current API_BASE_URL for any internal uploads
-    if (url.includes('/uploads/')) {
-        const uploadIndex = url.indexOf('/uploads/');
-        return `${API_BASE_URL}${url.substring(uploadIndex)}`;
+    // Fix: If it's a localhost URL from web, strip it so it can be re-prefixed
+    if (clean.includes('localhost:5000') || clean.includes('127.0.0.1:5000')) {
+        clean = clean.split('/uploads/')[1] || clean;
     }
+
+    if (clean.startsWith('http') && !clean.includes('localhost')) return clean;
     
-    return `${API_BASE_URL}/uploads/${url}`;
+    // Normalize to filename/path relative to uploads
+    const filename = clean.replace('/uploads/', '').replace(/^\//, '');
+    return `${API_BASE_URL}/uploads/${filename}`;
 };
 
 export default function EditProfileScreen() {
@@ -35,6 +42,13 @@ export default function EditProfileScreen() {
     const { width } = useWindowDimensions();
     const isDesktop = Platform.OS === 'web' && width > 768;
     const [saving, setSaving] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadMessage, setUploadMessage] = useState("Downloading image...");
+
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+    const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false);
+    const [pendingImage, setPendingImage] = useState<{ uri: string, type: string } | null>(null);
 
     // Initialize with user data or defaults
     const [name, setName] = useState(user?.name || '');
@@ -77,21 +91,59 @@ export default function EditProfileScreen() {
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsEditing: true,
             aspect: type === 'avatar' ? [1, 1] : [16, 9],
-            quality: 0.5,
-            base64: true,
+            quality: 0.8,
         });
 
         if (!result.canceled) {
-            const uri = result.assets[0].base64
-                ? `data:${result.assets[0].mimeType || 'image/jpeg'};base64,${result.assets[0].base64}`
-                : result.assets[0].uri;
-
-            if (type === 'avatar') {
-                setAvatar(uri);
-            } else {
-                setCoverImage(uri);
+            const asset = result.assets[0];
+            const uri = asset.uri;
+            
+            // Check file size
+            let fileSize = asset.fileSize;
+            
+            // If native and fileSize is missing, try FileSystem
+            if (!fileSize && Platform.OS !== 'web' && uri.startsWith('file:')) {
+                try {
+                    const fileInfo = await FileSystem.getInfoAsync(uri);
+                    if (fileInfo.exists) fileSize = fileInfo.size;
+                } catch (e) {
+                    console.warn("Failed to get file info:", e);
+                }
+            } else if (!fileSize && Platform.OS === 'web' && uri.startsWith('blob:')) {
+                try {
+                    const response = await fetch(uri);
+                    const blob = await response.blob();
+                    fileSize = blob.size;
+                } catch (e) {
+                    console.warn("Failed to get blob size:", e);
+                }
             }
+
+            if (fileSize && fileSize > MAX_FILE_SIZE) {
+                setModalMessage({
+                    title: 'Image Too Large',
+                    message: `The selected image is too big (${(fileSize / (1024 * 1024)).toFixed(1)}MB). Maximum size is 10MB.`
+                });
+                setErrorModalVisible(true);
+                return;
+            }
+
+            setPendingImage({ uri, type });
+            setIsConfirmModalVisible(true);
         }
+    };
+
+    const confirmUpload = () => {
+        if (!pendingImage) return;
+        
+        if (pendingImage.type === 'avatar') {
+            setAvatar(pendingImage.uri);
+        } else {
+            setCoverImage(pendingImage.uri);
+        }
+        
+        setIsConfirmModalVisible(false);
+        setPendingImage(null);
     };
 
     const [isPrivate, setIsPrivate] = useState(user?.isPrivate ?? true);
@@ -105,6 +157,35 @@ export default function EditProfileScreen() {
             fullPhone = selectedCountry.code + phone.replace(/^0+/, '');
         }
 
+        setIsUploading(true);
+        setUploadMessage("Downloading image...");
+
+        let finalAvatar = avatar;
+        let finalCover = coverImage;
+
+        try {
+            if (avatar && (avatar.startsWith('file:') || avatar.startsWith('blob:') || avatar.startsWith('ph:'))) {
+                 // console.log('📤 Uploading new avatar...');
+                 finalAvatar = await uploadFile(avatar, user.token, 'image');
+            }
+            if (coverImage && (coverImage.startsWith('file:') || coverImage.startsWith('blob:') || coverImage.startsWith('ph:'))) {
+                 // console.log('📤 Uploading new cover image...');
+                 finalCover = await uploadFile(coverImage, user.token, 'image');
+            }
+        } catch (error) {
+            console.error('❌ Image upload failed:', error);
+            setModalMessage({
+                title: 'Upload Failed',
+                message: 'Failed to upload your new profile images. Please try again.'
+            });
+            setErrorModalVisible(true);
+            setIsUploading(false);
+            setSaving(false);
+            return;
+        }
+
+        setIsUploading(false);
+
         const updatedUser: any = {
             name,
             handle,
@@ -114,8 +195,8 @@ export default function EditProfileScreen() {
             isPrivate,
             phone: fullPhone,
             links: website ? [{ title: 'Website', url: website }] : [],
-            avatar,
-            coverImage
+            avatar: finalAvatar,
+            coverImage: finalCover
         };
 
         if (newPassword) {
@@ -460,6 +541,22 @@ export default function EditProfileScreen() {
                 title={modalMessage.title}
                 message={modalMessage.message}
                 type="error"
+            />
+
+            <ProcessingModal 
+                visible={isUploading} 
+                message={uploadMessage} 
+            />
+
+            <ImageConfirmModal
+                visible={isConfirmModalVisible}
+                imageUri={pendingImage?.uri || null}
+                title={`Confirm ${pendingImage?.type === 'avatar' ? 'Profile Picture' : 'Cover Image'}`}
+                onConfirm={confirmUpload}
+                onCancel={() => {
+                    setIsConfirmModalVisible(false);
+                    setPendingImage(null);
+                }}
             />
         </View >
     );
