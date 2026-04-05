@@ -7,6 +7,7 @@ import { ArrowLeft, Camera, MapPin, Search, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 
 const CATEGORIES = ['Electronics', 'Vehicles', 'Clothing', 'Home', 'Sports', 'Other'];
 const CONDITIONS = ['New', 'Like New', 'Good', 'Fair', 'Poor'];
@@ -98,6 +99,17 @@ export default function CreateMarketItemScreen() {
         setImages(images.filter((_, i) => i !== index));
     };
 
+    const resetForm = () => {
+        setTitle('');
+        setDescription('');
+        setPrice('');
+        setCity('');
+        setImages([]);
+        setCategory('Electronics');
+        setCondition('Good');
+        setCurrency('DH');
+    };
+
     const handleSubmit = async () => {
         if (!title || !description || !price) {
             Alert.alert('Error', 'Please fill in all required fields');
@@ -183,9 +195,14 @@ export default function CreateMarketItemScreen() {
             });
 
             if (res.ok) {
-                Alert.alert('Success', isEditing ? 'Your item has been updated!' : 'Your item has been listed!', [
-                    { text: 'OK', onPress: () => router.replace('/marketplace/selling') }
-                ]);
+                Toast.show({
+                    type: 'success',
+                    text1: isEditing ? 'Success' : 'Listed',
+                    text2: isEditing ? 'Product updated successfully!' : 'Product listed successfully!',
+                    visibilityTime: 3000,
+                });
+                resetForm();
+                router.replace('/(tabs)/marketplace');
             } else {
                 const error = await res.json();
                 Alert.alert('Error', error.message || 'Failed to create listing');

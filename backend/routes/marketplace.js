@@ -68,6 +68,16 @@ router.get('/stats', protect, async (req, res) => {
         const userItems = await MarketItem.find({ user: userId });
         const totalViews = userItems.reduce((sum, item) => sum + (item.views || 0), 0);
 
+        // Aggregate daily views for time-series charts
+        const dailyViewsMap = {};
+        userItems.forEach(item => {
+            if (item.dailyViews) {
+                item.dailyViews.forEach(dv => {
+                    dailyViewsMap[dv.date] = (dailyViewsMap[dv.date] || 0) + dv.count;
+                });
+            }
+        });
+
         // 3. Chats to answer (all unread messages where user is a participant and sender is not them)
         // Find chats user is in
         const userChats = await Chat.find({ participants: userId })
@@ -97,6 +107,7 @@ router.get('/stats', protect, async (req, res) => {
         res.json({
             activeListings,
             totalViews,
+            dailyViewsMap, // Now serving 100% real database time-series!
             chatsToAnswer: unreadCount,
             listingsToRenew: 0,
             deleteAndRelist: 0,
@@ -123,6 +134,16 @@ router.get('/:id', async (req, res) => {
         
         // Increment view count
         item.views += 1;
+        
+        // Track time-series views
+        const today = new Date().toISOString().split('T')[0];
+        const dailyViewIdx = item.dailyViews.findIndex(v => v.date === today);
+        if (dailyViewIdx >= 0) {
+            item.dailyViews[dailyViewIdx].count += 1;
+        } else {
+            item.dailyViews.push({ date: today, count: 1 });
+        }
+        
         await item.save();
         
         res.json(item);

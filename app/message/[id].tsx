@@ -41,16 +41,21 @@ const getCorrectUrl = (url: string | undefined | null) => {
     const clean = url.trim();
     if (clean.length === 0) return undefined;
 
-    // Check for full URLs or data URIs
-    if (/^(https?|file|data):/i.test(clean)) return clean;
+    if (clean.startsWith('blob:') || clean.startsWith('data:') || clean.startsWith('file:')) return clean;
 
-    // Handle relative paths - ensure encoding for filenames with spaces
-    // We strictly assume API_BASE_URL is defined. If not, this still returns a valid-ish string structure.
-    const cleanPath = clean.replace(/\\/g, '/');
-    // Encode the path parts to handle spaces in filenames
-    const encodedPath = cleanPath.split('/').map(part => encodeURIComponent(part)).join('/');
+    if (clean.startsWith('http') && clean.includes('/uploads/')) {
+        const parts = clean.split('/uploads/');
+        return `${API_BASE_URL}/uploads/${parts[1]}`;
+    }
+    
+    if (clean.startsWith('http')) return clean;
+    if (clean.startsWith('/uploads/')) return `${API_BASE_URL}${clean}`;
+    if (clean.includes('/uploads/')) {
+        const parts = clean.split('/uploads/');
+        return `${API_BASE_URL}/uploads/${parts[1]}`;
+    }
 
-    return `${API_BASE_URL}/uploads/${encodedPath}`;
+    return `${API_BASE_URL}/uploads/${clean}`;
 };
 
 const formatTime = (dateStr: string) => {
@@ -769,6 +774,7 @@ export default function MessageScreen() {
             const rMsg = item.replyTo;
             const rSender = rMsg.sender?.name || 'User';
             const rContent = rMsg.type === 'text' ? rMsg.content : (rMsg.type === 'audio' ? 'Voice Message' : 'Media');
+            const rImageUrl = rMsg.type === 'image' ? getCorrectUrl(rMsg.content) : null;
 
             return (
                 <View style={{
@@ -778,10 +784,23 @@ export default function MessageScreen() {
                     padding: 6,
                     margin: 4,
                     marginBottom: 2,
-                    borderRadius: 4
+                    borderRadius: 4,
+                    flexDirection: 'row',
+                    gap: 8,
+                    alignItems: 'center',
+                    minWidth: 160
                 }}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: isMe ? 'white' : colors.primary, marginBottom: 2 }}>{rSender}</Text>
-                    <Text numberOfLines={1} style={{ fontSize: 11, color: isMe ? 'rgba(255,255,255,0.8)' : colors.textSecondary }}>{rContent}</Text>
+                    <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: isMe ? 'white' : colors.primary, marginBottom: 2 }}>{rSender}</Text>
+                        <Text numberOfLines={1} style={{ fontSize: 11, color: isMe ? 'rgba(255,255,255,0.8)' : colors.textSecondary }}>{rContent}</Text>
+                    </View>
+                    {rImageUrl && (
+                        <ExpoImage 
+                            source={{ uri: rImageUrl }} 
+                            style={{ width: 34, height: 34, borderRadius: 4 }} 
+                            contentFit="cover" 
+                        />
+                    )}
                 </View>
             );
         };
@@ -875,7 +894,15 @@ export default function MessageScreen() {
                                     </View>
                                 )}
                                 {imageUrl ? (
-                                    <ExpoImage source={{ uri: imageUrl }} style={{ width: '100%', height: 220 }} contentFit="cover" />
+                                    <View style={{ width: '100%', height: 220, backgroundColor: isDark ? '#333' : '#E0E0E0' }}>
+                                        <ExpoImage 
+                                            source={{ uri: imageUrl }} 
+                                            style={{ width: '100%', height: '100%' }} 
+                                            contentFit="cover" 
+                                            onLoad={() => console.log('Image loaded successfully')}
+                                            onError={() => console.log('Image failed to load URL:', imageUrl)}
+                                        />
+                                    </View>
                                 ) : (
                                     <View style={{ width: '100%', height: 220, backgroundColor: isDark ? '#333' : '#E0E0E0', alignItems: 'center', justifyContent: 'center' }}>
                                         <Ionicons name="image-outline" size={40} color={colors.textSecondary} />
@@ -920,7 +947,7 @@ export default function MessageScreen() {
                         borderBottomRightRadius: isMe ? 4 : 20,
                         borderBottomLeftRadius: isMe ? 20 : 4,
                         backgroundColor: isMe ? colors.primary : (isDark ? '#262626' : '#F2F2F2'),
-                        minWidth: 100
+                        minWidth: 140
                     }}>
                         <ReplyBlock />
                         <NoteReplyBlock />
@@ -1090,13 +1117,22 @@ export default function MessageScreen() {
                             backgroundColor: isDark ? '#1a1a1a' : '#f0f0f0',
                             borderLeftWidth: 4, borderLeftColor: colors.primary
                         }}>
-                            <View>
-                                <Text style={{ fontWeight: '700', color: colors.text }}>Replying to {replyingTo.sender === user?._id ? 'Yourself' : 'User'}</Text>
-                                <Text numberOfLines={1} style={{ color: colors.textSecondary, fontSize: 12 }}>
-                                    {replyingTo.type === 'text' ? replyingTo.content : `[${replyingTo.type}]`}
-                                </Text>
+                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontWeight: '700', color: colors.text }}>Replying to {replyingTo.sender === user?._id ? 'Yourself' : (replyingTo.sender?.name || 'User')}</Text>
+                                    <Text numberOfLines={1} style={{ color: colors.textSecondary, fontSize: 12 }}>
+                                        {replyingTo.type === 'text' ? replyingTo.content : (replyingTo.type === 'image' ? 'Image' : `[${replyingTo.type}]`)}
+                                    </Text>
+                                </View>
+                                {replyingTo.type === 'image' && (
+                                    <ExpoImage 
+                                        source={{ uri: getCorrectUrl(replyingTo.content) }} 
+                                        style={{ width: 40, height: 40, borderRadius: 6 }} 
+                                        contentFit="cover" 
+                                    />
+                                )}
                             </View>
-                            <TouchableOpacity onPress={() => setReplyingTo(null)}>
+                            <TouchableOpacity onPress={() => setReplyingTo(null)} style={{ padding: 4 }}>
                                 <Ionicons name="close" size={20} color={colors.textSecondary} />
                             </TouchableOpacity>
                         </View>

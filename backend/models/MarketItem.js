@@ -53,6 +53,10 @@ const marketItemSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    dailyViews: [{
+        date: String,
+        count: { type: Number, default: 0 }
+    }],
     savedBy: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'

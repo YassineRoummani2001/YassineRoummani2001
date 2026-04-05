@@ -1,4 +1,6 @@
 import { useUser } from '@/context/AuthContext';
+import { useMessages } from '@/context/MessagesContext';
+import { useNotifications } from '@/context/NotificationContext';
 import { useThemeContext } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { usePathname, useRouter } from 'expo-router';
@@ -23,6 +25,8 @@ export default function WebSidebar() {
     const pathname = usePathname();
     const { colors, isDark } = useThemeContext();
     const { user } = (useUser() || {}) as any;
+    const { unreadCount: unreadMessages } = useMessages();
+    const { unreadCount: unreadNotifications } = useNotifications();
 
     const SIDEBAR_WIDTH = 280;
 
@@ -71,12 +75,16 @@ export default function WebSidebar() {
             <View style={styles.menuContainer}>
                 {menuItems.map((item) => {
                     const active = isActive(item.path);
+                    let badgeCount = 0;
+                    if (item.name === 'Messages') badgeCount = unreadMessages;
+                    if (item.name === 'Notifications') badgeCount = unreadNotifications;
 
                     return (
                         <MenuItem
                             key={item.name}
                             item={item}
                             active={active}
+                            badgeCount={badgeCount}
                             onPress={() => router.push(item.path as any)}
                             colors={colors}
                             isDark={isDark}
@@ -123,7 +131,7 @@ export default function WebSidebar() {
     );
 }
 
-function MenuItem({ item, active, onPress, colors, isDark }: any) {
+function MenuItem({ item, active, onPress, colors, isDark, badgeCount }: any) {
     return (
         <Pressable
             onPress={onPress}
@@ -152,9 +160,16 @@ function MenuItem({ item, active, onPress, colors, isDark }: any) {
                 styles.menuText,
                 { color: active ? colors.primary : isDark ? '#EEE' : '#111', marginLeft: 16 },
                 active && { fontWeight: '800' },
+                { flex: 1 }
             ]}>
                 {item.name}
             </Text>
+            
+            {badgeCount > 0 && (
+                <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+                    <Text style={styles.badgeText}>{badgeCount > 99 ? '99+' : badgeCount}</Text>
+                </View>
+            )}
         </Pressable>
     );
 }
@@ -277,5 +292,19 @@ const styles = StyleSheet.create({
     },
     userHandle: {
         fontSize: 12,
+    },
+    badge: {
+        minWidth: 22,
+        height: 22,
+        borderRadius: 11,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 6,
+        marginLeft: 8,
+    },
+    badgeText: {
+        color: 'white',
+        fontSize: 11,
+        fontWeight: 'bold',
     }
 });
