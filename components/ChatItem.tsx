@@ -13,6 +13,7 @@ interface ChatItemProps {
     storyViewed?: boolean;
     onPress: () => void;
     onLongPress?: () => void;
+    onStoryPress?: () => void;
     isDark: boolean;
     lastMessageSender?: string;
     isPinned?: boolean;
@@ -31,6 +32,7 @@ const ChatItem = memo(({
     storyViewed = false,
     onPress,
     onLongPress,
+    onStoryPress,
     isDark,
     lastMessageSender,
     isPinned = false
@@ -86,6 +88,17 @@ const ChatItem = memo(({
                     )}
                 </View>
                 {online && <View style={[styles.onlineDot, { borderColor: bgColor }]} />}
+                {hasStory && onStoryPress && (
+                    <Pressable
+                        onPress={onStoryPress}
+                        style={[styles.storyPlayIcon, { 
+                            backgroundColor: storyViewed ? '#A0A0A0' : '#E1306C',
+                            borderColor: bgColor 
+                        }]}
+                    >
+                        <Ionicons name="play" size={8} color="#FFF" style={{ marginLeft: 1 }} />
+                    </Pressable>
+                )}
             </View>
 
             {/* Info */}
@@ -223,6 +236,17 @@ const styles = StyleSheet.create({
         height: 10,
         borderRadius: 5,
         backgroundColor: '#0095F6',
+    },
+    storyPlayIcon: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
     },
 });
 

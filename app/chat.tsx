@@ -447,6 +447,15 @@ export default function ChatScreen() {
                                     setSelectedChatForDelete(item);
                                     setIsDeleteModalVisible(true);
                                 }}
+                                onStoryPress={item.hasStory && !item.isGroup && other ? () => {
+                                    router.push({
+                                        pathname: '/story-view',
+                                        params: {
+                                            userId: other._id,
+                                            userStr: JSON.stringify({ _id: other._id, name: other.name, avatar: other.avatar, stories: other.stories || [] })
+                                        }
+                                    } as any);
+                                } : undefined}
                                 isPinned={item.isPinned}
                                 isDark={isDark}
                             />
