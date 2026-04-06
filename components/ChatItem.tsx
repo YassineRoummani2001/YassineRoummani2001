@@ -9,11 +9,16 @@ interface ChatItemProps {
     time: string;
     unread?: number;
     online?: boolean;
+    hasStory?: boolean;
+    storyViewed?: boolean;
     onPress: () => void;
     onLongPress?: () => void;
     isDark: boolean;
     lastMessageSender?: string;
+    isPinned?: boolean;
 }
+
+import { Ionicons } from '@expo/vector-icons';
 
 const ChatItem = memo(({
     avatar,
@@ -22,10 +27,13 @@ const ChatItem = memo(({
     time,
     unread = 0,
     online = false,
+    hasStory = false,
+    storyViewed = false,
     onPress,
     onLongPress,
     isDark,
-    lastMessageSender
+    lastMessageSender,
+    isPinned = false
 }: ChatItemProps) => {
 
     // Fallback initials
@@ -55,27 +63,43 @@ const ChatItem = memo(({
         >
             {/* Avatar */}
             <View style={styles.avatarContainer}>
-                {/* Note Bubble Removed */}
-
-                {avatar ? (
-                    <Image
-                        source={{ uri: avatar }}
-                        style={styles.avatar}
-                        contentFit="cover"
-                        transition={200}
-                    />
-                ) : (
-                    <View style={[styles.avatarFallback, { backgroundColor: isDark ? '#333' : '#E0E0E0' }]}>
-                        <Text style={[styles.initials, { color: isDark ? '#FFF' : '#555' }]}>{initials}</Text>
-                    </View>
-                )}
+                <View style={hasStory ? {
+                    padding: 2,
+                    borderRadius: 32, // (56 + 2*2 + 2*2)/2 = 32
+                    borderWidth: 2,
+                    borderColor: storyViewed ? '#A0A0A0' : '#E1306C', // Grey if viewed, Pink if new
+                } : {}}>
+                    {avatar ? (
+                        <Image
+                            source={{ uri: avatar }}
+                            style={styles.avatar}
+                            contentFit="cover"
+                            transition={200}
+                        />
+                    ) : (
+                        <View style={[
+                            styles.avatarFallback,
+                            { backgroundColor: isDark ? '#333' : '#E0E0E0' }
+                        ]}>
+                            <Text style={[styles.initials, { color: isDark ? '#FFF' : '#555' }]}>{initials}</Text>
+                        </View>
+                    )}
+                </View>
                 {online && <View style={[styles.onlineDot, { borderColor: bgColor }]} />}
             </View>
 
             {/* Info */}
             <View style={styles.content}>
-                <View style={styles.row}>
-                    <Text numberOfLines={1} style={[styles.name, { color: textColor }]}>{name}</Text>
+                <View style={[styles.row, { gap: 4 }]}>
+                    {isPinned && (
+                        <Ionicons 
+                            name="pin" 
+                            size={12} 
+                            color={isDark ? '#FFF' : '#333'} 
+                            style={{ opacity: 0.6, marginTop: 2 }} 
+                        />
+                    )}
+                    <Text numberOfLines={1} style={[styles.name, { color: textColor, flex: 1 }]}>{name}</Text>
                     <Text style={[styles.time, { color: subTextColor }]}>{time}</Text>
                 </View>
 

@@ -797,7 +797,7 @@ router.get('/search', async (req, res) => {
             const Post = require('../models/Post');
             results.posts = await Post.find({
                 caption: { $regex: q.replace('#', ''), $options: 'i' }
-            }).populate('user', 'name handle avatar').limit(20);
+            }).populate('user', 'name handle avatar');
         } else {
             // Search for users
             results.users = await User.find({

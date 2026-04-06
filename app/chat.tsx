@@ -102,7 +102,8 @@ export default function ChatScreen() {
     const [showNewChat, setShowNewChat] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedNote, setSelectedNote] = useState<any>(null);
-    const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'groups' | 'marketplace'>('all');
+    const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'groups' | 'marketplace' | 'favorites'>('all');
+    const [counts, setCounts] = useState<any>({ all: 0, unread: 0, groups: 0, marketplace: 0, favorites: 0 });
     const [showGroupModal, setShowGroupModal] = useState(false);
     const [selectedChatForDelete, setSelectedChatForDelete] = useState<any>(null);
     const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
@@ -119,7 +120,15 @@ export default function ChatScreen() {
 
             if (chatRes.ok) {
                 const data = await chatRes.json();
-                setChats(data);
+                const sortedChats = (data.chats || []).sort((a: any, b: any) => {
+                    if (a.isPinned && !b.isPinned) return -1;
+                    if (!a.isPinned && b.isPinned) return 1;
+                    const dateA = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt).getTime() : 0;
+                    const dateB = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : 0;
+                    return dateB - dateA;
+                });
+                setChats(sortedChats);
+                setCounts(data.counts || { all: 0, unread: 0, groups: 0, marketplace: 0, favorites: 0 });
             }
             if (followRes.ok) setFollowingUsers(await followRes.json());
 
@@ -185,6 +194,7 @@ export default function ChatScreen() {
         if (activeFilter === 'unread') return c.unreadCount > 0;
         if (activeFilter === 'groups') return c.isGroup;
         if (activeFilter === 'marketplace') return c.isMarketplace;
+        if (activeFilter === 'favorites') return c.favoritedBy && c.favoritedBy.includes(user?._id);
         
         return true;
     });
@@ -231,10 +241,11 @@ export default function ChatScreen() {
     };
 
     const filters = [
-        { id: 'all', label: 'All' },
-        { id: 'unread', label: 'Unread' },
-        { id: 'groups', label: 'Groups' },
-        { id: 'marketplace', label: 'Marketplace' }
+        { id: 'all', label: 'All', count: counts.all },
+        { id: 'unread', label: 'Unread', count: counts.unread },
+        { id: 'favorites', label: 'Favorites', count: counts.favorites },
+        { id: 'groups', label: 'Groups', count: counts.groups },
+        { id: 'marketplace', label: 'Marketplace', count: counts.marketplace }
     ];
 
     return (
@@ -297,7 +308,7 @@ export default function ChatScreen() {
                                 styles.filterText, 
                                 { color: activeFilter === f.id ? (isDark ? '#000' : '#FFF') : colors.textSecondary }
                             ]}>
-                                {f.label}
+                                {f.label} {f.id !== 'all' && f.count > 0 && <Text style={{ fontSize: 10, opacity: 0.7 }}>({f.count})</Text>}
                             </Text>
                         </TouchableOpacity>
                     ))}
@@ -403,7 +414,13 @@ export default function ChatScreen() {
                         const other = item.participants.find((p: any) => p._id !== user._id) || item.participants[0];
                         
                         const chatName = item.isGroup ? item.groupName : (other?.name || 'Vibe User');
-                        const chatAvatar = item.isGroup ? item.groupAvatar : other?.avatar;
+                        let rawAvatar = item.isGroup ? item.groupAvatar : other?.avatar;
+                        if (rawAvatar && rawAvatar.startsWith('/uploads/')) {
+                            rawAvatar = `${API_BASE_URL}${rawAvatar}`;
+                        } else if (rawAvatar && !rawAvatar.startsWith('http') && !rawAvatar.startsWith('data:')) {
+                            rawAvatar = `${API_BASE_URL}/uploads/${rawAvatar}`;
+                        }
+                        const chatAvatar = rawAvatar;
 
                         return (
                             <ChatItem
@@ -417,6 +434,8 @@ export default function ChatScreen() {
                                 time={formatTime(item.updatedAt)}
                                 unread={item.unreadCount || 0}
                                 online={!item.isGroup && other?.isOnline}
+                                hasStory={item.hasStory}
+                                storyViewed={item.storyViewed}
                                 onPress={() => {
                                     if (item.isGroup) {
                                         router.push({ pathname: `/message/${item._id}`, params: { isGroup: 'true' } } as any);
@@ -428,6 +447,7 @@ export default function ChatScreen() {
                                     setSelectedChatForDelete(item);
                                     setIsDeleteModalVisible(true);
                                 }}
+                                isPinned={item.isPinned}
                                 isDark={isDark}
                             />
                         );

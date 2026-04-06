@@ -15,11 +15,7 @@ export default function DesktopRightSidebar() {
     const [suggestedUsers, setSuggestedUsers] = useState<any[]>([]);
     const [hoveredUser, setHoveredUser] = useState<string | null>(null);
     const [hoveredTag, setHoveredTag] = useState<number | null>(null);
-    const [trendingHashtags, setTrendingHashtags] = useState<any[]>([
-        { tag: '#design', count: 124 },
-        { tag: '#development', count: 98 },
-        { tag: '#music', count: 85 }
-    ]);
+    const [trendingHashtags, setTrendingHashtags] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState<'All' | 'New' | 'Old' | 'Follow' | 'Following'>('All');
     const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -51,7 +47,7 @@ export default function DesktopRightSidebar() {
                 if (res.ok) {
                     const data = await res.json();
                     if (data && data.length > 0) {
-                        setTrendingHashtags(data);
+                        setTrendingHashtags(data.slice(0, 8));
                     }
                 }
             } catch (err) {
@@ -60,6 +56,7 @@ export default function DesktopRightSidebar() {
         };
 
         fetchSuggestions();
+        fetchHashtags();
     }, [user?._id]);
 
     const filteredUsers = React.useMemo(() => {

@@ -15,6 +15,8 @@ import {
     MessageSquare,
     Search,
     Shield,
+    Star,
+    Pin,
     UserCircle
 } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -29,8 +31,11 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View
+    View,
+    Dimensions,
+    Platform
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
@@ -74,6 +79,8 @@ export default function UserInfoScreen() {
 
     // States for toggles/settings
     const [isMuted, setIsMuted] = useState(false);
+    const [isPinned, setIsPinned] = useState(false);
+    const [isFavorite, setIsFavorite] = useState(false);
     const [themeColor, setThemeColor] = useState('#ffffff');
     const [showThemePicker, setShowThemePicker] = useState(false);
 
@@ -136,7 +143,15 @@ export default function UserInfoScreen() {
                 }
 
                 // 2. Fetch Chat Data (to get settings like theme, mute)
-                const chatRes = await ApiClient.post<{ theme: string, disappearingMessages: number, mutedBy: string[] }>(
+                const chatRes = await ApiClient.post<{ 
+                    theme: string, 
+                    disappearingMessages: number, 
+                    mutedBy: string[],
+                    isPinned: boolean,
+                    isFavorite: boolean,
+                    _id: string,
+                    nicknames?: Record<string, string>
+                }>(
                     '/api/chats',
                     { userId: id },
                     { 'Authorization': `Bearer ${user?.token}` }
@@ -153,6 +168,8 @@ export default function UserInfoScreen() {
                     if (chatData.mutedBy && user?._id) {
                         setIsMuted(chatData.mutedBy.includes(user._id));
                     }
+                    setIsPinned(!!chatData.isPinned);
+                    setIsFavorite(!!chatData.isFavorite);
                 }
 
             } catch (error) {
@@ -197,6 +214,32 @@ export default function UserInfoScreen() {
         } else {
             // Revert on failure (complex to revert fully here without refetch, but acceptable for now)
             ErrorHandler.show(response.message, 'toast');
+        }
+    };
+
+    const handlePinToggle = async () => {
+        if (!chat?._id) return;
+        const newState = !isPinned;
+        setIsPinned(newState);
+        const res = await ApiClient.post<any>(`/api/chats/${chat._id}/pin`, {}, { 'Authorization': `Bearer ${user?.token}` });
+        if (res.success) {
+            Toast.show({ type: 'success', text1: newState ? 'Pinned' : 'Unpinned' });
+        } else {
+            setIsPinned(!newState);
+            ErrorHandler.show(res.message, 'toast');
+        }
+    };
+
+    const handleFavoriteToggle = async () => {
+        if (!chat?._id) return;
+        const newState = !isFavorite;
+        setIsFavorite(newState);
+        const res = await ApiClient.post<any>(`/api/chats/${chat._id}/favorite`, {}, { 'Authorization': `Bearer ${user?.token}` });
+        if (res.success) {
+            Toast.show({ type: 'success', text1: newState ? 'Added to favorites' : 'Removed from favorites' });
+        } else {
+            setIsFavorite(!newState);
+            ErrorHandler.show(res.message, 'toast');
         }
     };
 
@@ -303,45 +346,68 @@ export default function UserInfoScreen() {
                     <ArrowLeft size={24} color={colors.text} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Details</Text>
-                <View style={{ width: 40 }} />
+                <TouchableOpacity style={styles.backButton} onPress={() => router.push(`/user/${recipient._id}` as any)}>
+                    <UserCircle size={24} color={colors.text} />
+                </TouchableOpacity>
             </View>
 
-            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+                contentContainerStyle={[styles.content, { alignSelf: 'center', width: '100%', maxWidth: 600 }]} 
+                showsVerticalScrollIndicator={false}
+            >
                 {/* Profile Section */}
                 <View style={styles.profileSection}>
-                    <TouchableOpacity onPress={() => router.push(`/user/${recipient._id}` as any)}>
+                    <LinearGradient
+                        colors={[colors.primary + '40', colors.background]}
+                        style={styles.coverBg}
+                    />
+                    
+                    <TouchableOpacity 
+                        activeOpacity={0.9}
+                        onPress={() => router.push(`/user/${recipient._id}` as any)}
+                        style={styles.avatarWrapper}
+                    >
                         <Image
                             source={{ uri: getCorrectUrl(recipient.avatar || 'https://i.pravatar.cc/150') }}
                             style={styles.avatar}
                         />
                     </TouchableOpacity>
-                    <Text style={styles.name}>{currentNickname || recipient.name}</Text>
-                    <Text style={styles.username}>{recipient.handle || `@${recipient.name.replace(/\s/g, '').toLowerCase()}`}</Text>
+                    
+                    <View style={{ alignItems: 'center', marginTop: 10 }}>
+                        <Text style={styles.name}>{currentNickname || recipient.name}</Text>
+                        <Text style={styles.username}>{recipient.handle || `@${recipient.name.replace(/\s/g, '').toLowerCase()}`}</Text>
+                        
+                        {recipient.bio && (
+                            <Text style={styles.bioText} numberOfLines={2}>{recipient.bio}</Text>
+                        )}
+                    </View>
 
                     {/* Action Grid */}
-                    <View style={styles.actionGrid}>
-                        <TouchableOpacity style={styles.actionItem} onPress={() => router.push(`/user/${recipient._id}` as any)}>
-                            <View style={styles.actionIconCircle}>
-                                <UserCircle size={24} color={colors.text} />
-                            </View>
-                            <Text style={styles.actionText}>Profile</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={styles.actionItem} onPress={() => {
-                            router.dismiss();
-                            router.replace(`/message/${id}?search=true` as any);
-                        }}>
-                            <View style={styles.actionIconCircle}>
-                                <Search size={24} color={colors.text} />
-                            </View>
-                            <Text style={styles.actionText}>Search</Text>
-                        </TouchableOpacity>
-
+                    <ScrollView 
+                        horizontal 
+                        showsHorizontalScrollIndicator={false} 
+                        contentContainerStyle={styles.actionGrid}
+                        style={{ width: '100%', marginTop: 24 }}
+                    >
                         <TouchableOpacity style={styles.actionItem} onPress={handleMuteToggle}>
-                            <View style={[styles.actionIconCircle, isMuted && { backgroundColor: colors.gray }]}>
-                                <Bell size={24} color={isMuted ? "#EF4444" : colors.text} />
+                            <View style={[styles.actionIconCircle, isMuted && { backgroundColor: '#EF4444', borderColor: '#EF4444' }]}>
+                                <Bell size={22} color={isMuted ? "#FFF" : colors.text} />
                             </View>
                             <Text style={styles.actionText}>{isMuted ? 'Unmute' : 'Mute'}</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.actionItem} onPress={handlePinToggle}>
+                            <View style={[styles.actionIconCircle, isPinned && { backgroundColor: colors.primary, borderColor: colors.primary }]}>
+                                <Pin size={22} color={isPinned ? "#FFF" : colors.text} />
+                            </View>
+                            <Text style={styles.actionText}>{isPinned ? 'Unpin' : 'Pin'}</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.actionItem} onPress={handleFavoriteToggle}>
+                            <View style={[styles.actionIconCircle, isFavorite && { backgroundColor: '#EAB308', borderColor: '#EAB308' }]}>
+                                <Star size={22} color={isFavorite ? "#FFF" : colors.text} fill={isFavorite ? "#FFF" : "transparent"} />
+                            </View>
+                            <Text style={styles.actionText}>{isFavorite ? 'Unfavorite' : 'Favorite'}</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity style={styles.actionItem} onPress={() => {
@@ -400,7 +466,7 @@ export default function UserInfoScreen() {
                             </View>
                             <Text style={styles.actionText}>Options</Text>
                         </TouchableOpacity>
-                    </View>
+                    </ScrollView>
                 </View>
 
                 {/* Settings Section */}
@@ -609,52 +675,81 @@ const createStyles = (colors: any, isDark: boolean, insets: any) => StyleSheet.c
     },
     profileSection: {
         alignItems: 'center',
-        paddingVertical: 32,
+        paddingBottom: 24,
         backgroundColor: colors.background,
-        marginBottom: 20,
+        marginBottom: 10,
+    },
+    coverBg: {
+        width: '100%',
+        height: 120,
+        position: 'absolute',
+        top: 0,
+    },
+    avatarWrapper: {
+        marginTop: 40,
+        padding: 4,
+        backgroundColor: colors.background,
+        borderRadius: 55,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 6,
     },
     avatar: {
         width: 100,
         height: 100,
         borderRadius: 50,
-        marginBottom: 16,
         borderWidth: 2,
-        borderColor: colors.border
+        borderColor: colors.background
     },
     name: {
         fontSize: 22,
-        fontWeight: '700',
+        fontWeight: '800',
         color: colors.text,
-        marginBottom: 4,
+        marginBottom: 2,
     },
     username: {
-        fontSize: 15,
+        fontSize: 14,
         color: colors.textSecondary,
-        marginBottom: 24,
+        fontWeight: '500',
+        marginBottom: 8,
+    },
+    bioText: {
+        fontSize: 13,
+        color: colors.textSecondary,
+        textAlign: 'center',
+        paddingHorizontal: 40,
+        lineHeight: 18,
     },
     actionGrid: {
         flexDirection: 'row',
-        width: '100%',
-        justifyContent: 'center',
-        gap: 32, // More coherent spacing
         paddingHorizontal: 20,
+        gap: 16, 
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexGrow: 1,
+        paddingBottom: 4,
     },
     actionItem: {
         alignItems: 'center',
-        gap: 8,
+        gap: 6,
+        minWidth: 70,
     },
     actionIconCircle: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: isDark ? '#333' : '#F3F4F6',
+        width: 54,
+        height: 54,
+        borderRadius: 27,
+        backgroundColor: isDark ? '#262626' : '#F2F2F2',
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: isDark ? '#333' : '#EEE',
     },
     actionText: {
         color: colors.text,
-        fontSize: 12,
-        fontWeight: '500',
+        fontSize: 11,
+        fontWeight: '600',
     },
     sectionHeader: {
         paddingHorizontal: 20,

@@ -9,7 +9,7 @@ import { Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, ScrollVi
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
-const CATEGORIES = ['Electronics', 'Vehicles', 'Clothing', 'Home', 'Sports', 'Other'];
+const CATEGORIES = ['Electronics', 'Vehicles', 'Clothing', 'Furniture', 'Beauty', 'Home', 'Sports', 'Toys & Games', 'Books', 'Real Estate', 'Pets', 'Other'];
 const CONDITIONS = ['New', 'Like New', 'Good', 'Fair', 'Poor'];
 
 const MOROCCAN_CITIES = [

@@ -21,20 +21,106 @@ router.get('/', protect, async (req, res) => {
             .populate('participants', 'name handle avatar')
             .sort({ updatedAt: -1 });
 
-        // Calculate unreadCount for each chat
-        const chatsWithUnread = await Promise.all(chats.map(async (chat) => {
+        // Calculate unreadCount and hasStory for each chat
+        const Story = require('../models/Story');
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+        const chatsWithExtras = await Promise.all(chats.map(async (chat) => {
             const unreadCount = await Message.countDocuments({
                 chatId: chat._id,
                 sender: { $ne: req.user._id },
                 readBy: { $ne: req.user._id }
             });
+            
+            let hasStory = false;
+            let storyViewed = false;
+            // Only check for individual chats or if you want it for groups too
+            if (!chat.isGroup) {
+                const otherParticipant = chat.participants.find(p => p._id.toString() !== req.user._id.toString());
+                if (otherParticipant) {
+                    const activeStories = await Story.find({
+                        user: otherParticipant._id,
+                        createdAt: { $gt: twentyFourHoursAgo }
+                    });
+                    
+                    if (activeStories.length > 0) {
+                        hasStory = true;
+                        // It is considered viewed if EVERY active story has been viewed by the user
+                        storyViewed = activeStories.every(story => story.views && story.views.includes(req.user._id));
+                    }
+                }
+            }
+
             return {
                 ...chat._doc,
-                unreadCount
+                unreadCount,
+                hasStory,
+                storyViewed,
+                isPinned: chat.pinnedBy && chat.pinnedBy.includes(req.user._id),
+                isFavorite: chat.favoritedBy && chat.favoritedBy.includes(req.user._id)
             };
         }));
 
-        res.json(chatsWithUnread);
+        res.json({
+            chats: chatsWithExtras,
+            counts: {
+                all: chatsWithExtras.length,
+                unread: chatsWithExtras.filter(c => c.unreadCount > 0).length,
+                groups: chatsWithExtras.filter(c => c.isGroup).length,
+                marketplace: chatsWithExtras.filter(c => c.isMarketplace).length,
+                favorites: chatsWithExtras.filter(c => c.favoritedBy && c.favoritedBy.includes(req.user._id)).length
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Toggle Favorite Chat
+router.post('/:chatId/favorite', protect, async (req, res) => {
+    try {
+        const chat = await Chat.findById(req.params.chatId);
+        if (!chat) return res.status(404).json({ message: 'Chat not found' });
+
+        if (!chat.favoritedBy) chat.favoritedBy = [];
+
+        const index = chat.favoritedBy.indexOf(req.user._id);
+        let favorited = false;
+        if (index > -1) {
+            chat.favoritedBy.splice(index, 1);
+            favorited = false;
+        } else {
+            chat.favoritedBy.push(req.user._id);
+            favorited = true;
+        }
+
+        await chat.save();
+        res.json({ success: true, favorited, chat });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Toggle Pin Chat
+router.post('/:chatId/pin', protect, async (req, res) => {
+    try {
+        const chat = await Chat.findById(req.params.chatId);
+        if (!chat) return res.status(404).json({ message: 'Chat not found' });
+
+        if (!chat.pinnedBy) chat.pinnedBy = [];
+
+        const index = chat.pinnedBy.indexOf(req.user._id);
+        let pinned = false;
+        if (index > -1) {
+            chat.pinnedBy.splice(index, 1);
+            pinned = false;
+        } else {
+            chat.pinnedBy.push(req.user._id);
+            pinned = true;
+        }
+
+        await chat.save();
+        res.json({ success: true, pinned, chat });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

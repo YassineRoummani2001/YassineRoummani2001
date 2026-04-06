@@ -11,7 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -60,6 +60,13 @@ const getCorrectUrl = (url: string | undefined | null) => {
 
 const formatTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+const formatDividerDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const day = date.toLocaleDateString([], { weekday: 'short' }).toUpperCase();
+    const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    return `${day} ${time}`;
 };
 
 const AvatarImage = ({ uri, name, size = 32 }: { uri?: string, name?: string, size?: number }) => {
@@ -248,6 +255,19 @@ export default function MessageScreen() {
     const [messages, setMessages] = useState<any[]>([]);
     const [inputText, setInputText] = useState('');
     const [keyboardVisible, setKeyboardVisible] = useState(false);
+    const [showSearch, setShowSearch] = useState(params.search === 'true');
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Filter messages based on search query
+    const filteredMessages = useMemo(() => {
+        if (!searchQuery.trim()) return messages;
+        const q = searchQuery.toLowerCase();
+        return messages.filter((m: any) => {
+            if (m.type === 'text' && m.content?.toLowerCase().includes(q)) return true;
+            if (m.type === 'system' && m.content?.toLowerCase().includes(q)) return true;
+            return false;
+        });
+    }, [messages, searchQuery]);
 
     useEffect(() => {
         const showSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboardVisible(true));
@@ -726,12 +746,33 @@ export default function MessageScreen() {
     };
 
     // Render Items
-    const renderMessageItem = ({ item }: { item: any }) => {
+    const renderMessageItem = ({ item, index }: { item: any, index: number }): React.ReactElement | null => {
         if (!item || !user) return null;
+
+        // Divider logic: compare with the next older message (index + 1 in inverted list)
+        let showDivider = false;
+        let dividerText = '';
+        
+        const nextMsg = messages[index + 1]; 
+        if (nextMsg) {
+            const currentDate = new Date(item.createdAt);
+            const nextDate = new Date(nextMsg.createdAt);
+            const diff = currentDate.getTime() - nextDate.getTime();
+            
+            // Show divider if more than 30 minutes gap
+            if (diff > 30 * 60 * 1000) {
+                showDivider = true;
+                dividerText = formatDividerDate(item.createdAt);
+            }
+        } else if (index === messages.length - 1) {
+            // First message of the chat (at the very top)
+            showDivider = true;
+            dividerText = formatDividerDate(item.createdAt);
+        }
 
         if (item.type === 'system') {
             const isMeAction = item.sender?._id === user._id || item.sender === user._id;
-            return (
+            const systemContent = (
                 <View style={{ width: '100%', alignItems: 'center', marginVertical: 14 }}>
                     <View style={{ 
                         backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
@@ -759,6 +800,18 @@ export default function MessageScreen() {
                             </Text>
                         )}
                     </View>
+                </View>
+            );
+            return (
+                <View>
+                    {showDivider && (
+                        <View style={{ marginVertical: 20, alignItems: 'center' }}>
+                            <Text style={{ fontSize: 11, color: colors.textSecondary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                {dividerText}
+                            </Text>
+                        </View>
+                    )}
+                    {systemContent}
                 </View>
             );
         }
@@ -994,7 +1047,18 @@ export default function MessageScreen() {
             </TouchableOpacity>
         );
 
-        return content;
+        return (
+            <View>
+                {showDivider && (
+                    <View style={{ marginVertical: 20, alignItems: 'center' }}>
+                        <Text style={{ fontSize: 11, color: colors.textSecondary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                            {dividerText}
+                        </Text>
+                    </View>
+                )}
+                {content}
+            </View>
+        );
     };
 
     const formatDuration = (sec: number) => {
@@ -1014,45 +1078,88 @@ export default function MessageScreen() {
                 backgroundColor: isDark ? '#000' : '#FFF', 
                 borderBottomColor: isDark ? '#262626' : '#F2F2F2' 
             }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 4, paddingLeft: isDesktop ? 10 : 0 }}>
-                    <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
-                        <Ionicons name="arrow-back" size={24} color={colors.text} />
-                    </TouchableOpacity>
+                {showSearch ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingHorizontal: 4 }}>
+                        <TouchableOpacity onPress={() => setShowSearch(false)} style={{ padding: 8 }}>
+                            <Ionicons name="arrow-back" size={24} color={colors.text} />
+                        </TouchableOpacity>
+                        <TextInput
+                            style={{ 
+                                flex: 1, 
+                                height: 40, 
+                                backgroundColor: isDark ? '#262626' : '#F3F4F6', 
+                                borderRadius: 20, 
+                                paddingHorizontal: 15, 
+                                color: colors.text,
+                                fontSize: 15
+                            }}
+                            placeholder="Search messages..."
+                            placeholderTextColor={colors.textSecondary}
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            autoFocus
+                        />
+                        {searchQuery.length > 0 && (
+                            <TouchableOpacity onPress={() => setSearchQuery('')} style={{ padding: 8 }}>
+                                <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                ) : (
+                    <>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 4, paddingLeft: isDesktop ? 10 : 0 }}>
+                            <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
+                                <Ionicons name="arrow-back" size={24} color={colors.text} />
+                            </TouchableOpacity>
 
-                    {isGroup === 'true' && chat ? (
-                        <TouchableOpacity 
-                            style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }} 
-                            onPress={() => router.push({ pathname: `/message/group-info/${chat._id}` } as any)}
-                        >
-                            <AvatarImage uri={chat.groupAvatar} name={chat.groupName} size={isDesktop ? 40 : 36} />
-                            <View style={{ marginLeft: 12, flex: 1 }}>
-                                <Text numberOfLines={1} style={{ fontSize: isDesktop ? 18 : 16, fontWeight: '700', color: colors.text }}>{chat.groupName}</Text>
-                                <Text numberOfLines={1} style={{ fontSize: 12, color: colors.textSecondary }}>{chat.participants?.length || 0} members</Text>
-                            </View>
-                        </TouchableOpacity>
-                    ) : recipient ? (
-                        <TouchableOpacity 
-                            style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }} 
-                            onPress={() => router.push(`/message/user-info/${userId}`)}
-                        >
-                            <AvatarImage uri={recipient.avatar} name={recipient.name} size={isDesktop ? 40 : 36} />
-                            <View style={{ marginLeft: 12, flex: 1 }}>
-                                <Text numberOfLines={1} style={{ fontSize: isDesktop ? 18 : 16, fontWeight: '700', color: colors.text }}>{recipient.name}</Text>
-                                <Text numberOfLines={1} style={{ fontSize: 12, color: colors.textSecondary }}>{isTyping ? 'Typing...' : (recipient.username || 'View profile')}</Text>
-                            </View>
-                        </TouchableOpacity>
-                    ) : (
-                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-                            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: isDark ? '#262626' : '#EEE' }} />
+                            {isGroup === 'true' && chat ? (
+                                <TouchableOpacity 
+                                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }} 
+                                    onPress={() => router.push({ pathname: `/message/group-info/${chat._id}` } as any)}
+                                >
+                                    <AvatarImage uri={chat.groupAvatar} name={chat.groupName} size={isDesktop ? 40 : 36} />
+                                    <View style={{ marginLeft: 12, flex: 1 }}>
+                                        <Text numberOfLines={1} style={{ fontSize: isDesktop ? 18 : 16, fontWeight: '700', color: colors.text }}>{chat.groupName}</Text>
+                                        <Text numberOfLines={1} style={{ fontSize: 12, color: colors.textSecondary }}>{chat.participants?.length || 0} members</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            ) : recipient ? (
+                                <TouchableOpacity 
+                                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }} 
+                                    onPress={() => router.push(`/message/user-info/${userId}`)}
+                                >
+                                    <AvatarImage uri={recipient.avatar} name={recipient.name} size={isDesktop ? 40 : 36} />
+                                    <View style={{ marginLeft: 12, flex: 1 }}>
+                                        <Text numberOfLines={1} style={{ fontSize: isDesktop ? 18 : 16, fontWeight: '700', color: colors.text }}>{recipient.name}</Text>
+                                        <Text numberOfLines={1} style={{ fontSize: 12, color: colors.textSecondary }}>{isTyping ? 'Typing...' : (recipient.username || 'View profile')}</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            ) : (
+                                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: isDark ? '#262626' : '#EEE' }} />
+                                </View>
+                            )}
                         </View>
-                    )}
-                </View>
 
-                <View style={{ flexDirection: 'row', gap: isDesktop ? 28 : 24, alignItems: 'center', paddingRight: isDesktop ? 20 : 8 }}>
-                    <TouchableOpacity><Ionicons name="call-outline" size={24} color={colors.text} /></TouchableOpacity>
-                    <TouchableOpacity><Ionicons name="videocam-outline" size={26} color={colors.text} /></TouchableOpacity>
-                </View>
+                        <View style={{ flexDirection: 'row', gap: isDesktop ? 20 : 16, alignItems: 'center', paddingRight: isDesktop ? 20 : 12 }}>
+                            <TouchableOpacity onPress={() => setShowSearch(true)}>
+                                <Ionicons name="search-outline" size={22} color={colors.text} />
+                            </TouchableOpacity>
+                            <TouchableOpacity><Ionicons name="call-outline" size={22} color={colors.text} /></TouchableOpacity>
+                            <TouchableOpacity><Ionicons name="videocam-outline" size={24} color={colors.text} /></TouchableOpacity>
+                        </View>
+                    </>
+                )}
             </View>
+
+            {/* Search Results Count */}
+            {showSearch && searchQuery.trim().length > 0 && (
+                <View style={{ backgroundColor: isDark ? '#1a1a1a' : '#F3F4F6', paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: isDark ? '#333' : '#E5E7EB' }}>
+                    <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: '600' }}>
+                        {filteredMessages.length} {filteredMessages.length === 1 ? 'result' : 'results'} found
+                    </Text>
+                </View>
+            )}
 
             {/* List */}
             <KeyboardAvoidingView
@@ -1063,14 +1170,21 @@ export default function MessageScreen() {
                 <View style={{ flex: 1 }}>
                     <FlatList
                         ref={flatListRef}
-                        data={messages}
+                        data={showSearch && searchQuery.trim() ? filteredMessages : messages}
                         inverted
                         keyExtractor={item => item._id}
                         onEndReached={loadMoreMessages}
                         onEndReachedThreshold={0.5}
-                        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 10 }}
+                        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 10, ...(showSearch && searchQuery.trim() && filteredMessages.length === 0 ? { flex: 1 } : {}) }}
                         renderItem={renderMessageItem}
                         ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.primary} /> : null}
+                        ListEmptyComponent={showSearch && searchQuery.trim() ? (
+                            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', transform: [{ scaleY: -1 }] }}>
+                                <Ionicons name="search-outline" size={48} color={colors.textSecondary} style={{ opacity: 0.4, marginBottom: 12 }} />
+                                <Text style={{ fontSize: 16, color: colors.textSecondary, fontWeight: '600' }}>No messages found</Text>
+                                <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4, opacity: 0.7 }}>Try a different search term</Text>
+                            </View>
+                        ) : null}
                         onScroll={(event) => {
                             const offsetY = event.nativeEvent.contentOffset.y;
                             setShowScrollBottom(offsetY > 200);

@@ -20,11 +20,19 @@ const TRENDING_TOPICS = [
 export default function SearchScreen() {
     const { q } = useLocalSearchParams();
     const [searchQuery, setSearchQuery] = useState((q as string) || '');
+    
+    useEffect(() => {
+        if (typeof q === 'string') {
+            setSearchQuery(q);
+        }
+    }, [q]);
+
     const [results, setResults] = useState<{ users: any[], posts: any[] }>({ users: [], posts: [] });
     const [refreshing, setRefreshing] = useState(false);
     const [suggestedUsers, setSuggestedUsers] = useState<any[]>([]);
     const [recentSearches, setRecentSearches] = useState<string[]>([]);
     const [isSearching, setIsSearching] = useState(false);
+    const [trendingTopics, setTrendingTopics] = useState<string[]>(TRENDING_TOPICS);
 
     const { colors, isDark } = useThemeContext();
     const insets = useSafeAreaInsets();
@@ -38,6 +46,7 @@ export default function SearchScreen() {
     useEffect(() => {
         loadRecentSearches();
         fetchSuggestedUsers();
+        fetchTrendingTopics();
     }, []);
 
     const fetchSuggestedUsers = async () => {
@@ -50,6 +59,20 @@ export default function SearchScreen() {
             }
         } catch (error) {
             console.error('Error fetching suggested users:', error);
+        }
+    };
+
+    const fetchTrendingTopics = async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/posts/all-hashtags`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.length > 0) {
+                    setTrendingTopics(data.slice(0, 8).map((t: any) => t.tag.replace('#', '')));
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching trending topics:', error);
         }
     };
 
@@ -316,7 +339,7 @@ export default function SearchScreen() {
                                 </View>
                             </View>
                             <View style={styles.tagsContainer}>
-                                {TRENDING_TOPICS.map((topic, index) => (
+                                {trendingTopics.map((topic, index) => (
                                     <TouchableOpacity 
                                         key={index} 
                                         style={styles.tag}

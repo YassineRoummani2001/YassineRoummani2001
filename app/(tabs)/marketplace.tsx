@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const CATEGORIES = ['All', 'Electronics', 'Vehicles', 'Clothing', 'Home', 'Sports', 'Other'];
+const CATEGORIES = ['All', 'Electronics', 'Vehicles', 'Clothing', 'Furniture', 'Beauty', 'Home', 'Sports', 'Toys & Games', 'Books', 'Real Estate', 'Pets', 'Other'];
 
 const MOROCCAN_CITIES = [
     'Casablanca', 'Rabat', 'Fès', 'Tanger', 'Marrakech', 'Salé', 'Agadir', 'Meknès', 'Oujda',

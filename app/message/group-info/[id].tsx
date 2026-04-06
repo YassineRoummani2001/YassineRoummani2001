@@ -21,8 +21,10 @@ import {
     useWindowDimensions,
     View,
     TextInput,
-    Share
+    Share,
+    Dimensions
 } from 'react-native';
+import Toast from 'react-native-toast-message';
 import AddParticipantModal from '@/components/AddParticipantModal';
 import ConfirmModal from '@/components/ConfirmModal';
 import ProcessingModal from '@/components/ProcessingModal';
@@ -59,6 +61,8 @@ export default function GroupInfoScreen() {
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState<string | null>(null);
     const [isMuted, setIsMuted] = useState(false);
+    const [isPinned, setIsPinned] = useState(false);
+    const [isFavorite, setIsFavorite] = useState(false);
     const [isEditingName, setIsEditingName] = useState(false);
     const [isEditingDesc, setIsEditingDesc] = useState(false);
     const [tempGroupName, setTempGroupName] = useState('');
@@ -78,6 +82,8 @@ export default function GroupInfoScreen() {
         if (groupData?.mutedBy) {
             setIsMuted(groupData.mutedBy.includes(currentUser._id));
         }
+        setIsPinned(!!groupData?.isPinned);
+        setIsFavorite(!!groupData?.isFavorite);
     }, [groupData]);
 
     useEffect(() => {
@@ -303,6 +309,28 @@ export default function GroupInfoScreen() {
         }
     };
 
+    const handlePinToggle = async () => {
+        const newState = !isPinned;
+        setIsPinned(newState);
+        const res = await ApiClient.post<any>(`/api/chats/${id}/pin`, {}, { 'Authorization': `Bearer ${currentUser.token}` });
+        if (res.success) {
+            Toast.show({ type: 'success', text1: newState ? 'Pinned' : 'Unpinned' });
+        } else {
+            setIsPinned(!newState);
+        }
+    };
+
+    const handleFavoriteToggle = async () => {
+        const newState = !isFavorite;
+        setIsFavorite(newState);
+        const res = await ApiClient.post<any>(`/api/chats/${id}/favorite`, {}, { 'Authorization': `Bearer ${currentUser.token}` });
+        if (res.success) {
+            Toast.show({ type: 'success', text1: newState ? 'Added to favorites' : 'Removed from favorites' });
+        } else {
+            setIsFavorite(!newState);
+        }
+    };
+
     if (loading) {
         return (
             <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
@@ -333,7 +361,10 @@ export default function GroupInfoScreen() {
                 <View style={{ width: 40 }} />
             </View>
 
-            <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+            <ScrollView 
+                contentContainerStyle={{ paddingBottom: 40, alignSelf: 'center', width: '100%', maxWidth: 600 }}
+                showsVerticalScrollIndicator={false}
+            >
                 {/* Hero Section */}
                 <View style={styles.hero}>
                     <View style={styles.coverWrapper}>
@@ -498,55 +529,99 @@ export default function GroupInfoScreen() {
 
                 {/* Group Actions */}
                 <View style={styles.section}>
-                    <TouchableOpacity 
-                        style={[styles.actionRow, { borderBottomWidth: 1, borderBottomColor: isDark ? '#333' : '#eee' }]}
-                        onPress={handleShareGroup}
-                    >
-                        <Ionicons name="share-social-outline" size={22} color={colors.text} />
-                        <Text style={[styles.actionText, { color: colors.text }]}>Share Group</Text>
-                        <View style={{ flex: 1 }} />
-                        <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                        style={[styles.actionRow, { borderBottomWidth: 1, borderBottomColor: isDark ? '#333' : '#eee' }]}
-                        onPress={handleMuteToggle}
-                    >
-                        <Ionicons name={isMuted ? "notifications-off-outline" : "notifications-outline"} size={22} color={colors.text} />
-                        <Text style={[styles.actionText, { color: colors.text }]}>{isMuted ? "Unmute Notifications" : "Mute Notifications"}</Text>
-                        <View style={{ flex: 1 }} />
-                        <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                        style={[styles.actionRow, { borderBottomWidth: 1, borderBottomColor: isDark ? '#333' : '#eee' }]}
-                        onPress={() => router.push(`/message/shared-media/${id}`)}
-                    >
-                        <Ionicons name="images-outline" size={22} color={colors.text} />
-                        <Text style={[styles.actionText, { color: colors.text }]}>Shared Media</Text>
-                        <View style={{ flex: 1 }} />
-                        <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                        style={[styles.actionRow, { borderBottomWidth: 1, borderBottomColor: isDark ? '#333' : '#eee' }]}
-                        onPress={toggleDisappearingMessages}
-                    >
-                        <Ionicons name="timer-outline" size={22} color={colors.text} />
-                        <View style={{ flex: 1, marginLeft: 12 }}>
-                            <Text style={[styles.actionText, { color: colors.text, marginLeft: 0 }]}>Disappearing Messages</Text>
-                            <Text style={{ fontSize: 12, color: colors.textSecondary }}>{groupData.disappearingMessages ? 'On (24 hours)' : 'Off'}</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                        style={[styles.actionRow, { borderBottomWidth: 1, borderBottomColor: isDark ? '#333' : '#eee' }]}
-                        onPress={handleClearChat}
-                    >
-                        <Ionicons name="trash-outline" size={22} color="#FF4B4B" />
-                        <Text style={[styles.actionText, { color: '#FF4B4B' }]}>Clear Chat</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionRow} onPress={handleLeaveGroup}>
-                        <Ionicons name="exit-outline" size={22} color="#FF4B4B" />
-                        <Text style={[styles.actionText, { color: '#FF4B4B' }]}>Leave Group</Text>
-                    </TouchableOpacity>
+                    <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Settings & Actions</Text>
+                    <View style={[styles.settingsGroup, { backgroundColor: isDark ? '#1a1a1a' : '#fff', borderColor: isDark ? '#333' : '#eee' }]}>
+                        <TouchableOpacity 
+                            style={[styles.actionRow, { borderBottomWidth: 1, borderBottomColor: isDark ? '#303030' : '#f0f0f0' }]}
+                            onPress={handleShareGroup}
+                        >
+                            <View style={[styles.iconBox, { backgroundColor: colors.primary + '20' }]}>
+                                <Ionicons name="share-social-outline" size={20} color={colors.primary} />
+                            </View>
+                            <Text style={[styles.actionText, { color: colors.text }]}>Share Group</Text>
+                            <View style={{ flex: 1 }} />
+                            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={[styles.actionRow, { borderBottomWidth: 1, borderBottomColor: isDark ? '#303030' : '#f0f0f0' }]}
+                            onPress={handleMuteToggle}
+                        >
+                            <View style={[styles.iconBox, { backgroundColor: isMuted ? '#EF4444' + '20' : colors.primary + '20' }]}>
+                                <Ionicons name={isMuted ? "notifications-off-outline" : "notifications-outline"} size={20} color={isMuted ? "#EF4444" : colors.primary} />
+                            </View>
+                            <Text style={[styles.actionText, { color: colors.text }]}>{isMuted ? "Unmute Notifications" : "Mute Notifications"}</Text>
+                            <View style={{ flex: 1 }} />
+                            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={[styles.actionRow, { borderBottomWidth: 1, borderBottomColor: isDark ? '#303030' : '#f0f0f0' }]}
+                            onPress={handlePinToggle}
+                        >
+                            <View style={[styles.iconBox, { backgroundColor: isPinned ? colors.primary + '20' : '#8882' }]}>
+                                <Ionicons name={isPinned ? "pin" : "pin-outline"} size={20} color={isPinned ? colors.primary : colors.textSecondary} />
+                            </View>
+                            <Text style={[styles.actionText, { color: isPinned ? colors.primary : colors.text }]}>{isPinned ? "Unpin Chat" : "Pin Chat"}</Text>
+                            <View style={{ flex: 1 }} />
+                            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={[styles.actionRow, { borderBottomWidth: 1, borderBottomColor: isDark ? '#303030' : '#f0f0f0' }]}
+                            onPress={handleFavoriteToggle}
+                        >
+                            <View style={[styles.iconBox, { backgroundColor: isFavorite ? "#EAB308" + '20' : '#8882' }]}>
+                                <Ionicons name={isFavorite ? "star" : "star-outline"} size={20} color={isFavorite ? "#EAB308" : colors.textSecondary} />
+                            </View>
+                            <Text style={[styles.actionText, { color: isFavorite ? "#EAB308" : colors.text }]}>{isFavorite ? "Remove from Favorites" : "Add to Favorites"}</Text>
+                            <View style={{ flex: 1 }} />
+                            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={[styles.actionRow, { borderBottomWidth: 1, borderBottomColor: isDark ? '#303030' : '#f0f0f0' }]}
+                            onPress={() => router.push(`/message/shared-media/${id}`)}
+                        >
+                            <View style={[styles.iconBox, { backgroundColor: colors.primary + '20' }]}>
+                                <Ionicons name="images-outline" size={20} color={colors.primary} />
+                            </View>
+                            <Text style={[styles.actionText, { color: colors.text }]}>Shared Media</Text>
+                            <View style={{ flex: 1 }} />
+                            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={[styles.actionRow, { borderBottomWidth: 1, borderBottomColor: isDark ? '#303030' : '#f0f0f0' }]}
+                            onPress={toggleDisappearingMessages}
+                        >
+                            <View style={[styles.iconBox, { backgroundColor: groupData.disappearingMessages ? "#10B981" + '20' : '#8882' }]}>
+                                <Ionicons name="timer-outline" size={20} color={groupData.disappearingMessages ? "#10B981" : colors.textSecondary} />
+                            </View>
+                            <View style={{ flex: 1, marginLeft: 12 }}>
+                                <Text style={[styles.actionText, { color: colors.text, marginLeft: 0 }]}>Disappearing Messages</Text>
+                                <Text style={{ fontSize: 11, color: colors.textSecondary }}>{groupData.disappearingMessages ? 'On (24 hours)' : 'Off'}</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={[styles.actionRow, { borderBottomWidth: 1, borderBottomColor: isDark ? '#303030' : '#f0f0f0' }]}
+                            onPress={handleClearChat}
+                        >
+                            <View style={[styles.iconBox, { backgroundColor: '#FF4B4B' + '10' }]}>
+                                <Ionicons name="trash-outline" size={20} color="#FF4B4B" />
+                            </View>
+                            <Text style={[styles.actionText, { color: '#FF4B4B' }]}>Clear Chat</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.actionRow} onPress={handleLeaveGroup}>
+                            <View style={[styles.iconBox, { backgroundColor: '#FF4B4B' + '10' }]}>
+                                <Ionicons name="exit-outline" size={20} color="#FF4B4B" />
+                            </View>
+                            <Text style={[styles.actionText, { color: '#FF4B4B' }]}>Leave Group</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </ScrollView>
 
@@ -752,13 +827,26 @@ const styles = StyleSheet.create({
     actionRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 16,
-        paddingHorizontal: 4,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
     },
     actionText: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '600',
         marginLeft: 12,
+    },
+    settingsGroup: {
+        borderRadius: 16,
+        borderWidth: 1,
+        overflow: 'hidden',
+        marginTop: 8,
+    },
+    iconBox: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     groupDesc: {
         fontSize: 14,

@@ -185,6 +185,9 @@ const createStyles = (colors: any) => StyleSheet.create({
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.1,
         shadowRadius: 8,
+        borderRadius: 37,
+        backgroundColor: colors.background,
+        elevation: 4,
     },
     gradientBorder: {
         width: 74,
