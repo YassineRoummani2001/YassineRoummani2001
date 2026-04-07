@@ -50,13 +50,13 @@ export default function StoryList() {
 
                 const res = await fetch(url, {
                     headers: {
-                        'Authorization': `Bearer ${user.token}`
+                        'Authorization': `Bearer ${user?.token || ''}`
                     }
                 });
 
                 if (res.ok) {
                     const data = await res.json();
-                    const filtered = data.filter((u: any) => String(u._id) !== String(user?._id));
+                    const filtered = (data || []).filter((u: any) => u?._id && String(u._id) !== String(user?._id));
                     setFetchedUsers(filtered);
                 }
             } catch (error) {
