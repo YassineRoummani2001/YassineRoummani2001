@@ -8,7 +8,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { Download, Heart, MessageCircle, MoreHorizontal, Play, Send, Volume2, VolumeX, X, Bookmark } from 'lucide-react-native';
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { ActivityIndicator, Alert, Animated, Image, Platform, Share, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Dimensions, Image, Platform, Share, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
@@ -486,9 +486,103 @@ export default function MediaViewScreen() {
                 onReport={() => Toast.show({ type: 'success', text1: 'Reported', text2: 'Thank you for your feedback' })}
                 onCopyLink={() => Toast.show({ type: 'success', text1: 'Copied', text2: 'Link copied to clipboard' })}
             />
+
+            {/* Local Toast for Modal consistency */}
+            <Toast 
+                config={{
+                    success: (props) => renderPremiumToast(props, 'success'),
+                    error: (props) => renderPremiumToast(props, 'error'),
+                    info: (props) => renderPremiumToast(props, 'info'),
+                }}
+                topOffset={Platform.OS === 'ios' ? 64 : 45}
+                visibilityTime={3000}
+            />
         </View>
     );
 }
+
+const renderPremiumToast = (props: any, type: 'success' | 'error' | 'info') => {
+  const icons = {
+    success: { name: 'checkmark-circle' as const, color: '#10B981', bg: 'rgba(16, 185, 129, 0.1)' },
+    error: { name: 'close-circle' as const, color: '#EF4444', bg: 'rgba(239, 68, 68, 0.1)' },
+    info: { name: 'information-circle' as const, color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.1)' }
+  };
+  const config = icons[type];
+  const { Ionicons } = require('@expo/vector-icons');
+
+  return (
+    <View style={toastStyles.wrapper}>
+      <View style={toastStyles.premiumContainer}>
+        <View style={[toastStyles.iconCircle, { backgroundColor: config.bg }]}>
+          <Ionicons name={config.name} size={20} color={config.color} />
+        </View>
+        <View style={toastStyles.content}>
+          <Text style={toastStyles.title} numberOfLines={1}>{props.text1}</Text>
+          {props.text2 && <Text style={toastStyles.message} numberOfLines={2}>{props.text2}</Text>}
+        </View>
+        <View style={toastStyles.dismissIcon}>
+          <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.3)" />
+        </View>
+      </View>
+    </View>
+  );
+};
+
+const toastStyles = StyleSheet.create({
+  wrapper: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  premiumContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(20, 20, 25, 0.94)',
+    borderRadius: 24,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 20,
+    width: 'auto',
+    maxWidth: 340,
+    minHeight: 50,
+    alignSelf: 'center',
+  },
+  iconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  content: {
+    marginLeft: 10,
+    flex: 1,
+    marginRight: 6,
+  },
+  title: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  message: {
+    color: 'rgba(255, 255, 255, 0.65)',
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 0,
+    lineHeight: 15,
+  },
+  dismissIcon: {
+    paddingLeft: 4,
+  },
+});
 
 function ActionBtn({ icon, label, onPress, active }: any) {
     return (

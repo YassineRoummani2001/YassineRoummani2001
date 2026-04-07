@@ -2,6 +2,7 @@ import { Colors } from '@/constants/Colors';
 import { API_BASE_URL } from '@/constants/Config';
 import { useThemeContext } from '@/context/ThemeContext';
 import { useUser } from '@/context/UserContext';
+import { getCorrectUrl } from '@/utils/api';
 import { Search, Send, X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
@@ -11,6 +12,7 @@ import {
     Image,
     Modal,
     SafeAreaView,
+    Platform,
     StyleSheet,
     Text,
     TextInput,
@@ -32,7 +34,7 @@ interface ShareToUsersModalProps {
 }
 
 export default function ShareToUsersModal({ visible, onClose, post }: ShareToUsersModalProps) {
-    const { user } = useUser() || { user: null };
+    const { user } = (useUser() || {}) as any;
     const { theme, colors: activeColors, isDark } = useThemeContext();
     const colorScheme = theme; // Backward compatibility alias if needed, or just use theme
 
@@ -156,11 +158,21 @@ export default function ShareToUsersModal({ visible, onClose, post }: ShareToUse
     return (
         <Modal
             visible={visible}
-            animationType="slide"
-            presentationStyle="pageSheet"
+            animationType="fade"
+            transparent={true}
             onRequestClose={onClose}
         >
-            <SafeAreaView style={[styles.safeArea, { backgroundColor: activeColors.background }]}>
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+                <SafeAreaView style={[
+                    styles.safeArea, 
+                    { 
+                        backgroundColor: activeColors.background,
+                        width: Platform.OS === 'web' ? 400 : '100%',
+                        maxHeight: Platform.OS === 'web' ? '80%' : '100%',
+                        borderRadius: Platform.OS === 'web' ? 16 : 0,
+                        overflow: 'hidden'
+                    }
+                ]}>
                 {/* Header */}
                 <View style={[styles.header, { borderBottomColor: activeColors.border }]}>
                     <TouchableOpacity onPress={onClose} style={styles.iconButton}>
@@ -212,7 +224,7 @@ export default function ShareToUsersModal({ visible, onClose, post }: ShareToUse
                                     <View style={styles.userInfo}>
                                         <Image
                                             source={{
-                                                uri: item.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name)}&background=random`
+                                                uri: getCorrectUrl(item.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name)}&background=random`
                                             }}
                                             style={styles.avatar}
                                         />
@@ -246,7 +258,8 @@ export default function ShareToUsersModal({ visible, onClose, post }: ShareToUse
                 )}
 
                 {/* Floating Bottom Bar (Optional if needed, but header button is enough) */}
-            </SafeAreaView>
+                </SafeAreaView>
+            </View>
         </Modal>
     );
 }

@@ -3,6 +3,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { getCorrectUrl } from '@/utils/api';
 import { Image, Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 export default function TabLayout() {
@@ -75,7 +76,7 @@ export default function TabLayout() {
             user?.avatar ? (
               <View style={[styles.avatarContainer, focused && { borderColor: colors.text, borderWidth: 1.5 }]}>
                 <Image
-                  source={{ uri: user.avatar }}
+                  source={{ uri: getCorrectUrl(user.avatar) }}
                   style={styles.avatar}
                 />
               </View>

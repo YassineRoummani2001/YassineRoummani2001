@@ -183,6 +183,8 @@ const renderPremiumToast = (props: any, type: 'success' | 'error' | 'info') => {
 };
 
 export default function RootLayout() {
+  const isWeb = Platform.OS === 'web';
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <CustomThemeProvider>
@@ -196,8 +198,10 @@ export default function RootLayout() {
           error: (props) => renderPremiumToast(props, 'error'),
           info: (props) => renderPremiumToast(props, 'info'),
         }}
-        topOffset={Platform.OS === 'ios' ? 54 : 40}
-        visibilityTime={2500}
+        position={isWeb ? 'bottom' : 'top'}
+        topOffset={!isWeb ? (Platform.OS === 'ios' ? 64 : 45) : undefined}
+        bottomOffset={isWeb ? 40 : undefined}
+        visibilityTime={3000}
       />
     </GestureHandlerRootView>
   );
@@ -208,49 +212,51 @@ const toastStyles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
   premiumContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(20, 20, 25, 0.92)',
+    backgroundColor: 'rgba(20, 20, 25, 0.94)',
     borderRadius: 24,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 15,
-    elevation: 12,
-    maxWidth: 380,
-    minHeight: 60,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 20,
+    width: 'auto',
+    maxWidth: 340,
+    minHeight: 50,
+    alignSelf: 'center',
   },
   iconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   content: {
-    marginLeft: 14,
+    marginLeft: 10,
     flex: 1,
-    marginRight: 10,
+    marginRight: 6,
   },
   title: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
     letterSpacing: -0.2,
   },
   message: {
     color: 'rgba(255, 255, 255, 0.65)',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
-    marginTop: 1,
-    lineHeight: 17,
+    marginTop: 0,
+    lineHeight: 15,
   },
   dismissIcon: {
     paddingLeft: 4,
