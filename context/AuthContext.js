@@ -102,6 +102,7 @@ export const UserProvider = ({ children }) => {
                 links: userWithoutToken.links || [], 
                 coverImage: userWithoutToken.coverImage,
                 saved: userWithoutToken.saved || [],
+                isPrivate: userWithoutToken.isPrivate || false,
             };
             
             setUser(userData); 

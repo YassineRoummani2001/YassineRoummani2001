@@ -1005,6 +1005,7 @@ export default function MessageScreen() {
                         <View>
                             <ReplyBlock />
                             <NoteReplyBlock />
+                            <StoryReplyBlock />
                             <TouchableOpacity
                                 activeOpacity={0.9}
                                 onLongPress={() => setSelectedMessage(item)}
@@ -1065,12 +1066,14 @@ export default function MessageScreen() {
                     <View>
                         <ReplyBlock />
                         <NoteReplyBlock />
+                        <StoryReplyBlock />
                         <VoiceMessage uri={item.content} itemsDuration={item.duration} isMe={isMe} colors={colors} />
                     </View>
                 ) : item.type === 'image' ? (
                     <View>
                         <ReplyBlock />
                         <NoteReplyBlock />
+                        <StoryReplyBlock />
                         <View style={{ borderRadius: 18, overflow: 'hidden', backgroundColor: isDark ? '#262626' : '#F2F2F2' }}>
                             {(() => {
                                 const validUri = getCorrectUrl(item.content);
@@ -1095,6 +1098,7 @@ export default function MessageScreen() {
                     }}>
                         <ReplyBlock />
                         <NoteReplyBlock />
+                        <StoryReplyBlock />
 
                         <View style={{ padding: 12, paddingTop: (item.replyTo || item.noteRepliedTo) ? 4 : 12 }}>
                             <Text style={{ fontSize: 16, color: isMe ? '#FFF' : colors.text }}>{item.content}</Text>

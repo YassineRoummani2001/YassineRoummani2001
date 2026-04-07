@@ -16,7 +16,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
     FlatList,
     Image,
+    Modal,
     Platform,
+    Pressable,
     RefreshControl,
     SafeAreaView,
     ScrollView,
@@ -148,6 +150,7 @@ export default function ChatScreen() {
     const [showGroupModal, setShowGroupModal] = useState(false);
     const [selectedChatForDelete, setSelectedChatForDelete] = useState<any>(null);
     const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
+    const [isAccountsSheetVisible, setIsAccountsSheetVisible] = useState(false);
 
     // Fetch Data
     const fetchData = useCallback(async () => {
@@ -301,10 +304,19 @@ export default function ChatScreen() {
                             <Ionicons name="arrow-back" size={24} color={colors.text} />
                         </TouchableOpacity>
                     )}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: (!isDesktop && router.canGoBack()) ? 0 : 16 }}>
-                        <Text style={[styles.headerTitle, { color: colors.text }]}>{user?.username || 'Messages'}</Text>
-                        <Ionicons name="chevron-down" size={16} color={colors.text} />
-                    </View>
+                    <TouchableOpacity 
+                        onPress={() => setIsAccountsSheetVisible(true)}
+                        activeOpacity={0.7}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: (!isDesktop && router.canGoBack()) ? 0 : 16 }}
+                    >
+                        {user?.isPrivate && (
+                            <Ionicons name="lock-closed" size={18} color={colors.text} style={{ marginTop: 2 }} />
+                        )}
+                        <Text style={[styles.headerTitle, { color: colors.text }]}>
+                            {user?.name || 'Messages'}
+                        </Text>
+                        <Ionicons name="chevron-down" size={16} color={colors.text} style={{ marginTop: 4 }} />
+                    </TouchableOpacity>
                 </View>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
@@ -488,7 +500,10 @@ export default function ChatScreen() {
                                 onStoryPress={item.hasStory && !item.isGroup && other ? () => {
                                     router.push({
                                         pathname: '/story-view',
-                                        params: { userId: other._id }
+                                        params: { 
+                                            userId: other._id,
+                                            userStr: JSON.stringify({ _id: other._id, name: other.name, avatar: other.avatar })
+                                        }
                                     } as any);
                                 } : undefined}
                                 isPinned={item.isPinned}
@@ -595,6 +610,95 @@ export default function ChatScreen() {
                     setSelectedChatForDelete(null);
                 }}
             />
+
+            {/* Accounts Bottom Sheet */}
+            <Modal
+                visible={isAccountsSheetVisible}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setIsAccountsSheetVisible(false)}
+            >
+                <Pressable 
+                    style={sheetStyles.overlay} 
+                    onPress={() => setIsAccountsSheetVisible(false)}
+                >
+                    <View style={[sheetStyles.sheet, { backgroundColor: isDark ? '#262626' : '#FFF' }]}>
+                        <View style={[sheetStyles.handle, { backgroundColor: isDark ? '#444' : '#DDD' }]} />
+                        
+                        <ScrollView bounces={false}>
+                            {/* Current Account */}
+                            <TouchableOpacity style={sheetStyles.accountItem} activeOpacity={0.7}>
+                                <View style={sheetStyles.avatarContainer}>
+                                    <Image 
+                                        source={{ uri: getCorrectUrl(user?.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || user?.username || 'U')}&background=random` }} 
+                                        style={sheetStyles.avatar} 
+                                    />
+                                </View>
+                                <Text style={[sheetStyles.accountName, { color: colors.text }]}>
+                                    {user?.handle || user?.username}
+                                </Text>
+                                <View style={[sheetStyles.checkContainer, { backgroundColor: '#0095F6' }]}>
+                                    <Ionicons name="checkmark" size={14} color="#FFF" />
+                                </View>
+                            </TouchableOpacity>
+
+                            {/* signup Account */}
+                            <TouchableOpacity 
+                                style={sheetStyles.accountItem} 
+                                activeOpacity={0.7} 
+                                onPress={() => {
+                                    setIsAccountsSheetVisible(false);
+                                    // Slight delay to ensure modal close animation finishes before navigation
+                                    setTimeout(() => {
+                                        router.push('/auth/signup' as any);
+                                    }, 100);
+                                }}
+                            >
+                                <View style={[sheetStyles.avatarContainer, sheetStyles.addIconContainer, { borderColor: isDark ? '#444' : '#DDD' }]}>
+                                    <Ionicons name="person-add-outline" size={24} color={colors.text} />
+                                </View>
+                                <Text style={[sheetStyles.accountName, { color: colors.text }]}>
+                                    Sign up
+                                </Text>
+                            </TouchableOpacity>
+
+                            {/* Logout Account */}
+                            <TouchableOpacity 
+                                style={sheetStyles.accountItem} 
+                                activeOpacity={0.7} 
+                                onPress={() => {
+                                    setIsAccountsSheetVisible(false);
+                                    // Handle logout (assuming AuthContext has logout)
+                                    // router.replace('/auth/login');
+                                }}
+                            >
+                                <View style={[sheetStyles.avatarContainer, sheetStyles.logoutIconContainer, { borderColor: isDark ? '#444' : '#DDD' }]}>
+                                    <Ionicons name="log-out-outline" size={24} color="#FF3B30" />
+                                </View>
+                                <Text style={[sheetStyles.accountName, { color: '#FF3B30' }]}>
+                                    Log out
+                                </Text>
+                            </TouchableOpacity>
+
+                            <View style={[sheetStyles.divider, { backgroundColor: isDark ? '#333' : '#EEE', marginVertical: 8 }]} />
+
+                            {/* Accounts Center Button */}
+                            <TouchableOpacity style={[sheetStyles.footerButton, { borderColor: isDark ? '#444' : '#E0E0E0' }]}>
+                                <Text style={[sheetStyles.footerButtonText, { color: colors.text }]}>
+                                    Go to Accounts Center
+                                </Text>
+                            </TouchableOpacity>
+
+                            <View style={sheetStyles.metaFooter}>
+                                <View style={[sheetStyles.logoCircle, { backgroundColor: '#0095F6' }]}>
+                                    <Ionicons name="flash" size={12} color="#FFF" />
+                                </View>
+                                <Text style={[sheetStyles.metaText, { color: colors.text }]}>Vibe</Text>
+                            </View>
+                        </ScrollView>
+                    </View>
+                </Pressable>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -610,9 +714,9 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     headerTitle: {
-        fontSize: 28,
-        fontWeight: '900',
-        letterSpacing: -1,
+        fontSize: 20,
+        fontWeight: '700',
+        letterSpacing: -0.5,
     },
     searchContainer: {
         paddingHorizontal: 20,
@@ -669,6 +773,143 @@ const styles = StyleSheet.create({
     },
     onlineBadge: {
         position: 'absolute', bottom: 2, right: 2, width: 14, height: 14, borderRadius: 7, backgroundColor: '#10B981', borderWidth: 2,
+    }
+});
+
+const sheetStyles = StyleSheet.create({
+    overlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+    },
+    sheet: {
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingBottom: 40,
+        maxHeight: '70%',
+        width: '100%',
+        ...(Platform.OS === 'web' && {
+            width: 500,
+            maxWidth: '100%',
+        })
+    },
+    handle: {
+        width: 40,
+        height: 4,
+        borderRadius: 2,
+        alignSelf: 'center',
+        marginTop: 12,
+        marginBottom: 20,
+    },
+    accountItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        gap: 16,
+    },
+    avatarContainer: {
+        position: 'relative',
+    },
+    avatar: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: '#CCC',
+    },
+    addIconContainer: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    logoutIconContainer: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255, 59, 48, 0.05)',
+    },
+    accountName: {
+        fontSize: 16,
+        fontWeight: '600',
+        flex: 1,
+    },
+    checkContainer: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    divider: {
+        height: 1,
+        marginVertical: 16,
+    },
+    sectionHeader: {
+        paddingHorizontal: 20,
+        marginBottom: 8,
+    },
+    sectionHeaderText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    fbBadge: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        backgroundColor: '#1877F2',
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
+        borderColor: '#FFF',
+    },
+    notificationDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#FF3B30',
+    },
+    footerButton: {
+        marginHorizontal: 20,
+        marginTop: 24,
+        height: 48,
+        borderRadius: 8,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    footerButtonText: {
+        fontSize: 15,
+        fontWeight: '700',
+    },
+    metaFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 24,
+        gap: 6,
+        opacity: 0.8,
+    },
+    logoCircle: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    metaText: {
+        fontSize: 16,
+        fontWeight: '700',
+        letterSpacing: 0.5,
     }
 });
 

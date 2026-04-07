@@ -57,6 +57,7 @@ export default function StoryViewScreen() {
     const [showOptions, setShowOptions] = useState(false);
     const [mediaError, setMediaError] = useState(false);
     const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
+    const [firstLoadDone, setFirstLoadDone] = useState(false);
 
     const [message, setMessage] = useState('');
     const [isSending, setIsSending] = useState(false);
@@ -103,9 +104,13 @@ export default function StoryViewScreen() {
                         if (!prev) return data;
                         return { ...prev, ...data };
                     });
+                    setFirstLoadDone(true);
+                } else if (!res.ok && isMounted) {
+                    setFirstLoadDone(true); // Treat error as load finish to show 'User not found' if necessary
                 }
             } catch (e) {
                 console.error("Failed to refresh user data", e);
+                if (isMounted) setFirstLoadDone(true);
             }
         };
         fetchFreshUser();
@@ -459,25 +464,20 @@ export default function StoryViewScreen() {
     // --- RENDER GUARDS ---
 
 
-    if (!user) {
+    if (stories.length === 0) {
+        if (firstLoadDone) {
+            setTimeout(handleClose, 0);
+            return null;
+        }
         return (
             <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <Text style={{ color: 'white' }}>User not found</Text>
-                <TouchableOpacity onPress={handleClose} style={{ marginTop: 20 }}>
-                    <X color="white" size={32} />
+                <ActivityIndicator size="large" color="white" />
+                <Text style={{ color: 'rgba(255,255,255,0.6)', marginTop: 20 }}>Loading stories...</Text>
+                <TouchableOpacity onPress={handleClose} style={{ position: 'absolute', top: 50, right: 20 }}>
+                     <X color="white" size={32} />
                 </TouchableOpacity>
             </View>
         );
-    }
-
-    if (!activeStory || stories.length === 0) {
-        // No active stories, navigate back
-        // Using useEffect to navigate back on next tick to avoid render loop?
-        // Actually better to just return null and use an effect to pop?
-        // But for now, returning a message or empty view is safer than null if logic was wrong.
-        // However, if we want to auto-close:
-        setTimeout(handleClose, 0);
-        return <View style={styles.container} />;
     }
 
     const isDesktop = SCREEN_WIDTH > 768;
