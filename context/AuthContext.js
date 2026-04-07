@@ -7,54 +7,60 @@ import { UserContext } from './UserContext';
 
 const TOKEN_KEY = 'vibe_auth_token';
 const USER_KEY = 'vibe_user_data';
+const ACCOUNTS_KEY = 'vibe_accounts_list';
 
 // Helper for cross-platform secure storage
 const safeTokenStorage = {
-    async set(token) {
+    async set(token, key = TOKEN_KEY) {
         try {
             const isAvailable = await SecureStore.isAvailableAsync();
-            if (isAvailable) return await SecureStore.setItemAsync(TOKEN_KEY, token);
-            return await AsyncStorage.setItem(TOKEN_KEY, token);
+            if (isAvailable) return await SecureStore.setItemAsync(key, token);
+            return await AsyncStorage.setItem(key, token);
         } catch (e) {
-            return await AsyncStorage.setItem(TOKEN_KEY, token);
+            return await AsyncStorage.setItem(key, token);
         }
     },
-    async get() {
+    async get(key = TOKEN_KEY) {
         try {
             const isAvailable = await SecureStore.isAvailableAsync();
-            if (isAvailable) return await SecureStore.getItemAsync(TOKEN_KEY);
-            return await AsyncStorage.getItem(TOKEN_KEY);
+            if (isAvailable) return await SecureStore.getItemAsync(key);
+            return await AsyncStorage.getItem(key);
         } catch (e) {
-            return await AsyncStorage.getItem(TOKEN_KEY);
+            return await AsyncStorage.getItem(key);
         }
     },
-    async remove() {
+    async remove(key = TOKEN_KEY) {
         try {
             const isAvailable = await SecureStore.isAvailableAsync();
-            if (isAvailable) return await SecureStore.deleteItemAsync(TOKEN_KEY);
-            return await AsyncStorage.removeItem(TOKEN_KEY);
+            if (isAvailable) return await SecureStore.deleteItemAsync(key);
+            return await AsyncStorage.removeItem(key);
         } catch (e) {
-            return await AsyncStorage.removeItem(TOKEN_KEY);
+            return await AsyncStorage.removeItem(key);
         }
     }
 };
 
 export const UserProvider = ({ children }) => {
     const [user, setUser] = useState(null);
+    const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const loadStoredUser = async () => {
             try {
-                const token = await safeTokenStorage.get();
-                const userJson = await AsyncStorage.getItem(USER_KEY);
+                const [token, userJson, accountsJson] = await Promise.all([
+                    safeTokenStorage.get(),
+                    AsyncStorage.getItem(USER_KEY),
+                    AsyncStorage.getItem(ACCOUNTS_KEY)
+                ]);
+
+                if (accountsJson) {
+                    setAccounts(JSON.parse(accountsJson));
+                }
 
                 if (token && userJson) {
                     const userData = JSON.parse(userJson);
                     setUser({ ...userData, token });
-                    // console.log('✅ User restored from storage');
-                } else {
-                    // console.log('ℹ️ No user session found');
                 }
             } catch (error) {
                 console.error('❌ Error loading user execution:', error);
@@ -67,18 +73,22 @@ export const UserProvider = ({ children }) => {
 
     const logout = useCallback(async () => {
         try {
-            // console.log('🚪 Logging out...');
+            // Remove current account from accounts list to keep it clean if desired
+            // Or just clear active session
+            const newAccounts = accounts.filter(a => a._id !== user?._id);
+            setAccounts(newAccounts);
             setUser(null);
+            
             await Promise.all([
                 AsyncStorage.removeItem(USER_KEY),
-                safeTokenStorage.remove()
+                safeTokenStorage.remove(),
+                AsyncStorage.setItem(ACCOUNTS_KEY, JSON.stringify(newAccounts))
             ]);
-            // console.log('✅ Logout successful - user cleared');
         } catch (error) {
             console.error('❌ Logout error:', error);
             setUser(null);
         }
-    }, []);
+    }, [user, accounts]);
 
     const login = useCallback(async (userData) => {
         try {
@@ -106,25 +116,47 @@ export const UserProvider = ({ children }) => {
             };
             
             setUser(userData); 
+
+            // Update accounts list
+            const otherAccounts = accounts.filter(a => a._id !== userData._id);
+            const newAccounts = [essentialData, ...otherAccounts];
+            setAccounts(newAccounts);
+
             await Promise.all([
                 AsyncStorage.setItem(USER_KEY, JSON.stringify(essentialData)),
-                safeTokenStorage.set(token)
+                safeTokenStorage.set(token),
+                AsyncStorage.setItem(ACCOUNTS_KEY, JSON.stringify(newAccounts)),
+                // Store individual tokens for each account to allow switching
+                safeTokenStorage.set(token, `vibe_token_${userData._id}`)
             ]);
         } catch (error) {
             console.error('Login storage error:', error);
-            try {
-                await AsyncStorage.removeItem(USER_KEY);
-                await AsyncStorage.setItem(USER_KEY, JSON.stringify({
-                    _id: userData._id,
-                    name: userData.name,
-                    email: userData.email,
-                    avatar: userData.avatar,
-                }));
-            } catch (retryError) {
-                console.error('Retry failed:', retryError);
-            }
         }
-    }, []);
+    }, [accounts]);
+
+    const switchAccount = useCallback(async (targetUserId) => {
+        try {
+            setLoading(true);
+            const targetUser = accounts.find(a => a._id === targetUserId);
+            if (!targetUser) return;
+
+            const token = await safeTokenStorage.get(`vibe_token_${targetUserId}`);
+            if (!token) {
+                // If no token, we might need them to log in again
+                return logout();
+            }
+
+            setUser({ ...targetUser, token });
+            await Promise.all([
+                AsyncStorage.setItem(USER_KEY, JSON.stringify(targetUser)),
+                safeTokenStorage.set(token)
+            ]);
+        } catch (error) {
+            console.error('Switch account error:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [accounts, logout]);
 
     const addStory = useCallback(async (newStory) => {
         if (!user || !user.token) return;
@@ -305,8 +337,10 @@ export const UserProvider = ({ children }) => {
     const contextValue = useMemo(() => {
         return {
             user,
+            accounts,
             login,
             logout,
+            switchAccount,
             addStory,
             updateProfile,
             followUser,
@@ -315,7 +349,7 @@ export const UserProvider = ({ children }) => {
             deleteAccount,
             loading
         };
-    }, [user, login, logout, addStory, updateProfile, followUser, savePost, refreshUser, deleteAccount, loading]);
+    }, [user, accounts, login, logout, switchAccount, addStory, updateProfile, followUser, savePost, refreshUser, deleteAccount, loading]);
 
     // console.log('🛡️ UserProvider Rendering. Children:', !!children);
 

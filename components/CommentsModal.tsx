@@ -7,6 +7,7 @@ import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Modal, Platfo
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
+import { getCorrectUrl } from '@/utils/api';
 
 // Web standard custom scrollbar styles
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -242,7 +243,10 @@ export default function CommentsModal({ visible, onClose, postId, initialComment
     const renderItem = ({ item }: { item: Comment }) => (
         <View style={styles.commentItem}>
             <TouchableOpacity activeOpacity={0.7}>
-                <Image source={{ uri: item.user.avatar || 'https://i.pravatar.cc/100?u=' + item.user._id }} style={styles.avatar} />
+                <Image 
+                    source={{ uri: getCorrectUrl(item.user.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user.name || 'U')}&background=random` }} 
+                    style={styles.avatar} 
+                />
             </TouchableOpacity>
             <View style={styles.commentContent}>
                 <View style={[styles.commentBubble, { backgroundColor: isDark ? '#1C1C1E' : '#F2F2F7' }]}>
@@ -390,7 +394,7 @@ export default function CommentsModal({ visible, onClose, postId, initialComment
                             { backgroundColor: isDark ? '#1C1C1E' : '#F2F2F7' }
                         ]}>
                             <Image 
-                                source={{ uri: user?.avatar || 'https://i.pravatar.cc/100?u=current_user' }} 
+                                source={{ uri: getCorrectUrl(user?.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=random` }} 
                                 style={styles.inputAvatar} 
                             />
                             <TextInput
@@ -642,10 +646,7 @@ const styles = StyleSheet.create({
         borderRadius: 19,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 5,
+        boxShadow: '0px 4px 5px rgba(0,0,0,0.2)',
         elevation: 5,
     },
     mentionDropdown: {

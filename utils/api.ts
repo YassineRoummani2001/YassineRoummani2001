@@ -86,9 +86,32 @@ export const api = async <T = any>(
 };
 
 // Convenience methods
+export const getCorrectUrl = (uri?: string | null) => {
+    if (!uri || typeof uri !== 'string' || uri.trim() === '') return undefined;
+    const clean = uri.trim();
+    if (clean.length === 0) return undefined;
+
+    if (clean.startsWith('blob:') || clean.startsWith('data:') || clean.startsWith('file:')) return clean;
+
+    if (clean.startsWith('http') && clean.includes('/uploads/')) {
+        const parts = clean.split('/uploads/');
+        return `${API_BASE_URL}/uploads/${parts[1]}`;
+    }
+
+    if (clean.startsWith('http')) return clean;
+    if (clean.startsWith('/uploads/')) return `${API_BASE_URL}${clean}`;
+    if (clean.includes('/uploads/')) {
+        const parts = clean.split('/uploads/');
+        return `${API_BASE_URL}/uploads/${parts[1]}`;
+    }
+
+    return `${API_BASE_URL}/uploads/${clean}`;
+};
+
 export const ApiClient = {
     get: <T>(url: string, headers?: any) => api<T>(url, { method: 'GET', headers }),
     post: <T>(url: string, body: any, headers?: any) => api<T>(url, { method: 'POST', body: JSON.stringify(body), headers }),
     put: <T>(url: string, body: any, headers?: any) => api<T>(url, { method: 'PUT', body: JSON.stringify(body), headers }),
     delete: <T>(url: string, headers?: any) => api<T>(url, { method: 'DELETE', headers }),
+    getCorrectUrl,
 };

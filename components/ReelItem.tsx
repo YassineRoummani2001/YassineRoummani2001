@@ -32,29 +32,9 @@ import ReelOptionsModal from './ReelOptionsModal';
 import ShareToUsersModal from './ShareToUsersModal';
 import VideoProgressBar from './VideoProgressBar';
 import LikersModal from './LikersModal';
+import { getCorrectUrl } from '@/utils/api';
 
-// Helper to construct valid URIs
-const getValidUri = (uri?: string) => {
-    if (!uri || typeof uri !== 'string' || uri.trim() === '') return undefined;
-    const clean = uri.trim();
-    if (clean.length === 0) return undefined;
 
-    if (clean.startsWith('blob:') || clean.startsWith('data:') || clean.startsWith('file:')) return clean;
-
-    if (clean.startsWith('http') && clean.includes('/uploads/')) {
-        const parts = clean.split('/uploads/');
-        return `${API_BASE_URL}/uploads/${parts[1]}`;
-    }
-
-    if (clean.startsWith('http')) return clean;
-    if (clean.startsWith('/uploads/')) return `${API_BASE_URL}${clean}`;
-    if (clean.includes('/uploads/')) {
-        const parts = clean.split('/uploads/');
-        return `${API_BASE_URL}/uploads/${parts[1]}`;
-    }
-
-    return `${API_BASE_URL}/uploads/${clean}`;
-};
 
 interface ReelItemProps {
     item: any;
@@ -74,9 +54,9 @@ export default function ReelItem({ item, active, isMuted, width, height }: ReelI
     const [isFollowing, setIsFollowing] = useState(false);
     const [isRequested, setIsRequested] = useState(false);
 
-    const videoUri = getValidUri(item.videoUri || item.uri);
+    const videoUri = getCorrectUrl(item.videoUri || item.uri);
     const author = item.user || {};
-    const avatarUri = getValidUri(author.avatar);
+    const avatarUri = getCorrectUrl(author.avatar);
 
     const [webVideoUrl, setWebVideoUrl] = useState<string | null>(null);
 
@@ -617,7 +597,7 @@ export default function ReelItem({ item, active, isMuted, width, height }: ReelI
                                         item.latestLikers.map((liker: any, idx: number) => (
                                             <Image 
                                                 key={liker._id} 
-                                                source={{ uri: getValidUri(liker.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(liker.name || 'U')}&background=random` }} 
+                                                source={{ uri: getCorrectUrl(liker.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(liker.name || 'U')}&background=random` }} 
                                                 style={[styles.stackedAvatar, { left: idx === 0 ? 0 : -8, zIndex: 10 - idx }]} 
                                             />
                                         ))
@@ -667,7 +647,7 @@ export default function ReelItem({ item, active, isMuted, width, height }: ReelI
                 currentTime={currentTime} 
                 duration={duration} 
                 onSeek={handleSeek} 
-                bottomOffset={insets.bottom + 85}
+                bottomOffset={Platform.OS === 'web' ? 10 : (insets.bottom + 85)}
                 showTime={paused}
             />
 
@@ -747,10 +727,8 @@ const styles = StyleSheet.create({
         color: 'white', 
         fontSize: 12, 
         fontWeight: '700', 
-        textShadowColor: 'rgba(0,0,0,0.5)', 
-        textShadowOffset: { width: 1, height: 1 }, 
-        textShadowRadius: 3 
-    },
+        // @ts-ignore
+        textShadow: '1px 1px 3px rgba(0,0,0,0.5)',    },
     musicDiscWrapper: { 
         width: 50, 
         height: 50, 

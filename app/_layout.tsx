@@ -56,7 +56,7 @@ LogBox.ignoreLogs([
   'Video component from `expo-av` is deprecated',
   '"shadow*" style props are deprecated. Use "boxShadow".',
   '"textShadow*" style props are deprecated. Use "textShadow".',
-  '[expo-notifications] Listening to push token changes is not yet fully supported on web',
+  '[expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.',
 ]);
 
 // Root Layout Configuration
@@ -219,10 +219,7 @@ const toastStyles = StyleSheet.create({
     paddingVertical: 12,
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.2)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    boxShadow: '0px 4px 10px rgba(0,0,0,0.3)',
     elevation: 10,
   },
   errorContainer: {
@@ -237,10 +234,7 @@ const toastStyles = StyleSheet.create({
     paddingVertical: 12,
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.2)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    boxShadow: '0px 4px 10px rgba(0,0,0,0.3)',
     elevation: 10,
   },
   infoContainer: {
@@ -255,10 +249,7 @@ const toastStyles = StyleSheet.create({
     paddingVertical: 12,
     borderWidth: 1,
     borderColor: 'rgba(59, 130, 246, 0.2)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    boxShadow: '0px 4px 10px rgba(0,0,0,0.3)',
     elevation: 10,
   },
   content: {

@@ -22,6 +22,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { formatDistanceToNow } from 'date-fns';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator } from 'react-native';
+import { getCorrectUrl } from '@/utils/api';
 
 const { width, height } = Dimensions.get('window') || { width: 0, height: 0 };
 
@@ -153,7 +154,7 @@ export default function NoteViewer({ visible, note, currentUser, onClose, onRepl
                                 <View style={styles.mainContent}>
                                     <View style={styles.avatarWrapper}>
                                         <Image
-                                            source={{ uri: user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}` }}
+                                            source={{ uri: getCorrectUrl(user.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'U')}&background=random` }}
                                             style={styles.avatar}
                                         />
                                     </View>
@@ -260,7 +261,7 @@ export default function NoteViewer({ visible, note, currentUser, onClose, onRepl
                                                                 }}
                                                             >
                                                                 <Image 
-                                                                    source={{ uri: liker.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(liker.name || 'U')}` }}
+                                                                    source={{ uri: getCorrectUrl(liker.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(liker.name || 'U')}&background=random` }}
                                                                     style={styles.likerAvatar}
                                                                 />
                                                                 <View style={styles.likerInfo}>
@@ -340,13 +341,7 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         paddingBottom: 24,
         // Web shadow
-        // @ts-ignore
-        boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
-        // Native shadow
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.3,
-        shadowRadius: 20,
+        boxShadow: '0px 20px 40px rgba(0,0,0,0.4)',
         elevation: 10,
     },
     pullHandle: {

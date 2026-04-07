@@ -8,7 +8,7 @@ import { API_BASE_URL } from '@/constants/Config';
 import { useMessages } from '@/context/MessagesContext';
 import { useThemeContext } from '@/context/ThemeContext';
 import { useUser } from '@/context/UserContext';
-import { ApiClient } from '@/utils/api';
+import { ApiClient, getCorrectUrl } from '@/utils/api';
 import { formatDistanceToNow } from 'date-fns';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,28 +31,7 @@ import {
     View,
 } from 'react-native';
 
-// Helper to normalize URIs
-const getCorrectUrl = (uri?: string | null) => {
-    if (!uri || typeof uri !== 'string' || uri.trim() === '') return undefined;
-    const clean = uri.trim();
-    if (clean.length === 0) return undefined;
 
-    if (clean.startsWith('blob:') || clean.startsWith('data:') || clean.startsWith('file:')) return clean;
-
-    if (clean.startsWith('http') && clean.includes('/uploads/')) {
-        const parts = clean.split('/uploads/');
-        return `${API_BASE_URL}/uploads/${parts[1]}`;
-    }
-
-    if (clean.startsWith('http')) return clean;
-    if (clean.startsWith('/uploads/')) return `${API_BASE_URL}${clean}`;
-    if (clean.includes('/uploads/')) {
-        const parts = clean.split('/uploads/');
-        return `${API_BASE_URL}/uploads/${parts[1]}`;
-    }
-
-    return `${API_BASE_URL}/uploads/${clean}`;
-};
 
 const UserNoteBubble = ({ note, isDark }: { note: any, isDark: boolean }) => {
     if (!note) return null;
@@ -128,7 +107,7 @@ const UserNoteBubble = ({ note, isDark }: { note: any, isDark: boolean }) => {
 export default function ChatScreen() {
     const router = useRouter();
     const userContext = useUser();
-    const { user } = (userContext || {}) as any;
+    const { user, accounts, logout, switchAccount } = (userContext || {}) as any;
     const { socket } = useMessages();
     const { colors, isDark } = useThemeContext();
 
@@ -626,21 +605,37 @@ export default function ChatScreen() {
                         <View style={[sheetStyles.handle, { backgroundColor: isDark ? '#444' : '#DDD' }]} />
                         
                         <ScrollView bounces={false}>
-                            {/* Current Account */}
-                            <TouchableOpacity style={sheetStyles.accountItem} activeOpacity={0.7}>
-                                <View style={sheetStyles.avatarContainer}>
-                                    <Image 
-                                        source={{ uri: getCorrectUrl(user?.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || user?.username || 'U')}&background=random` }} 
-                                        style={sheetStyles.avatar} 
-                                    />
-                                </View>
-                                <Text style={[sheetStyles.accountName, { color: colors.text }]}>
-                                    {user?.handle || user?.username}
-                                </Text>
-                                <View style={[sheetStyles.checkContainer, { backgroundColor: '#0095F6' }]}>
-                                    <Ionicons name="checkmark" size={14} color="#FFF" />
-                                </View>
-                            </TouchableOpacity>
+                            {/* All Logged in Accounts */}
+                            {accounts && accounts.map((item: any) => (
+                                <TouchableOpacity 
+                                    key={item._id}
+                                    style={sheetStyles.accountItem} 
+                                    activeOpacity={0.7}
+                                    onPress={() => {
+                                        if (item._id !== user?._id) {
+                                            switchAccount(item._id);
+                                            setIsAccountsSheetVisible(false);
+                                        }
+                                    }}
+                                >
+                                    <View style={sheetStyles.avatarContainer}>
+                                        <Image 
+                                            source={{ uri: getCorrectUrl(item.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || item.username || 'U')}&background=random` }} 
+                                            style={sheetStyles.avatar} 
+                                        />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[sheetStyles.accountName, { color: colors.text }]}>
+                                            {item.handle || item.username || item.name}
+                                        </Text>
+                                    </View>
+                                    {item._id === user?._id && (
+                                        <View style={[sheetStyles.checkContainer, { backgroundColor: '#0095F6' }]}>
+                                            <Ionicons name="checkmark" size={14} color="#FFF" />
+                                        </View>
+                                    )}
+                                </TouchableOpacity>
+                            ))}
 
                             {/* signup Account */}
                             <TouchableOpacity 
@@ -648,9 +643,8 @@ export default function ChatScreen() {
                                 activeOpacity={0.7} 
                                 onPress={() => {
                                     setIsAccountsSheetVisible(false);
-                                    // Slight delay to ensure modal close animation finishes before navigation
                                     setTimeout(() => {
-                                        router.push('/auth/signup' as any);
+                                        router.replace('/auth/signup' as any);
                                     }, 100);
                                 }}
                             >
@@ -666,10 +660,10 @@ export default function ChatScreen() {
                             <TouchableOpacity 
                                 style={sheetStyles.accountItem} 
                                 activeOpacity={0.7} 
-                                onPress={() => {
+                                onPress={async () => {
                                     setIsAccountsSheetVisible(false);
-                                    // Handle logout (assuming AuthContext has logout)
-                                    // router.replace('/auth/login');
+                                    await logout();
+                                    router.replace('/auth/login' as any);
                                 }}
                             >
                                 <View style={[sheetStyles.avatarContainer, sheetStyles.logoutIconContainer, { borderColor: isDark ? '#444' : '#DDD' }]}>

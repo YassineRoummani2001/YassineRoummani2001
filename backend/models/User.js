@@ -34,6 +34,11 @@ const userSchema = new mongoose.Schema({
         createdAt: { type: Date, default: Date.now }
     }],
     savedPosts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Post' }],
+    collections: [{
+        name: { type: String, required: true },
+        image: { type: String }, // Optional cover image from one of the posts
+        posts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Post' }]
+    }],
     blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     isOnline: { type: Boolean, default: false },
     lastSeen: { type: Date, default: Date.now },

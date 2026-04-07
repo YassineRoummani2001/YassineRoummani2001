@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { Search } from 'lucide-react-native';
+import { getCorrectUrl } from '@/utils/api';
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import Toast from 'react-native-toast-message';
@@ -38,18 +39,7 @@ const MemoizedReelItem = memo(
         prev.isMuted === next.isMuted
 );
 
-// ─── Helper ───────────────────────────────────────────────────────────────────
-const getValidUri = (uri?: string) => {
-    if (!uri) return '';
-    if (uri.startsWith('data:') || uri.startsWith('file:')) return uri;
-    if (uri.startsWith('http') && uri.includes('/uploads/')) {
-        const parts = uri.split('/uploads/');
-        return `${API_BASE_URL}/uploads/${parts[1]}`;
-    }
-    if (uri.startsWith('http')) return uri;
-    if (uri.startsWith('/uploads/')) return `${API_BASE_URL}${uri}`;
-    return `${API_BASE_URL}${uri.startsWith('/') ? '' : '/'}${uri}`;
-};
+
 
 // ─── NavArrow for desktop ─────────────────────────────────────────────────────
 function NavArrow({ direction, onPress }: { direction: 'up' | 'down'; onPress: () => void }) {
@@ -283,7 +273,7 @@ export default function ReelsScreen() {
                 {/* ── Ambient blurred background ── */}
                 {activeReel?.user?.avatar && (
                     <Image
-                        source={{ uri: getValidUri(activeReel.user.avatar) }}
+                        source={{ uri: getCorrectUrl(activeReel.user.avatar) }}
                         style={styles.ambientBg}
                         blurRadius={Platform.OS === 'web' ? 0 : 40}
                     />

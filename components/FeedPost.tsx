@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '@/constants/Config';
+import { getCorrectUrl } from '@/utils/api';
 import { useUser } from '@/context/AuthContext';
 import { useThemeContext } from '@/context/ThemeContext'; // Import ThemeContext
 import { useRouter } from 'expo-router';
@@ -16,34 +17,13 @@ import ShareToUsersModal from './ShareToUsersModal';
 
 const { width } = Dimensions.get('window');
 
-// Helper to normalize URIs
-const getValidUri = (uri?: string) => {
-    if (!uri || typeof uri !== 'string' || uri.trim() === '') return undefined;
-    const clean = uri.trim();
-    if (clean.length === 0) return undefined;
 
-    if (clean.startsWith('blob:') || clean.startsWith('data:') || clean.startsWith('file:')) return clean;
-
-    if (clean.startsWith('http') && clean.includes('/uploads/')) {
-        const parts = clean.split('/uploads/');
-        return `${API_BASE_URL}/uploads/${parts[1]}`;
-    }
-
-    if (clean.startsWith('http')) return clean;
-    if (clean.startsWith('/uploads/')) return `${API_BASE_URL}${clean}`;
-    if (clean.includes('/uploads/')) {
-        const parts = clean.split('/uploads/');
-        return `${API_BASE_URL}/uploads/${parts[1]}`;
-    }
-
-    return `${API_BASE_URL}/uploads/${clean}`;
-};
 
 // --- STABLE FEED VIDEO COMPONENT (expo-video) ---
 import { useVideoPlayer, VideoView } from 'expo-video';
 
 const FeedVideo = ({ videoSource, posterSource, isMuted, setIsMuted, active, styles, doubleTapRef }: { videoSource: string, posterSource?: string, isMuted: boolean, setIsMuted: (muted: boolean) => void, active: boolean, styles: any, doubleTapRef: any }) => {
-    const validUri = getValidUri(videoSource);
+    const validUri = getCorrectUrl(videoSource);
 
     // Don't initialize player if no valid video source
     if (!validUri || validUri.trim() === '') {
@@ -156,10 +136,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
         borderRadius: 28,
         padding: 16,
         // High-end modern shadow
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: isDark ? 0.4 : 0.06,
-        shadowRadius: 20,
+        boxShadow: isDark ? '0px 10px 20px rgba(0,0,0,0.4)' : '0px 10px 20px rgba(0,0,0,0.06)',
         elevation: 8,
         borderWidth: 1,
         borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
@@ -379,10 +356,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
         paddingHorizontal: 20,
         paddingVertical: 8,
         borderRadius: 20,
-        shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
+        boxShadow: `0px 4px 8px ${colors.primary}4D`,
         elevation: 4,
     },
     saveEditText: {
@@ -889,7 +863,7 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
                         }
                     }}
                 >
-                    <Image source={{ uri: getValidUri(post.user?.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.user?.name || 'User')}&background=random` }} style={styles.avatar} />
+                    <Image source={{ uri: getCorrectUrl(post.user?.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.user?.name || 'U')}&background=random` }} style={styles.avatar} />
                     <View style={styles.usernameContainer}>
                         <Text style={styles.username}>{post.user?.name || 'Unknown'}</Text>
                         <View style={styles.metaRow}>
@@ -980,12 +954,12 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
                         />
                     ) : (
                         <Image
-                            source={{ uri: getValidUri(post.image || post.uri) }}
+                            source={{ uri: getCorrectUrl(post.image || post.uri) }}
                             style={styles.media}
                             resizeMode="cover"
                             onError={(e) => {
                                 if (__DEV__) {
-                                    // console.log('❌ Image Load Error:', e.nativeEvent.error, 'URI:', getValidUri(post.image || post.uri));
+                                    // console.log('❌ Image Load Error:', e.nativeEvent.error, 'URI:', getCorrectUrl(post.image || post.uri));
                                 }
                                 // In Prod: Fail silently (Image component might show blank or grey, which is better than crash or alert)
                             }}
@@ -995,7 +969,7 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
                     {/* Animated Heart Overlay */}
                     <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
                         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                            <Animated.View style={{ transform: [{ scale: likeScale }], shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { height: 5, width: 0 }, shadowColor: '#000' }}>
+                            <Animated.View style={{ transform: [{ scale: likeScale }], boxShadow: '0px 5px 10px rgba(0,0,0,0.3)' }}>
                                 <Ionicons name="heart" size={100} color="white" />
                             </Animated.View>
                         </View>

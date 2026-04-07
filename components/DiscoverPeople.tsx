@@ -14,13 +14,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useThemeContext } from '@/context/ThemeContext';
 import { API_BASE_URL } from '@/constants/Config';
 import { useRouter } from 'expo-router';
+import { getCorrectUrl } from '@/utils/api';
 
-// Helper to construct valid URIs
-const getValidUri = (uri?: string) => {
-    if (!uri) return '';
-    if (uri.startsWith('http')) return uri;
-    return `${API_BASE_URL}${uri.startsWith('/') ? '' : '/'}${uri}`;
-};
+
 
 export default function DiscoverPeople() {
     const { colors, isDark } = useThemeContext();
@@ -55,7 +51,7 @@ export default function DiscoverPeople() {
             <View style={[styles.card, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF', borderColor: isDark ? '#333' : '#F0F0F0' }]}>
                 <TouchableOpacity onPress={() => router.push(`/user/${item._id || item.id}`)}>
                     <Image 
-                        source={{ uri: getValidUri(item.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || 'U')}&background=random` }} 
+                        source={{ uri: getCorrectUrl(item.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || 'U')}&background=random` }} 
                         style={styles.avatar} 
                     />
                 </TouchableOpacity>
@@ -144,20 +140,8 @@ const styles = StyleSheet.create({
         marginHorizontal: 8,
         padding: 20,
         alignItems: 'center',
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.08,
-                shadowRadius: 12,
-            },
-            android: {
-                elevation: 3,
-            },
-            web: {
-                boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
-            }
-        }),
+        boxShadow: '0px 8px 24px rgba(0,0,0,0.06)',
+        elevation: 3,
     },
     avatar: {
         width: 110,
@@ -188,10 +172,7 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
+        boxShadow: '0px 4px 8px rgba(0,0,0,0.1)',
         elevation: 2,
     },
     viewBtnText: {

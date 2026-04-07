@@ -19,19 +19,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useThemeContext } from '@/context/ThemeContext';
 import { API_BASE_URL } from '@/constants/Config';
 import { useRouter } from 'expo-router';
+import { getCorrectUrl } from '@/utils/api';
 
-// Helper to construct valid URIs
-const getValidUri = (uri?: string) => {
-    if (!uri) return '';
-    if (uri.startsWith('data:') || uri.startsWith('file:')) return uri;
-    if (uri.startsWith('http') && uri.includes('/uploads/')) {
-        const parts = uri.split('/uploads/');
-        return `${API_BASE_URL}/uploads/${parts[1]}`;
-    }
-    if (uri.startsWith('http')) return uri;
-    if (uri.startsWith('/uploads/')) return `${API_BASE_URL}${uri}`;
-    return `${API_BASE_URL}${uri.startsWith('/') ? '' : '/'}${uri}`;
-};
+
 
 interface LikersModalProps {
     visible: boolean;
@@ -82,7 +72,7 @@ export default function LikersModal({ visible, onClose, postId, token }: LikersM
             }}
         >
             <Image 
-                source={{ uri: getValidUri(item.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || 'U')}&background=random` }} 
+                source={{ uri: getCorrectUrl(item.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || 'U')}&background=random` }} 
                 style={styles.avatar} 
             />
             <View style={styles.likerInfo}>

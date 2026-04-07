@@ -186,7 +186,7 @@ export default function MarketItemDetailScreen() {
                     <View style={styles.detailsColumn}>
                         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
                             <View style={styles.priceRow}>
-                                <Text style={[styles.priceTag, { color: colors.primary }]}>{item.price} {item.currency}</Text>
+                                <Text style={[styles.priceTag, { color: colors.primary }]}>{item.price} Dh</Text>
                                 <TouchableOpacity onPress={handleSave} style={styles.saveBtn}>
                                     <Heart size={24} color={isSaved ? "#FF3B30" : colors.text} fill={isSaved ? "#FF3B30" : "transparent"} />
                                 </TouchableOpacity>
@@ -242,7 +242,7 @@ export default function MarketItemDetailScreen() {
                                         </TouchableOpacity>
                                         <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.primary }]} onPress={() => router.push({ pathname: '/marketplace/create', params: { id: item._id } } as any)}>
                                             <Edit2 size={20} color="white" />
-                                            <Text style={styles.btnText}>Edit Listing</Text>
+                                            <Text style={styles.priceText}>{item.price} Dh</Text>
                                         </TouchableOpacity>
                                     </View>
                                 ) : (
@@ -286,7 +286,7 @@ export default function MarketItemDetailScreen() {
                         </View>
                     </View>
                     <View style={styles.mobileContent}>
-                        <Text style={[styles.priceTag, { color: colors.primary }]}>{item.price} {item.currency}</Text>
+                        <Text style={[styles.priceTag, { color: colors.primary }]}>{item.price} Dh</Text>
                         <Text style={[styles.itemTitle, { color: colors.text }]}>{item.title}</Text>
                         <View style={styles.metaRow}>
                             <View style={[styles.metaBadge, { backgroundColor: isDark ? '#222' : '#f0f0f0' }]}><Text style={styles.metaText}>{item.condition}</Text></View>

@@ -1,23 +1,24 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { formatDistanceToNow } from 'date-fns';
-import {
-    View,
-    Text,
-    Image,
-    TouchableOpacity,
-    StyleSheet,
-    ScrollView,
-    TextInput,
-    ActivityIndicator,
-    Platform,
-    Animated,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
-import { useUser } from '@/context/UserContext';
 import { API_BASE_URL } from '@/constants/Config';
 import { useThemeContext } from '@/context/ThemeContext';
+import { useUser } from '@/context/UserContext';
+import { getCorrectUrl } from '@/utils/api';
+import { Ionicons } from '@expo/vector-icons';
+import { formatDistanceToNow } from 'date-fns';
+import { useRouter } from 'expo-router';
+import { Bookmark, Heart, MessageCircle, MoreHorizontal, Send } from 'lucide-react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+    ActivityIndicator,
+    Animated,
+    Image,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import CommentsModal from './CommentsModal';
 import ShareToUsersModal from './ShareToUsersModal';
 
@@ -53,7 +54,7 @@ export default function ReelInfoPanel({
     const { colors, isDark } = useThemeContext();
 
     const author = item?.user || {};
-    const avatarUri = author.avatar || 'https://i.pravatar.cc/150';
+    const avatarUri = getCorrectUrl(author.avatar) || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(author.name || 'User') + '&background=random';
 
     const [comments, setComments] = useState<any[]>([]);
     const [commentText, setCommentText] = useState('');
@@ -294,7 +295,7 @@ export default function ReelInfoPanel({
                         {[...comments].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()).map((comment, idx) => (
                             <View key={comment._id || idx} style={[styles.commentItem, { borderBottomColor: border }]}>
                                 <Image
-                                    source={{ uri: comment.user?.avatar || 'https://i.pravatar.cc/100' }}
+                                    source={{ uri: getCorrectUrl(comment.user?.avatar) || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(comment.user?.name || 'User') + '&background=random' }}
                                     style={styles.commentAvatar}
                                 />
                                 <View style={styles.commentBody}>
@@ -321,7 +322,7 @@ export default function ReelInfoPanel({
                 {/* ── COMMENT INPUT ── */}
                 <View style={[styles.commentInputRow, { backgroundColor: cardBg, borderColor: border }]}>
                     <Image
-                        source={{ uri: user?.avatar || 'https://i.pravatar.cc/150' }}
+                        source={{ uri: getCorrectUrl(user?.avatar) || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user?.name || 'User') + '&background=random' }}
                         style={styles.commentInputAvatar}
                     />
                     <TextInput

@@ -11,12 +11,15 @@ import { ActivityIndicator, Dimensions, Image, KeyboardAvoidingView, Platform, S
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
+import { useUser } from '@/context/UserContext';
+
 const { width } = Dimensions.get('window');
 
 // Email validation regex
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function SignupScreen() {
+    const { login } = (useUser() || {}) as any;
     const router = useRouter();
     const { colors, isDark } = useThemeContext();
     const insets = useSafeAreaInsets();
@@ -123,9 +126,16 @@ export default function SignupScreen() {
                 Toast.show({
                     type: 'success',
                     text1: 'Account Created! 🎉',
-                    text2: 'Welcome to Vibe! Please login.',
+                    text2: 'Welcome to Vibe!',
                 });
-                router.replace('/auth/login');
+                
+                // Login immediately
+                if ((response.data as any)?.token) {
+                    await login(response.data);
+                    router.replace('/(tabs)');
+                } else {
+                    router.replace('/auth/login');
+                }
             } else {
                 // Specific field mapping for errors
                 const msg = response.message || '';

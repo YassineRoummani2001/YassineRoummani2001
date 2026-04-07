@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '@/constants/Config';
+import { getCorrectUrl } from '@/utils/api';
 import { useUser } from '@/context/UserContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -9,29 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window') || { height: 0 };
 
-const getValidUri = (uri?: string) => {
-    if (!uri) return '';
-    if (uri.startsWith('data:') || uri.startsWith('file:')) return uri;
-    
-    // Auto-fix our backend URLs if they have the wrong IP/localhost
-    if (uri.startsWith('http') && uri.includes('/uploads/')) {
-        const parts = uri.split('/uploads/');
-        return `${API_BASE_URL}/uploads/${parts[1]}`;
-    }
-    
-    // External URLs
-    if (uri.startsWith('http')) return uri;
 
-    // Handle relative uploads
-    if (uri.startsWith('/uploads/')) return `${API_BASE_URL}${uri}`;
-    if (uri.includes('/uploads/')) {
-        const parts = uri.split('/uploads/');
-        return `${API_BASE_URL}/uploads/${parts[1]}`;
-    }
-
-    // Default fallback
-    return `${API_BASE_URL}${uri.startsWith('/') ? '' : '/'}${uri}`;
-};
 
 interface SimpleReelItemProps {
     item: any;
@@ -94,7 +73,7 @@ export default function SimpleReelItem({ item, active, index }: SimpleReelItemPr
             {Platform.OS === 'web' ? (
                 <video
                     ref={videoRef}
-                    src={getValidUri(videoUri)}
+                    src={getCorrectUrl(videoUri)}
                     style={{
                         position: 'absolute',
                         top: 0,
@@ -184,7 +163,7 @@ export default function SimpleReelItem({ item, active, index }: SimpleReelItemPr
                     onPress={() => router.push({ pathname: '/user/[id]', params: { id: author._id || '1' } })}
                 >
                     <Image
-                        source={{ uri: getValidUri(author.avatar) || 'https://i.pravatar.cc/100' }}
+                        source={{ uri: getCorrectUrl(author.avatar) || 'https://i.pravatar.cc/100' }}
                         style={styles.avatar}
                     />
                     <Text style={styles.username}>{author.name}</Text>

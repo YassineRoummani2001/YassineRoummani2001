@@ -97,7 +97,7 @@ export default function MarketplaceScreen() {
                     resizeMode="cover"
                 />
                 <View style={[styles.priceBadge, { backgroundColor: colors.primary }]}>
-                    <Text style={styles.priceText}>{item.price} DH</Text>
+                    <Text style={styles.priceText}>{item.price} Dh</Text>
                 </View>
             </View>
             <View style={styles.itemInfo}>

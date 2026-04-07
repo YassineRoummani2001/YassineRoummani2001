@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
+import { getCorrectUrl } from '@/utils/api';
 
 export default function MediaViewScreen() {
     const router = useRouter();
@@ -51,20 +52,10 @@ export default function MediaViewScreen() {
         }
     }, [post, user]);
 
-    // Helper to normalize URIs
-    const getValidUri = (uri: string) => {
-        if (!uri) return '';
-        if (uri.startsWith('/uploads/')) return `${API_BASE_URL}${uri}`;
-        if (uri.includes('/uploads/')) {
-            const parts = uri.split('/uploads/');
-            return `${API_BASE_URL}/uploads/${parts[1]}`;
-        }
-        if (uri.startsWith('http') || uri.startsWith('data:')) return uri;
-        return `${API_BASE_URL}${uri.startsWith('/') ? '' : '/'}${uri}`;
-    };
+
 
     // Video Player logic
-    const activeUri = getValidUri(uri as string);
+    const activeUri = getCorrectUrl(uri as string) || '';
     const isVideo = type === 'video' || type === 'reel';
 
     const player = useVideoPlayer(activeUri, player => {
@@ -400,7 +391,7 @@ export default function MediaViewScreen() {
                                     onPress={() => router.push(`/user/${post?.user?._id}` as any)}
                                 >
                                     <Image
-                                        source={{ uri: post?.user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(post?.user?.name || 'V')}&background=random` }}
+                                        source={{ uri: getCorrectUrl(post?.user?.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(post?.user?.name || 'V')}&background=random` }}
                                         style={styles.avatar}
                                     />
                                 </TouchableOpacity>

@@ -87,7 +87,7 @@ export default function WebSidebar() {
                 onPress={() => router.push('/(tabs)' as any)}
                 style={styles.logoContainer}
             >
-                <View style={[styles.logoIconBg, { backgroundColor: colors.primary, shadowColor: colors.primary }]}>
+                <View style={[styles.logoIconBg, { backgroundColor: colors.primary, boxShadow: `0px 4px 8px ${colors.primary}4D` }]}>
                     <Ionicons name="flash" size={24} color="white" />
                 </View>
                 <Text style={[styles.logoText, { color: colors.primary, marginLeft: 8 }]}>
@@ -163,10 +163,7 @@ function MenuItem({ item, active, onPress, colors, isDark, badgeCount }: any) {
                 styles.menuItem,
                 active && {
                     backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.85)',
-                    shadowColor: colors.primary,
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.2,
-                    shadowRadius: 15,
+                    boxShadow: `0px 4px 15px ${colors.primary}33`,
                     elevation: 10,
                     borderWidth: 1.5,
                     borderColor: colors.primary,
@@ -249,9 +246,7 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
+        boxShadow: '0px 4px 8px rgba(0,0,0,0.3)',
     },
     logoText: {
         fontSize: 28,

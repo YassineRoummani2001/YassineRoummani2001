@@ -1,7 +1,7 @@
 import { API_BASE_URL } from '@/constants/Config';
 import { useUser } from '@/context/UserContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Clapperboard, Grid3X3, Layers, Plus, Search } from 'lucide-react-native';
+import { ArrowLeft, Clapperboard, Grid3X3, Layers, Plus, Search, X } from 'lucide-react-native';
 import { useCallback, useEffect, useState, useMemo } from 'react';
 import {
     ActivityIndicator,
@@ -34,24 +34,44 @@ export default function SavedScreen() {
     const contentWidth = isDesktop ? Math.min(windowWidth - 320, 650) : windowWidth;
     const { colors, isDark } = useThemeContext();
 
-    // 0: All, 1: Posts, 2: Reels
-    const [activeTab, setActiveTab] = useState(params.tab === 'reels' ? 2 : 0);
+    // 0: All, 1: Posts, 2: Reels, or Collection object
+    const [activeTab, setActiveTab] = useState<number | any>(params.tab === 'reels' ? 2 : 0);
     const [savedPosts, setSavedPosts] = useState<any[]>([]);
+    const [collections, setCollections] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await fetchSavedPosts();
+        await Promise.all([fetchSavedPosts(), fetchCollections()]);
         setRefreshing(false);
     };
 
     useEffect(() => {
         if (user?._id) {
             fetchSavedPosts();
+            fetchCollections();
         }
-    }, [user]);
+    }, [user?._id]);
+
+    const fetchCollections = async () => {
+        if (!user?.token) return;
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/auth/collections`, {
+                headers: { 'Authorization': `Bearer ${user.token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setCollections(data);
+                
+                // If collections are empty, we could create defaults or just leave empty
+                // For now, let's just use what we have
+            }
+        } catch (error) {
+            console.error('Error fetching collections:', error);
+        }
+    };
 
     const fetchSavedPosts = async () => {
         if (!user?.token) return;
@@ -77,10 +97,17 @@ export default function SavedScreen() {
 
     const getFilteredPosts = useMemo(() => {
         let filtered = savedPosts;
-        if (activeTab === 1) {
-            filtered = savedPosts.filter(p => p.type !== 'reel' && p.type !== 'video');
-        } else if (activeTab === 2) {
-            filtered = savedPosts.filter(p => p.type === 'reel' || p.type === 'video');
+        
+        if (typeof activeTab === 'number') {
+            if (activeTab === 1) {
+                filtered = savedPosts.filter(p => p.type !== 'reel' && p.type !== 'video');
+            } else if (activeTab === 2) {
+                filtered = savedPosts.filter(p => p.type === 'reel' || p.type === 'video');
+            }
+        } else if (activeTab && activeTab._id) {
+            // It's a collection object
+            const colPostIds = activeTab.posts.map((p: any) => p._id || p);
+            filtered = savedPosts.filter(p => colPostIds.includes(p._id));
         }
         
         if (searchQuery.trim()) {
@@ -139,11 +166,54 @@ export default function SavedScreen() {
         );
     }, [contentWidth, activeTab, router, colors]);
 
+    const CollectionCard = ({ name, posts, image, count, isActive, onPress }: any) => {
+        const previewPosts = posts?.slice(0, 4) || [];
+        
+        return (
+            <TouchableOpacity 
+                style={[styles.collectionCard, { opacity: count === 0 && !isActive ? 0.6 : 1 }]} 
+                onPress={onPress}
+                activeOpacity={0.7}
+            >
+                <View style={[
+                    styles.collectionPreview, 
+                    { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' },
+                    isActive && { borderColor: colors.primary, borderWidth: 2 }
+                ]}>
+                    {image ? (
+                        <Image source={{ uri: image }} style={styles.fullPreview} />
+                    ) : count > 0 ? (
+                        <View style={styles.gridPreview}>
+                            {previewPosts.map((p: any, i: number) => (
+                                <Image 
+                                    key={i} 
+                                    source={{ uri: p.image || p.uri }} 
+                                    style={[styles.gridThumb, { width: '48%', height: '48%' }]} 
+                                />
+                            ))}
+                        </View>
+                    ) : (
+                        <Layers size={24} color={colors.textSecondary} />
+                    )}
+                </View>
+                <Text style={[
+                    styles.collName, 
+                    { color: isActive ? colors.primary : colors.text }
+                ]} numberOfLines={1}>{name}</Text>
+                <Text style={[styles.collCount, { color: colors.textSecondary }]}>{count} items</Text>
+            </TouchableOpacity>
+        );
+    };
+
     const ListHeader = () => (
         <View style={{ marginTop: 10 }}>
-            {/* My Collections Section preview */}
+            {/* My Collections Section */}
             <View style={styles.collectionsHeader}>
                 <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>Collections</Text>
+                <TouchableOpacity style={styles.newColBtn}>
+                   <Plus size={14} color={colors.primary} />
+                   <Text style={[styles.newColText, { color: colors.primary }]}>New</Text>
+                </TouchableOpacity>
             </View>
             
             <ScrollView 
@@ -151,62 +221,87 @@ export default function SavedScreen() {
                 showsHorizontalScrollIndicator={false} 
                 contentContainerStyle={styles.collectionsScroll}
             >
-                {/* Default collection */}
-                <TouchableOpacity style={styles.collectionCard}>
-                    <View style={[styles.collectionPreview, { backgroundColor: isDark ? '#222' : '#f0f0f0' }]}>
-                        {savedPosts.slice(0, 4).map((p, i) => (
-                            <Image 
-                                key={i}
-                                source={{ uri: p.image || p.uri }} 
-                                style={[styles.previewThumb, { width: 34, height: 34 }]} 
-                            />
-                        ))}
-                        {savedPosts.length === 0 && <Layers size={24} color={colors.textSecondary} />}
-                    </View>
-                    <Text style={[styles.collName, { color: colors.text }]}>All Items</Text>
-                    <Text style={[styles.collCount, { color: colors.textSecondary }]}>{savedPosts.length} items</Text>
-                </TouchableOpacity>
+                {/* Default collection: All Items */}
+                <CollectionCard 
+                    name="All Items"
+                    posts={savedPosts}
+                    count={savedPosts.length}
+                    isActive={activeTab === 0}
+                    onPress={() => setActiveTab(0)}
+                />
                 
-                {/* Visual placeholder for more collections */}
-                {['Design', 'Music', 'Ideas'].map((name, i) => (
-                    <TouchableOpacity key={i} style={styles.collectionCard} disabled>
-                        <View style={[styles.collectionPreview, { backgroundColor: isDark ? '#1a1a1a' : '#f8f8f8', opacity: 0.5 }]}>
-                             <Layers size={20} color={colors.textSecondary} />
-                        </View>
-                        <Text style={[styles.collName, { color: colors.textSecondary }]}>{name}</Text>
-                        <Text style={[styles.collCount, { color: colors.textSecondary }]}>0 items</Text>
-                    </TouchableOpacity>
+                {/* Real collections */}
+                {collections.map((col) => (
+                    <CollectionCard 
+                        key={col._id}
+                        name={col.name}
+                        posts={col.posts}
+                        image={col.image}
+                        count={col.posts.length}
+                        isActive={activeTab?._id === col._id}
+                        onPress={() => setActiveTab(col)}
+                    />
+                ))}
+
+                {/* Placeholders if empty to guide user */}
+                {collections.length < 3 && ['Design', 'Music'].map((name, i) => (
+                    !collections.some(c => c.name === name) && (
+                        <CollectionCard 
+                            key={`placeholder-${i}`}
+                            name={name}
+                            count={0}
+                            onPress={() => {}} // Could open create modal
+                        />
+                    )
                 ))}
             </ScrollView>
 
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-            {/* Tab Navigation */}
-            <View style={styles.tabContainer}>
-                <View style={styles.tabPillContainer}>
-                    <TouchableOpacity 
-                        style={[styles.tabPill, activeTab === 0 && { backgroundColor: isDark ? '#fff' : '#000' }]}
-                        onPress={() => setActiveTab(0)}
-                    >
-                        <Layers size={18} color={activeTab === 0 ? (isDark ? '#000' : '#fff') : colors.textSecondary} />
-                        <Text style={[styles.tabPillText, { color: activeTab === 0 ? (isDark ? '#000' : '#fff') : colors.textSecondary }]}>All</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                        style={[styles.tabPill, activeTab === 1 && { backgroundColor: isDark ? '#fff' : '#000' }]}
-                        onPress={() => setActiveTab(1)}
-                    >
-                        <Grid3X3 size={18} color={activeTab === 1 ? (isDark ? '#000' : '#fff') : colors.textSecondary} />
-                        <Text style={[styles.tabPillText, { color: activeTab === 1 ? (isDark ? '#000' : '#fff') : colors.textSecondary }]}>Posts</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                        style={[styles.tabPill, activeTab === 2 && { backgroundColor: isDark ? '#fff' : '#000' }]}
-                        onPress={() => setActiveTab(2)}
-                    >
-                        <Clapperboard size={18} color={activeTab === 2 ? (isDark ? '#000' : '#fff') : colors.textSecondary} />
-                        <Text style={[styles.tabPillText, { color: activeTab === 2 ? (isDark ? '#000' : '#fff') : colors.textSecondary }]}>Reels</Text>
+            {/* Tab Navigation (Only show if not in a specific collection) */}
+            {typeof activeTab === 'number' && (
+                <View style={styles.tabContainer}>
+                    <View style={styles.tabPillContainer}>
+                        <TouchableOpacity 
+                            style={[styles.tabPill, activeTab === 0 && { backgroundColor: isDark ? '#fff' : '#000' }]}
+                            onPress={() => setActiveTab(0)}
+                        >
+                            <Layers size={18} color={activeTab === 0 ? (isDark ? '#000' : '#fff') : colors.textSecondary} />
+                            <Text style={[styles.tabPillText, { color: activeTab === 0 ? (isDark ? '#000' : '#fff') : colors.textSecondary }]}>All</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                            style={[styles.tabPill, activeTab === 1 && { backgroundColor: isDark ? '#fff' : '#000' }]}
+                            onPress={() => setActiveTab(1)}
+                        >
+                            <Grid3X3 size={18} color={activeTab === 1 ? (isDark ? '#000' : '#fff') : colors.textSecondary} />
+                            <Text style={[styles.tabPillText, { color: activeTab === 1 ? (isDark ? '#000' : '#fff') : colors.textSecondary }]}>Posts</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                            style={[styles.tabPill, activeTab === 2 && { backgroundColor: isDark ? '#fff' : '#000' }]}
+                            onPress={() => setActiveTab(2)}
+                        >
+                            <Clapperboard size={18} color={activeTab === 2 ? (isDark ? '#000' : '#fff') : colors.textSecondary} />
+                            <Text style={[styles.tabPillText, { color: activeTab === 2 ? (isDark ? '#000' : '#fff') : colors.textSecondary }]}>Reels</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            )}
+            
+            {/* Show search result count or Breadcrumb if in collection */}
+            {typeof activeTab !== 'number' && (
+                <View style={[styles.tabContainer, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <TouchableOpacity onPress={() => setActiveTab(0)}>
+                            <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Saved Content</Text>
+                        </TouchableOpacity>
+                        <Text style={{ color: colors.textSecondary }}>/</Text>
+                        <Text style={{ color: colors.text, fontWeight: '800' }}>{activeTab.name}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => setActiveTab(0)} style={{ padding: 4 }}>
+                         <X size={16} color={colors.textSecondary} />
                     </TouchableOpacity>
                 </View>
-            </View>
+            )}
         </View>
     );
 
@@ -364,6 +459,24 @@ const styles = StyleSheet.create({
     previewThumb: {
         margin: 1,
         borderRadius: 4,
+    },
+    fullPreview: {
+        width: '100%',
+        height: '100%',
+    },
+    gridPreview: {
+        width: '100%',
+        height: '100%',
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 2,
+        padding: 2,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    gridThumb: {
+        borderRadius: 4,
+        backgroundColor: '#222',
     },
     collName: {
         fontSize: 13,

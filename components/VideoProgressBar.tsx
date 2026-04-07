@@ -81,12 +81,12 @@ export default function VideoProgressBar({
     return (
         <View style={[styles.container, { bottom: bottomOffset }]}>
             {/* Conditional Time Display (Pill style) */}
-            {showTime && (
+            {showTime && duration > 0 && (
                 <View style={styles.timeWrapper}>
                     <View style={styles.timePill}>
                         <Text style={styles.timeText}>
                             {formatTime(isScrubbing ? internalProgress.current * duration : currentTime)} 
-                            <Text style={{ opacity: 0.5, fontWeight: '400' }}> / {formatTime(duration)}</Text>
+                            <Text style={{ opacity: 0.6, fontWeight: '400', color: '#ccc' }}> / {formatTime(duration)}</Text>
                         </Text>
                     </View>
                 </View>

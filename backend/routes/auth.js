@@ -878,6 +878,93 @@ router.put('/save/:postId', protect, async (req, res) => {
     }
 });
 
+// @desc    Get user's collections
+// @route   GET /api/auth/collections
+// @access  Private
+router.get('/collections', protect, async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id)
+            .populate({
+                path: 'collections.posts',
+                populate: {
+                    path: 'user',
+                    select: 'name handle avatar'
+                }
+            });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.json(user.collections || []);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// @desc    Create a new collection
+// @route   POST /api/auth/collections
+// @access  Private
+router.post('/collections', protect, async (req, res) => {
+    try {
+        const { name, image } = req.body;
+        if (!name) return res.status(400).json({ message: 'Name is required' });
+
+        const user = await User.findById(req.user._id);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        // Check if collection name exists
+        if (user.collections.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+            return res.status(400).json({ message: 'Collection already exists' });
+        }
+
+        user.collections.push({ name, image, posts: [] });
+        await user.save();
+
+        res.status(201).json(user.collections[user.collections.length - 1]);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// @desc    Add/Remove post from collection
+// @route   PUT /api/auth/collections/:collectionId/add/:postId
+// @access  Private
+router.put('/collections/:collectionId/add/:postId', protect, async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        const collection = user.collections.id(req.params.collectionId);
+        if (!collection) return res.status(404).json({ message: 'Collection not found' });
+
+        const postId = req.params.postId;
+        const isAdded = collection.posts.includes(postId);
+
+        if (isAdded) {
+            collection.posts = collection.posts.filter(id => id.toString() !== postId);
+        } else {
+            // Also ensure post is in savedPosts
+            if (!user.savedPosts.includes(postId)) {
+                user.savedPosts.push(postId);
+            }
+            collection.posts.push(postId);
+            
+            // Set cover image if not set
+            if (!collection.image) {
+                const Post = require('../models/Post');
+                const post = await Post.findById(postId);
+                if (post) collection.image = post.image || post.uri;
+            }
+        }
+
+        await user.save();
+        res.json({ added: !isAdded, collection });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 // @desc    Update Expo Push Token
 // @route   POST /api/auth/push-token
 // @access  Private

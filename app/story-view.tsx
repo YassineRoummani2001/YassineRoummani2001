@@ -530,10 +530,8 @@ export default function StoryViewScreen() {
                     height: frameHeight,
                     borderRadius: 20,
                     overflow: 'hidden',
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 25 },
-                    shadowOpacity: 0.6,
-                    shadowRadius: 40,
+                    // @ts-ignore
+                    boxShadow: '0px 25px 40px rgba(0,0,0,0.6)',
                     borderWidth: 1,
                     borderColor: 'rgba(255,255,255,0.1)',
                 }
@@ -576,9 +574,8 @@ export default function StoryViewScreen() {
                                 fontSize: 22,
                                 fontWeight: 'bold',
                                 textAlign: 'center',
-                                textShadowColor: 'rgba(0,0,0,0.75)',
-                                textShadowOffset: { width: 0, height: 1 },
-                                textShadowRadius: 5,
+                                // @ts-ignore
+                                textShadow: '0px 1px 5px rgba(0,0,0,0.75)',
                                 padding: 20,
                                 position: 'absolute',
                                 bottom: 100,
