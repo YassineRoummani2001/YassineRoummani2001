@@ -74,6 +74,14 @@ export default function LoginScreen() {
         }
     };
 
+    const handleSocialLogin = (provider: string) => {
+        Toast.show({
+            type: 'info',
+            text1: `${provider} Login`,
+            text2: `${provider} authentication is coming soon! ✨`,
+        });
+    };
+
     const { width } = useWindowDimensions();
     const isDesktop = Platform.OS === 'web' && width > 768;
 
@@ -180,10 +188,18 @@ export default function LoginScreen() {
                             </View>
 
                             <View style={styles.socialRow}>
-                                <TouchableOpacity style={[styles.socialButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderColor: colors.border }]}>
+                                <TouchableOpacity 
+                                    style={[styles.socialButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderColor: colors.border }]}
+                                    onPress={() => handleSocialLogin('Google')}
+                                    activeOpacity={0.7}
+                                >
                                     <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/300/300221.png' }} style={styles.socialIconBase} />
                                 </TouchableOpacity>
-                                <TouchableOpacity style={[styles.socialButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderColor: colors.border }]}>
+                                <TouchableOpacity 
+                                    style={[styles.socialButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderColor: colors.border }]}
+                                    onPress={() => handleSocialLogin('Apple')}
+                                    activeOpacity={0.7}
+                                >
                                     <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/0/747.png' }} style={styles.socialIconBase} tintColor={isDark ? "#fff" : "#333"} />
                                 </TouchableOpacity>
                             </View>

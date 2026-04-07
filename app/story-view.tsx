@@ -132,7 +132,10 @@ export default function StoryViewScreen() {
     // Update isLiked when activeStory changes
     useEffect(() => {
         if (activeStory && currentUser) {
-            const liked = activeStory.likes && activeStory.likes.includes(currentUser._id || currentUser.id);
+            const liked = (activeStory.likes || activeStory.likers || []).some((idOrUser: any) => {
+                const id = typeof idOrUser === 'string' ? idOrUser : idOrUser?._id || idOrUser?.id;
+                return id === (currentUser._id || currentUser.id);
+            });
             setIsLiked(!!liked);
         } else {
             setIsLiked(false);
@@ -278,16 +281,11 @@ export default function StoryViewScreen() {
                         const updatedStories = prevUser.stories.map((s: any) => {
                             if (s._id === activeStory._id) {
                                 if (type === 'likes') {
-                                    // We received full objects, map to IDs if needed or just use length
-                                    // Be careful: 'data' is array of user objects. 's.likes' might be array of IDs.
-                                    // Best to just rely on length for the badge, but we need to update the array.
-                                    // Let's replace the array with the new list of IDs or Objects
-                                    // To be safe and consistent with schema (which usually stores IDs), we map to IDs.
-                                    // BUT, populate uses objects. The Badge uses .length.
-                                    // If we replace with objects, .length works.
-                                    return { ...s, likes: data.map((d: any) => d._id) };
+                                    const ids = (data || []).map((d: any) => d._id || d.id || d);
+                                    return { ...s, likes: ids, likers: ids };
                                 } else {
-                                    return { ...s, views: data.map((d: any) => d._id) };
+                                    const ids = (data || []).map((d: any) => d._id || d.id || d);
+                                    return { ...s, views: ids, viewers: ids };
                                 }
                             }
                             return s;
@@ -680,7 +678,7 @@ export default function StoryViewScreen() {
                                     >
                                         <Eye size={18} color="white" />
                                         <Text style={styles.statText}>
-                                            {activeStory.views?.length || 0}
+                                            {(activeStory.views?.length || activeStory.viewers?.length || 0)}
                                         </Text>
                                     </TouchableOpacity>
                                     <View style={styles.divider} />
@@ -690,7 +688,7 @@ export default function StoryViewScreen() {
                                     >
                                         <Heart size={18} color="white" fill={activeStory.likes?.length > 0 ? "white" : "transparent"} />
                                         <Text style={styles.statText}>
-                                            {activeStory.likes?.length || 0}
+                                            {(activeStory.likes?.length || activeStory.likers?.length || 0)}
                                         </Text>
                                     </TouchableOpacity>
                                 </BlurView>

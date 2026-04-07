@@ -161,6 +161,14 @@ export default function SignupScreen() {
         }
     };
 
+    const handleSocialLogin = (provider: string) => {
+        Toast.show({
+            type: 'info',
+            text1: `${provider} Login`,
+            text2: `${provider} authentication is coming soon! ✨`,
+        });
+    };
+
     const { width } = useWindowDimensions();
     const isDesktop = Platform.OS === 'web' && width > 768;
 
@@ -309,6 +317,29 @@ export default function SignupScreen() {
                                     </View>
                                 )}
                             </TouchableOpacity>
+
+                            <View style={styles.dividerContainer}>
+                                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                                <Text style={[styles.dividerText, { color: colors.textSecondary }]}>OR</Text>
+                                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                            </View>
+
+                            <View style={styles.socialRow}>
+                                <TouchableOpacity 
+                                    style={[styles.socialButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderColor: colors.border }]}
+                                    onPress={() => handleSocialLogin('Google')}
+                                    activeOpacity={0.7}
+                                >
+                                    <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/300/300221.png' }} style={styles.socialIconBase} />
+                                </TouchableOpacity>
+                                <TouchableOpacity 
+                                    style={[styles.socialButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderColor: colors.border }]}
+                                    onPress={() => handleSocialLogin('Apple')}
+                                    activeOpacity={0.7}
+                                >
+                                    <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/0/747.png' }} style={styles.socialIconBase} tintColor={isDark ? (isDesktop ? "#333" : "#fff") : "#333"} />
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
                         <View style={styles.footer}>
@@ -470,5 +501,36 @@ const styles = StyleSheet.create({
     },
     footerText: {
         fontSize: 15,
+    },
+    dividerContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 30,
+    },
+    divider: {
+        flex: 1,
+        height: 1,
+    },
+    dividerText: {
+        paddingHorizontal: 16,
+        fontSize: 14,
+    },
+    socialRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 20,
+    },
+    socialButton: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+    },
+    socialIconBase: {
+        width: 24,
+        height: 24,
+        resizeMode: 'contain',
     },
 });
