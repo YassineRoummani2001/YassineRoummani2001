@@ -19,7 +19,7 @@ interface ChatItemProps {
     isPinned?: boolean;
 }
 
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, AntDesign } from '@expo/vector-icons';
 
 const ChatItem = memo(({
     avatar,
@@ -104,14 +104,6 @@ const ChatItem = memo(({
             {/* Info */}
             <View style={styles.content}>
                 <View style={[styles.row, { gap: 4 }]}>
-                    {isPinned && (
-                        <Ionicons 
-                            name="pin" 
-                            size={12} 
-                            color={isDark ? '#FFF' : '#333'} 
-                            style={{ opacity: 0.6, marginTop: 2 }} 
-                        />
-                    )}
                     <Text numberOfLines={1} style={[styles.name, { color: textColor, flex: 1 }]}>{name}</Text>
                     <Text style={[styles.time, { color: subTextColor }]}>{time}</Text>
                 </View>
@@ -129,6 +121,16 @@ const ChatItem = memo(({
                     >
                         {lastMessage}
                     </Text>
+
+                    {isPinned && (
+                        <View style={[styles.pinnedCircle, { backgroundColor: isDark ? '#333' : '#F0F0F0' }]}>
+                            <AntDesign 
+                                name="pushpin" 
+                                size={12} 
+                                color={isDark ? '#AAA' : '#666'} 
+                            />
+                        </View>
+                    )}
 
                     {unread > 0 && (
                         <View style={styles.unreadDot} />
@@ -236,6 +238,15 @@ const styles = StyleSheet.create({
         height: 10,
         borderRadius: 5,
         backgroundColor: '#0095F6',
+        marginLeft: 8,
+    },
+    pinnedCircle: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: 8,
     },
     storyPlayIcon: {
         position: 'absolute',

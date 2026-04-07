@@ -146,7 +146,15 @@ router.post('/', protect, async (req, res) => {
         }
         
         const fullChat = await Chat.findById(chat._id).populate('participants', 'name handle avatar');
-        res.json(fullChat);
+        
+        // Add calculated flags
+        const chatResponse = {
+            ...fullChat._doc,
+            isPinned: fullChat.pinnedBy && fullChat.pinnedBy.includes(req.user._id),
+            isFavorite: fullChat.favoritedBy && fullChat.favoritedBy.includes(req.user._id)
+        };
+        
+        res.json(chatResponse);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -200,7 +208,15 @@ router.get('/:chatId', protect, async (req, res) => {
         const chat = await Chat.findById(req.params.chatId)
             .populate('participants', 'name handle avatar username bio');
         if (!chat) return res.status(404).json({ message: 'Chat not found' });
-        res.json(chat);
+        
+        // Add calculated flags
+        const chatResponse = {
+            ...chat._doc,
+            isPinned: chat.pinnedBy && chat.pinnedBy.includes(req.user._id),
+            isFavorite: chat.favoritedBy && chat.favoritedBy.includes(req.user._id)
+        };
+        
+        res.json(chatResponse);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

@@ -10,15 +10,15 @@ import {
     ArrowLeft,
     Bell,
     ChevronRight,
-    History as HistoryIcon,
-    Image as ImageIcon,
+    HistoryIcon,
+    ImageIcon,
     MessageSquare,
     Search,
     Shield,
     Star,
-    Pin,
     UserCircle
 } from 'lucide-react-native';
+import { AntDesign } from '@expo/vector-icons';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
@@ -357,8 +357,12 @@ export default function UserInfoScreen() {
             >
                 {/* Profile Section */}
                 <View style={styles.profileSection}>
+                    <Image
+                        source={{ uri: getCorrectUrl(recipient.coverImage || 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&fit=crop&q=80') }}
+                        style={styles.coverBg}
+                    />
                     <LinearGradient
-                        colors={[colors.primary + '40', colors.background]}
+                        colors={['rgba(0,0,0,0.4)', 'rgba(0,0,0,0.1)', colors.background]}
                         style={styles.coverBg}
                     />
                     
@@ -398,7 +402,7 @@ export default function UserInfoScreen() {
 
                         <TouchableOpacity style={styles.actionItem} onPress={handlePinToggle}>
                             <View style={[styles.actionIconCircle, isPinned && { backgroundColor: colors.primary, borderColor: colors.primary }]}>
-                                <Pin size={22} color={isPinned ? "#FFF" : colors.text} />
+                                <AntDesign name="pushpin" size={22} color={isPinned ? "#FFF" : colors.text} />
                             </View>
                             <Text style={styles.actionText}>{isPinned ? 'Unpin' : 'Pin'}</Text>
                         </TouchableOpacity>
