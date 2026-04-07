@@ -510,4 +510,46 @@ router.get('/:id/likers', async (req, res) => {
     }
 });
 
+// @desc    Toggle Like on a comment
+// @route   PUT /api/posts/:postId/comments/:commentId/like
+// @access  Private
+router.put('/:postId/comments/:commentId/like', protect, async (req, res) => {
+    try {
+        const post = await Post.findById(req.params.postId);
+        if (!post) return res.status(404).json({ message: 'Post not found' });
+
+        const comment = post.comments.id(req.params.commentId);
+        if (!comment) return res.status(404).json({ message: 'Comment not found' });
+
+        const userId = req.user._id;
+        if (!comment.likes) comment.likes = [];
+        
+        const isLiked = comment.likes.includes(userId);
+
+        if (isLiked) {
+            comment.likes.pull(userId);
+        } else {
+            comment.likes.push(userId);
+            
+            // Notification for comment like
+            if (comment.user.toString() !== userId.toString()) {
+                await Notification.create({
+                    recipient: comment.user,
+                    sender: userId,
+                    type: 'like',
+                    post: post._id,
+                    text: 'liked your comment.',
+                    isRead: false
+                });
+            }
+        }
+
+        await post.save();
+        res.json(comment.likes);
+    } catch (err) {
+        console.error('Comment like error:', err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
 module.exports = router;

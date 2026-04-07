@@ -46,6 +46,7 @@ interface Comment {
         handle?: string;
     };
     createdAt: string;
+    likes?: string[];
 }
 
 interface CommentsModalProps {
@@ -77,6 +78,8 @@ export default function CommentsModal({ visible, onClose, postId, initialComment
     const [loading, setLoading] = useState(false);
     const [inputText, setInputText] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [replyingTo, setReplyingTo] = useState<{ id: string, name: string } | null>(null);
+    const inputRef = React.useRef<TextInput>(null);
 
     const quickEmojis = ['🔥', '❤️', '🙌', '💀', '💯', '🤩', '🫡', '🥺', '😂', '🤞'];
 
@@ -103,6 +106,41 @@ export default function CommentsModal({ visible, onClose, postId, initialComment
         }
     };
 
+    const handleLikeComment = async (commentId: string) => {
+        if (!user) return;
+        
+        // Optimistic update
+        setComments(current => current.map(c => {
+            if (c._id === commentId) {
+                const currentLikes = c.likes || [];
+                const isLiked = currentLikes.includes(user._id);
+                return {
+                    ...c,
+                    likes: isLiked 
+                        ? currentLikes.filter(id => id !== user._id)
+                        : [...currentLikes, user._id]
+                };
+            }
+            return c;
+        }));
+
+        try {
+            await fetch(`${API_BASE_URL}/api/posts/${postId}/comments/${commentId}/like`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${user.token}` }
+            });
+        } catch (error) {
+            console.error("Error liking comment", error);
+            // Optional: revert on failure
+        }
+    };
+
+    const handleReply = (comment: Comment) => {
+        setReplyingTo({ id: comment.user._id, name: comment.user.name });
+        setInputText(`@${comment.user.name.replace(/\s+/g, '')} `);
+        inputRef.current?.focus();
+    };
+
     const handleSend = async () => {
         if (!inputText.trim() || submitting || !user) return;
 
@@ -114,7 +152,10 @@ export default function CommentsModal({ visible, onClose, postId, initialComment
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${user.token}`
                 },
-                body: JSON.stringify({ text: inputText.trim() })
+                body: JSON.stringify({ 
+                    text: inputText.trim(),
+                    replyTo: replyingTo?.id // Backend might not handle this yet but good to send
+                })
             });
 
             if (res.ok) {
@@ -122,6 +163,7 @@ export default function CommentsModal({ visible, onClose, postId, initialComment
                 const sorted = [...updatedComments].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
                 setComments(sorted);
                 setInputText('');
+                setReplyingTo(null);
                 if (onCommentAdded) {
                     onCommentAdded(updatedComments.length);
                 }
@@ -147,8 +189,18 @@ export default function CommentsModal({ visible, onClose, postId, initialComment
                     <Text style={[styles.commentText, { color: colors.text }]}>{item.text}</Text>
                 </View>
                 <View style={styles.commentActions}>
-                    <TouchableOpacity><Text style={styles.actionText}>Like</Text></TouchableOpacity>
-                    <TouchableOpacity><Text style={styles.actionText}>Reply</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleLikeComment(item._id)}>
+                        <Text style={[
+                            styles.actionText, 
+                            item.likes?.includes(user?._id) && { color: colors.primary, fontWeight: '800' }
+                        ]}>
+                            {item.likes?.includes(user?._id) ? 'Liked' : 'Like'}
+                            {item.likes && item.likes.length > 0 ? ` (${item.likes.length})` : ''}
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleReply(item)}>
+                        <Text style={styles.actionText}>Reply</Text>
+                    </TouchableOpacity>
                 </View>
             </View>
         </View>
@@ -255,17 +307,26 @@ export default function CommentsModal({ visible, onClose, postId, initialComment
                                 style={styles.inputAvatar} 
                             />
                             <TextInput
+                                ref={inputRef}
                                 style={[styles.input, { color: colors.text }]}
-                                placeholder="Write a comment..."
+                                placeholder={replyingTo ? `Reply to ${replyingTo.name}...` : "Write a comment..."}
                                 placeholderTextColor={colors.textSecondary}
                                 value={inputText}
                                 onChangeText={setInputText}
                                 multiline
                                 maxLength={500}
                                 selectionColor={colors.primary}
+                                onFocus={() => {
+                                    if (inputText === '' && replyingTo) {
+                                        setInputText(`@${replyingTo.name.replace(/\s+/g, '')} `);
+                                    }
+                                }}
                             />
                             <TouchableOpacity
-                                onPress={handleSend}
+                                onPress={() => {
+                                    handleSend();
+                                    setReplyingTo(null);
+                                }}
                                 disabled={!inputText.trim() || submitting}
                                 activeOpacity={0.8}
                             >
