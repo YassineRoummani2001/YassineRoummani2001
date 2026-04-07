@@ -107,8 +107,8 @@ export default function SavedScreen() {
             }
         } else if (activeTab && activeTab._id) {
             // It's a collection object
-            const colPostIds = activeTab.posts.map((p: any) => p._id || p);
-            filtered = savedPosts.filter(p => colPostIds.includes(p._id));
+            const colPostIds = (activeTab.posts || []).map((p: any) => (p?._id || p));
+            filtered = savedPosts.filter(p => p && colPostIds.includes(p._id));
         }
         
         if (searchQuery.trim()) {
