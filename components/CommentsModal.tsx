@@ -84,19 +84,38 @@ export default function CommentsModal({ visible, onClose, postId, initialComment
     const [mentionQuery, setMentionQuery] = useState<string | null>(null);
     const [mentionSuggestions, setMentionSuggestions] = useState<any[]>([]);
     const [mentionedUserIds, setMentionedUserIds] = useState<string[]>([]);
+    const [followingUsers, setFollowingUsers] = useState<any[]>([]);
 
     const quickEmojis = ['🔥', '❤️', '🙌', '💀', '💯', '🤩', '🫡', '🥺', '😂', '🤞'];
 
     useEffect(() => {
         if (visible && postId) {
             fetchComments();
+            if (user) {
+                fetchFollowingUsers();
+            }
         }
         if (!visible) {
             setMentionQuery(null);
             setMentionSuggestions([]);
             setMentionedUserIds([]);
         }
-    }, [visible, postId]);
+    }, [visible, postId, user]);
+
+    const fetchFollowingUsers = async () => {
+        if (!user || followingUsers.length > 0) return;
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/auth/following/${user._id || user.id}`, {
+                headers: { 'Authorization': `Bearer ${user.token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setFollowingUsers(data);
+            }
+        } catch (error) {
+            console.error('Error fetching following users:', error);
+        }
+    };
 
     const fetchComments = async () => {
         setLoading(true);
@@ -123,9 +142,8 @@ export default function CommentsModal({ visible, onClose, postId, initialComment
         if (atMatch) {
             const query = atMatch[1].toLowerCase();
             setMentionQuery(query);
-            // Filter from following list
-            const following: any[] = user?.following || [];
-            const filtered = following.filter((u: any) => {
+            // Filter from populated following list
+            const filtered = followingUsers.filter((u: any) => {
                 const name = (u.name || '').toLowerCase();
                 const handle = (u.handle || '').toLowerCase();
                 return name.includes(query) || handle.includes(query);
@@ -135,7 +153,7 @@ export default function CommentsModal({ visible, onClose, postId, initialComment
             setMentionQuery(null);
             setMentionSuggestions([]);
         }
-    }, [user]);
+    }, [followingUsers]);
 
     const insertMention = useCallback((mentionUser: any) => {
         // Replace the @query at the end with the selected user's handle/name
