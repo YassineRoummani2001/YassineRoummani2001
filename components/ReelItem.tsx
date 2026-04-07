@@ -368,15 +368,17 @@ export default function ReelItem({ item, active, isMuted, width, height }: ReelI
 
 
     const [isSaved, setIsSaved] = useState(() => {
-        if (!user || !user.savedPosts || !item) return false;
-        return user.savedPosts.some((p: any) => (typeof p === 'string' ? p : p._id) === (item._id || item.id));
+        if (!user || !user.saved || !item) return false;
+        const savedList = Array.isArray(user.saved) ? user.saved : [];
+        return savedList.some((p: any) => (typeof p === 'string' ? p : p?._id) === (item._id || item.id));
     });
 
     useEffect(() => {
-        if (!user || !user.savedPosts || !item) return;
-        const saved = user.savedPosts.some((p: any) => (typeof p === 'string' ? p : p._id) === (item._id || item.id));
+        if (!user || !user.saved || !item) return;
+        const savedList = Array.isArray(user.saved) ? user.saved : [];
+        const saved = savedList.some((p: any) => (typeof p === 'string' ? p : p?._id) === (item._id || item.id));
         setIsSaved(saved);
-    }, [user, item._id, item.id]);
+    }, [user?.saved, item._id, item.id]);
 
     const handleSaveReel = async () => {
         if (!user) return;

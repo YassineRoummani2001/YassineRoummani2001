@@ -112,6 +112,7 @@ export const UserProvider = ({ children }) => {
                 links: userWithoutToken.links || [], 
                 coverImage: userWithoutToken.coverImage,
                 saved: userWithoutToken.saved || [],
+                blockedUsers: userWithoutToken.blockedUsers || [],
                 isPrivate: userWithoutToken.isPrivate || false,
             };
             
@@ -272,27 +273,44 @@ export const UserProvider = ({ children }) => {
     }, [user]);
 
     const savePost = useCallback(async (postId, isSaving) => {
-        if (!user || !user.token) return;
+        if (!user || !user.token) return { success: false };
         
-        const currentSaved = user.saved || [];
-        let updatedSaved;
-        
-        if (isSaving) {
-            updatedSaved = [...currentSaved, postId];
-        } else {
-            updatedSaved = currentSaved.filter(id => id !== postId);
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/auth/save/${postId}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${user.token}`
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                // data.saved is the new status
+                
+                const currentSaved = Array.isArray(user.saved) ? user.saved : [];
+                let updatedSaved;
+                
+                if (data.saved) {
+                    if (!currentSaved.includes(postId)) {
+                        updatedSaved = [...currentSaved, postId];
+                    } else {
+                        updatedSaved = currentSaved;
+                    }
+                } else {
+                    updatedSaved = currentSaved.filter(id => String(id) !== String(postId));
+                }
+                
+                const updatedUser = { ...user, saved: updatedSaved };
+                setUser(updatedUser);
+                
+                const { token, ...dataToCache } = updatedUser;
+                await AsyncStorage.setItem(USER_KEY, JSON.stringify(dataToCache));
+                return { success: true, saved: data.saved };
+            }
+        } catch (error) {
+            console.error('Save post error:', error);
         }
-        
-        const updatedUser = { ...user, saved: updatedSaved };
-        setUser(updatedUser);
-        
-        // Cache updated user data
-        const { token, ...dataToCache } = updatedUser;
-        await AsyncStorage.setItem(USER_KEY, JSON.stringify(dataToCache));
-        
-        // No need to wait for backend here if we want optimistic UI
-        // But we return success/fail if needed
-        return { success: true };
+        return { success: false };
     }, [user]);
 
     const deleteAccount = useCallback(async () => {

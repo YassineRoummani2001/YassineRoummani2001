@@ -1,7 +1,7 @@
 import { API_BASE_URL } from '@/constants/Config';
 import { useUser } from '@/context/UserContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Clapperboard, Grid3X3, Layers, Plus, Search, X } from 'lucide-react-native';
+import { ArrowLeft, Clapperboard, Grid3X3, Layers, Plus, Search, Trash2, X } from 'lucide-react-native';
 import { useCallback, useEffect, useState, useMemo } from 'react';
 import {
     ActivityIndicator,
@@ -15,7 +15,9 @@ import {
     View,
     Platform,
     StatusBar,
-    ScrollView
+    ScrollView,
+    Modal,
+    TextInput
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
@@ -42,6 +44,9 @@ export default function SavedScreen() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
+    const [newCollectionName, setNewCollectionName] = useState('');
+    const [isCreating, setIsCreating] = useState(false);
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -96,28 +101,103 @@ export default function SavedScreen() {
         }
     };
 
-    const getFilteredPosts = useMemo(() => {
-        let filtered = savedPosts;
+    const handleCreateCollection = async () => {
+        if (!newCollectionName.trim() || isCreating) return;
         
+        setIsCreating(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/auth/collections`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${user.token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name: newCollectionName })
+            });
+
+            if (response.ok) {
+                const newCol = await response.json();
+                setCollections(prev => [...prev, newCol]);
+                setIsCreateModalVisible(false);
+                setNewCollectionName('');
+            } else {
+                const err = await response.json();
+                alert(err.message || 'Failed to create collection');
+            }
+        } catch (error) {
+            console.error('Error creating collection:', error);
+            alert('Something went wrong');
+        } finally {
+            setIsCreating(false);
+        }
+    };
+
+    const handleDeleteCollection = async () => {
+        if (typeof activeTab === 'number' || !activeTab?._id) return;
+        
+        // Final sanity check: only delete if empty
+        if (activeTab.posts?.length > 0) {
+            alert("You can only delete empty collections.");
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/auth/collections/${activeTab._id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${user.token}`
+                }
+            });
+
+            if (response.ok) {
+                setCollections(prev => prev.filter(c => c._id !== activeTab._id));
+                setActiveTab(0); // Go back to All
+            } else {
+                const err = await response.json();
+                alert(err.message || 'Failed to delete collection');
+            }
+        } catch (error) {
+            console.error('Error deleting collection:', error);
+            alert('Something went wrong');
+        }
+    };
+
+    const getFilteredPosts = useMemo(() => {
+        // Strict filter: only items currently in user's saved list (synced with context)
+        const userSavedIds = (user?.saved || []).map((p: any) => (typeof p === 'string' ? p : p?._id));
+        
+        let filtered: any[] = [];
+
         if (typeof activeTab === 'number') {
+            // General filter from the main saved list
+            filtered = savedPosts.filter(p => p && userSavedIds.includes(p._id));
+            
             if (activeTab === 1) {
-                filtered = savedPosts.filter(p => p.type !== 'reel' && p.type !== 'video');
+                // Posts only
+                filtered = filtered.filter(p => p.type !== 'reel' && p.type !== 'video' && !p.uri?.endsWith('.mp4'));
             } else if (activeTab === 2) {
-                filtered = savedPosts.filter(p => p.type === 'reel' || p.type === 'video');
+                // Reels/Videos only
+                filtered = filtered.filter(p => p.type === 'reel' || p.type === 'video' || p.uri?.endsWith('.mp4'));
             }
         } else if (activeTab && activeTab._id) {
-            // It's a collection object
-            const colPostIds = (activeTab.posts || []).map((p: any) => (p?._id || p));
-            filtered = savedPosts.filter(p => p && colPostIds.includes(p._id));
+            // It's a collection object - use its own posts directly (they are populated by backend)
+            filtered = (activeTab.posts || []).filter((p: any) => p && typeof p === 'object');
         }
+        
+        // Sort by newest first
+        filtered.sort((a, b) => {
+            const dateA = new Date(a.createdAt || 0).getTime();
+            const dateB = new Date(b.createdAt || 0).getTime();
+            return dateB - dateA;
+        });
         
         if (searchQuery.trim()) {
             const q = searchQuery.toLowerCase();
-            filtered = filtered.filter(p => p.caption?.toLowerCase().includes(q));
+            filtered = filtered.filter(p => p.caption?.toLowerCase().includes(q) || p.user?.name?.toLowerCase().includes(q));
         }
         
         return filtered;
-    }, [activeTab, savedPosts, searchQuery]);
+    }, [activeTab, savedPosts, searchQuery, user?.saved]);
 
     const renderGridItem = useCallback(({ item, index }: { item: any, index: number }) => {
         const isVideo = item.type === 'reel' || item.type === 'video' || item.uri?.endsWith('.mp4');
@@ -208,7 +288,10 @@ export default function SavedScreen() {
             {/* My Collections Section */}
             <View style={styles.collectionsHeader}>
                 <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>Collections</Text>
-                <TouchableOpacity style={styles.newColBtn}>
+                <TouchableOpacity 
+                    style={styles.newColBtn}
+                    onPress={() => setIsCreateModalVisible(true)}
+                >
                    <Plus size={14} color={colors.primary} />
                    <Text style={[styles.newColText, { color: colors.primary }]}>New</Text>
                 </TouchableOpacity>
@@ -295,9 +378,16 @@ export default function SavedScreen() {
                         <Text style={{ color: colors.textSecondary }}>/</Text>
                         <Text style={{ color: colors.text, fontWeight: '800' }}>{activeTab.name}</Text>
                     </View>
-                    <TouchableOpacity onPress={() => setActiveTab(0)} style={{ padding: 4 }}>
-                         <X size={16} color={colors.textSecondary} />
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        {activeTab.posts?.length === 0 && (
+                            <TouchableOpacity onPress={handleDeleteCollection} style={{ padding: 4 }}>
+                                <Trash2 size={16} color={colors.danger} />
+                            </TouchableOpacity>
+                        )}
+                        <TouchableOpacity onPress={() => setActiveTab(0)} style={{ padding: 4 }}>
+                             <X size={16} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                    </View>
                 </View>
             )}
         </View>
@@ -365,6 +455,60 @@ export default function SavedScreen() {
                     showsVerticalScrollIndicator={false}
                 />
             )}
+
+            {/* Create Collection Modal */}
+            <Modal
+                visible={isCreateModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setIsCreateModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <BlurView intensity={30} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+                    <Animated.View 
+                        entering={FadeInUp.springify().damping(12)}
+                        style={[styles.modalContent, { backgroundColor: isDark ? '#1a1a1a' : '#fff' }]}
+                    >
+                        <View style={styles.modalHeader}>
+                            <Text style={[styles.modalTitle, { color: colors.text }]}>New Collection</Text>
+                            <TouchableOpacity onPress={() => setIsCreateModalVisible(false)}>
+                                <X size={20} color={colors.textSecondary} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={[styles.modalSub, { color: colors.textSecondary }]}>
+                            Give your collection a name to help keep your saved items organized.
+                        </Text>
+
+                        <View style={[styles.inputFieldWrap, { backgroundColor: isDark ? '#262626' : '#f5f5f5' }]}>
+                            <TextInput
+                                style={[styles.modalInput, { color: colors.text }]}
+                                placeholder="Collection name..."
+                                placeholderTextColor={colors.textSecondary + '80'}
+                                value={newCollectionName}
+                                onChangeText={setNewCollectionName}
+                                autoFocus
+                            />
+                        </View>
+
+                        <TouchableOpacity 
+                            style={[
+                                styles.createBtn, 
+                                { backgroundColor: colors.primary },
+                                (!newCollectionName.trim() || isCreating) && { opacity: 0.5 }
+                            ]}
+                            disabled={!newCollectionName.trim() || isCreating}
+                            onPress={handleCreateCollection}
+                        >
+                            {isCreating ? (
+                                <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                                <Text style={styles.createBtnText}>Create Collection</Text>
+                            )}
+                        </TouchableOpacity>
+                    </Animated.View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -590,6 +734,67 @@ const styles = StyleSheet.create({
         elevation: 5,
     },
     exploreText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    modalOverlay: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        padding: 20,
+    },
+    modalContent: {
+        width: '100%',
+        maxWidth: 400,
+        borderRadius: 24,
+        padding: 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+    },
+    modalSub: {
+        fontSize: 14,
+        lineHeight: 20,
+        marginBottom: 24,
+        opacity: 0.8,
+    },
+    inputFieldWrap: {
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        marginBottom: 24,
+    },
+    modalInput: {
+        fontSize: 16,
+        fontWeight: '600',
+        padding: 0, // Remove native padding
+    },
+    createBtn: {
+        height: 54,
+        borderRadius: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    createBtnText: {
         color: 'white',
         fontSize: 16,
         fontWeight: '700',

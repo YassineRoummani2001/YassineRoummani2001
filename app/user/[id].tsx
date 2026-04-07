@@ -239,6 +239,7 @@ export default function UserProfileScreen() {
     const [postsLoading, setPostsLoading] = useState(true);
     const [userData, setUserData] = useState<any>(null);
     const [isRequested, setIsRequested] = useState(false);
+    const [isBlockingMe, setIsBlockingMe] = useState(false);
     const [userLoading, setUserLoading] = useState(true);
 
     const { colors, isDark } = useThemeContext();
@@ -257,6 +258,14 @@ export default function UserProfileScreen() {
         () => createStyles(colors, isDark, width, COLUMN_WIDTH, GRID_GAP, isDesktop),
         [colors, isDark, width, COLUMN_WIDTH, GRID_GAP, isDesktop]
     );
+
+    const isBlockedByMe = useMemo(() => {
+        if (!currentUser || !id) return false;
+        const uid = id.toString();
+        return currentUser.blockedUsers?.some((bid: any) => 
+            (typeof bid === 'string' ? bid : bid._id) === uid
+        );
+    }, [currentUser?.blockedUsers, id]);
 
     // ─── Tab underline animation ─────────────────────────────────────────────
     const tabUnderlineX = useRef(new Animated.Value(0)).current;
@@ -297,6 +306,7 @@ export default function UserProfileScreen() {
                 setUserData(data);
                 setFollowersCount(data.followersCount || 0);
                 setFollowingCount(data.followingCount || 0);
+                setIsBlockingMe(!!data.isBlockingMe);
             }
         } catch (e) { console.error(e); }
         finally { setUserLoading(false); }
@@ -344,17 +354,25 @@ export default function UserProfileScreen() {
                 method: 'PUT',
                 headers: { Authorization: `Bearer ${currentUser?.token}` },
             });
-            if (res.ok) { alert('User blocked'); router.replace('/'); }
+            if (res.ok) { 
+                const data = await res.json();
+                // Refresh currentUser to update blockedUsers list
+                // You might have a refreshUser in your context
+                // For now, let's just show an alert and reload
+                Alert.alert('Success', isBlockedByMe ? 'User unblocked' : 'User blocked');
+                // router.replace('/');
+                // Ideally we refresh the context here
+            }
         } catch (e) { console.error(e); }
     };
 
     const isOwnProfile = currentUser?._id === id;
     const canSeeContent = useMemo(() => {
-        if (!userData) return false;
+        if (!userData || isBlockedByMe || isBlockingMe) return false;
         if (isOwnProfile) return true;
         if (isFollowing) return true;
         return !userData.isPrivate;
-    }, [userData, isFollowing, isOwnProfile]);
+    }, [userData, isFollowing, isOwnProfile, isBlockedByMe, isBlockingMe]);
 
     // ─── Content renderer ────────────────────────────────────────────────────
     const reels = useMemo(
@@ -363,6 +381,36 @@ export default function UserProfileScreen() {
     );
 
     const renderContent = () => {
+        if (isBlockedByMe) {
+            return (
+                <View style={styles.privateState}>
+                    <View style={[styles.privateIconWrap, { backgroundColor: colors.danger + '20' }]}>
+                        <Ionicons name="ban" size={40} color={colors.danger} />
+                    </View>
+                    <Text style={[styles.emptyTitle, { color: colors.danger }]}>User Blocked</Text>
+                    <Text style={styles.emptySub}>You have blocked this user. Unblock them to see their content.</Text>
+                    <TouchableOpacity 
+                        style={[styles.followBtn, { marginTop: 20, backgroundColor: colors.danger }]}
+                        onPress={handleBlockUser}
+                    >
+                        <Text style={styles.followBtnText}>Unblock User</Text>
+                    </TouchableOpacity>
+                </View>
+            );
+        }
+
+        if (isBlockingMe) {
+            return (
+                <View style={styles.privateState}>
+                    <View style={styles.privateIconWrap}>
+                        <Ionicons name="alert-circle-outline" size={40} color={colors.textSecondary} />
+                    </View>
+                    <Text style={styles.emptyTitle}>User unavailable</Text>
+                    <Text style={styles.emptySub}>This account is not available to you.</Text>
+                </View>
+            );
+        }
+
         if (!canSeeContent) {
             return (
                 <View style={styles.privateState}>
@@ -639,7 +687,8 @@ export default function UserProfileScreen() {
                                     <TouchableOpacity
                                         style={styles.statPill}
                                         onPress={() => router.push({ pathname: '/users-list', params: { type: 'followers', title: 'Followers', userId: id } })}
-                                        activeOpacity={0.7}
+                                        activeOpacity={canSeeContent ? 0.7 : 1}
+                                        disabled={!canSeeContent}
                                     >
                                         <Text style={styles.statNumber}>{formatCount(followersCount)}</Text>
                                         <Text style={styles.statLabel}>followers</Text>
@@ -647,7 +696,8 @@ export default function UserProfileScreen() {
                                     <TouchableOpacity
                                         style={styles.statPill}
                                         onPress={() => router.push({ pathname: '/users-list', params: { type: 'following', title: 'Following', userId: id } })}
-                                        activeOpacity={0.7}
+                                        activeOpacity={canSeeContent ? 0.7 : 1}
+                                        disabled={!canSeeContent}
                                     >
                                         <Text style={styles.statNumber}>{formatCount(followingCount)}</Text>
                                         <Text style={styles.statLabel}>following</Text>
@@ -708,6 +758,8 @@ export default function UserProfileScreen() {
                                     <TouchableOpacity
                                         style={styles.mobileStatItem}
                                         onPress={() => router.push({ pathname: '/users-list', params: { type: 'followers', title: 'Followers', userId: id } })}
+                                        disabled={!canSeeContent}
+                                        activeOpacity={canSeeContent ? 0.7 : 1}
                                     >
                                         <Text style={styles.statNumber}>{formatCount(followersCount)}</Text>
                                         <Text style={styles.statLabel}>followers</Text>
@@ -715,6 +767,8 @@ export default function UserProfileScreen() {
                                     <TouchableOpacity
                                         style={styles.mobileStatItem}
                                         onPress={() => router.push({ pathname: '/users-list', params: { type: 'following', title: 'Following', userId: id } })}
+                                        disabled={!canSeeContent}
+                                        activeOpacity={canSeeContent ? 0.7 : 1}
                                     >
                                         <Text style={styles.statNumber}>{formatCount(followingCount)}</Text>
                                         <Text style={styles.statLabel}>following</Text>

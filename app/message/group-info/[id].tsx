@@ -31,7 +31,7 @@ import ConfirmModal from '@/components/ConfirmModal';
 import ProcessingModal from '@/components/ProcessingModal';
 import ImageConfirmModal from '@/components/ImageConfirmModal';
 import { uploadFile } from '@/utils/uploadHelper';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 // Helper to normalize URIs
 const getCorrectUrl = (uri?: string | null) => {

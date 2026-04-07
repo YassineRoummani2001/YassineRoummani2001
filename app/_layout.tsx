@@ -156,6 +156,32 @@ function InnerLayout() {
   );
 }
 
+const renderPremiumToast = (props: any, type: 'success' | 'error' | 'info') => {
+  const icons = {
+    success: { name: 'checkmark-circle' as const, color: '#10B981', bg: 'rgba(16, 185, 129, 0.1)' },
+    error: { name: 'close-circle' as const, color: '#EF4444', bg: 'rgba(239, 68, 68, 0.1)' },
+    info: { name: 'information-circle' as const, color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.1)' }
+  };
+  const config = icons[type];
+
+  return (
+    <View style={toastStyles.wrapper}>
+      <View style={toastStyles.premiumContainer}>
+        <View style={[toastStyles.iconCircle, { backgroundColor: config.bg }]}>
+          <Ionicons name={config.name} size={20} color={config.color} />
+        </View>
+        <View style={toastStyles.content}>
+          <Text style={toastStyles.title} numberOfLines={1}>{props.text1}</Text>
+          {props.text2 && <Text style={toastStyles.message} numberOfLines={2}>{props.text2}</Text>}
+        </View>
+        <View style={toastStyles.dismissIcon}>
+          <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.3)" />
+        </View>
+      </View>
+    </View>
+  );
+};
+
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -166,105 +192,67 @@ export default function RootLayout() {
       </CustomThemeProvider>
       <Toast 
         config={{
-          success: (props) => (
-            <View pointerEvents="box-none" style={Platform.OS === 'web' ? { width: Dimensions.get('window').width, alignItems: 'flex-end', paddingRight: 40 } : { width: '100%', alignItems: 'center' }}>
-              <View style={[toastStyles.successContainer, Platform.OS === 'web' && { width: 350 }]}>
-                 <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-                 <View style={toastStyles.content}>
-                   <Text style={toastStyles.title}>{props.text1}</Text>
-                   {props.text2 && <Text style={toastStyles.message}>{props.text2}</Text>}
-                 </View>
-              </View>
-            </View>
-          ),
-          error: (props) => (
-            <View pointerEvents="box-none" style={Platform.OS === 'web' ? { width: Dimensions.get('window').width, alignItems: 'flex-end', paddingRight: 40 } : { width: '100%', alignItems: 'center' }}>
-              <View style={[toastStyles.errorContainer, Platform.OS === 'web' && { width: 350 }]}>
-                 <Ionicons name="close-circle" size={24} color="#EF4444" />
-                 <View style={toastStyles.content}>
-                   <Text style={toastStyles.title}>{props.text1}</Text>
-                   {props.text2 && <Text style={toastStyles.message}>{props.text2}</Text>}
-                 </View>
-              </View>
-            </View>
-          ),
-          info: (props) => (
-            <View pointerEvents="box-none" style={Platform.OS === 'web' ? { width: Dimensions.get('window').width, alignItems: 'flex-end', paddingRight: 40 } : { width: '100%', alignItems: 'center' }}>
-              <View style={[toastStyles.infoContainer, Platform.OS === 'web' && { width: 350 }]}>
-                 <Ionicons name="information-circle" size={24} color="#3B82F6" />
-                 <View style={toastStyles.content}>
-                   <Text style={toastStyles.title}>{props.text1}</Text>
-                   {props.text2 && <Text style={toastStyles.message}>{props.text2}</Text>}
-                 </View>
-              </View>
-            </View>
-          )
+          success: (props) => renderPremiumToast(props, 'success'),
+          error: (props) => renderPremiumToast(props, 'error'),
+          info: (props) => renderPremiumToast(props, 'info'),
         }}
-        topOffset={Platform.OS === 'ios' ? 60 : 40}
+        topOffset={Platform.OS === 'ios' ? 54 : 40}
+        visibilityTime={2500}
       />
     </GestureHandlerRootView>
   );
 }
 
 const toastStyles = StyleSheet.create({
-  successContainer: {
-    height: 'auto',
-    minHeight: 60,
-    width: '90%',
-    backgroundColor: '#064E3B',
-    borderRadius: 16,
-    flexDirection: 'row',
+  wrapper: {
+    width: '100%',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
-    boxShadow: '0px 4px 10px rgba(0,0,0,0.3)',
-    elevation: 10,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
   },
-  errorContainer: {
-    height: 'auto',
-    minHeight: 60,
-    width: '90%',
-    backgroundColor: '#450A0A',
-    borderRadius: 16,
+  premiumContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    backgroundColor: 'rgba(20, 20, 25, 0.92)',
+    borderRadius: 24,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.2)',
-    boxShadow: '0px 4px 10px rgba(0,0,0,0.3)',
-    elevation: 10,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 15,
+    elevation: 12,
+    maxWidth: 380,
+    minHeight: 60,
   },
-  infoContainer: {
-    height: 'auto',
-    minHeight: 60,
-    width: '90%',
-    backgroundColor: '#1E1B4B',
-    borderRadius: 16,
-    flexDirection: 'row',
+  iconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.2)',
-    boxShadow: '0px 4px 10px rgba(0,0,0,0.3)',
-    elevation: 10,
+    justifyContent: 'center',
   },
   content: {
-    marginLeft: 12,
+    marginLeft: 14,
     flex: 1,
+    marginRight: 10,
   },
   title: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
+    letterSpacing: -0.2,
   },
   message: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(255, 255, 255, 0.65)',
     fontSize: 13,
-    marginTop: 2,
-    lineHeight: 18,
+    fontWeight: '500',
+    marginTop: 1,
+    lineHeight: 17,
+  },
+  dismissIcon: {
+    paddingLeft: 4,
   },
 });

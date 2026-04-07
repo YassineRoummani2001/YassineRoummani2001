@@ -101,6 +101,8 @@ router.post('/register', async (req, res) => {
                 phone: user.phone,
                 stories: [], // New user has no stories
                 following: user.following || [],
+                saved: user.savedPosts || [],
+                blockedUsers: user.blockedUsers || [],
                 token: generateToken(user._id),
             });
         }
@@ -157,6 +159,8 @@ router.post('/login', async (req, res) => {
                 phone: user.phone,
                 stories: stories || [],
                 following: user.following || [],
+                saved: user.savedPosts || [],
+                blockedUsers: user.blockedUsers || [],
                 token: generateToken(user._id),
             });
         } else {
@@ -210,6 +214,8 @@ router.put('/profile', protect, async (req, res) => {
                 token: generateToken(updatedUser._id),
                 followers: updatedUser.followers || [],
                 following: updatedUser.following || [],
+                saved: updatedUser.savedPosts || [],
+                blockedUsers: updatedUser.blockedUsers || [],
             });
         } else {
             res.status(404).json({ message: 'User not found' });
@@ -727,6 +733,25 @@ router.get('/user/:userId', async (req, res) => {
             createdAt: { $gt: twentyFourHoursAgo }
         }).sort({ createdAt: 1 });
 
+        // Check blocking status relative to requester
+        let isBlockedByMe = false;
+        let isBlockingMe = false;
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            try {
+                const token = authHeader.split(' ')[1];
+                const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                const requesterId = decoded.id;
+                
+                // Fetch full requester to check their block list
+                const requester = await User.findById(requesterId);
+                if (requester) {
+                    isBlockedByMe = requester.blockedUsers?.includes(user._id);
+                    isBlockingMe = user.blockedUsers?.includes(requester._id);
+                }
+            } catch (k) { /* ignore jwt error */ }
+        }
+
         res.json({
             _id: user._id,
             name: user.name,
@@ -738,11 +763,13 @@ router.get('/user/:userId', async (req, res) => {
             gender: user.gender,
             links: user.links,
             isPrivate: user.isPrivate,
-            stories: stories || [], // Return fetched stories
+            stories: stories || [],
             followersCount: user.followers?.length || 0,
             followingCount: user.following?.length || 0,
-            followers: user.followers || [],
             following: user.following || [],
+            saved: user.savedPosts || [],
+            isBlockedByMe,
+            isBlockingMe
         });
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -960,6 +987,26 @@ router.put('/collections/:collectionId/add/:postId', protect, async (req, res) =
 
         await user.save();
         res.json({ added: !isAdded, collection });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// @desc    Delete a collection
+// @route   DELETE /api/auth/collections/:collectionId
+// @access  Private
+router.delete('/collections/:collectionId', protect, async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        const collection = user.collections.id(req.params.collectionId);
+        if (!collection) return res.status(404).json({ message: 'Collection not found' });
+
+        user.collections.pull(req.params.collectionId);
+        await user.save();
+
+        res.json({ message: 'Collection deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

@@ -436,8 +436,8 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
 
     // Synchronize isSaved with post or user data
     useEffect(() => {
-        const postId = post.id || post._id;
-        const savedInUser = user?.saved?.some((id: string) => id === postId);
+        const postId = String(post._id || post.id || '');
+        const savedInUser = user?.saved?.some((id: any) => String(id) === postId);
         setIsSaved(!!(post.isSaved || savedInUser));
     }, [post.isSaved, user?.saved, post.id, post._id]);
 
@@ -674,71 +674,37 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
     };
 
     const handleSavePost = async () => {
-        if (!user?.token) {
+        if (!user?.token || !globalSavePost) {
             Alert.alert('Error', 'You must be logged in to save posts');
             return;
         }
 
         const postId = post.id || post._id;
-        // console.log('💾 Saving post:', postId);
-
         const wasSaved = isSaved;
         const newIsSaved = !wasSaved;
+
+        // Optimistic UI update
         setIsSaved(newIsSaved);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-        // Animate
+        // Animate bookmark icon
         Animated.sequence([
             Animated.timing(saveScale, { toValue: 1.3, duration: 100, useNativeDriver: true }),
             Animated.spring(saveScale, { toValue: 1, friction: 3, useNativeDriver: true }),
         ]).start();
 
         try {
-            const url = `${API_BASE_URL}/api/auth/save/${postId}`;
-            // console.log('📡 Save request to:', url);
-
-            const response = await fetch(url, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${user.token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (response.ok) {
-                // Update global state
-                if (globalSavePost) {
-                    await globalSavePost(postId, newIsSaved);
-                }
-            } else {
-                const errorText = await response.text();
-                setIsSaved(wasSaved); // Revert
-                console.error('❌ Save failed:', response.status, errorText);
-
-                let errorMessage = 'Failed to save post';
-                try {
-                    const err = JSON.parse(errorText);
-                    errorMessage = err.message || err.error || errorMessage;
-                } catch {
-                    errorMessage = errorText || `Error ${response.status}`;
-                }
-
-                Alert.alert(
-                    'Save Failed',
-                    `${errorMessage}\n\nPlease check:\n- Backend server is running\n- You are logged in`,
-                    [{ text: 'OK' }]
-                );
+            const result = await globalSavePost(postId, newIsSaved);
+            
+            if (!result.success) {
+                // Revert on failure
+                setIsSaved(wasSaved);
+                Alert.alert('Error', 'Failed to save post. Please check your connection.');
             }
-        } catch (error: any) {
+        } catch (error) {
             console.error('❌ Save error:', error);
-
-            let errorMsg = error.message || 'Unknown error';
-            if (errorMsg.includes('Network request failed')) {
-                errorMsg = 'Cannot connect to server.\n\nPlease check:\n1. Backend is running\n2. Server is on port 5000\n3. Your internet connection';
-            }
-
-            Alert.alert('Error', errorMsg, [{ text: 'OK' }]);
             setIsSaved(wasSaved);
+            Alert.alert('Error', 'An unexpected error occurred.');
         }
     };
 
@@ -999,7 +965,7 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
                             <Ionicons 
                                 name={isSaved ? "bookmark" : "bookmark-outline"} 
                                 size={21} 
-                                color={isSaved ? "#FACD00" : colors.text} 
+                                color={isSaved ? "#FFD700" : colors.text} 
                             />
                         </Animated.View>
                     </TouchableOpacity>

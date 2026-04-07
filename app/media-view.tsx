@@ -2,7 +2,7 @@ import CommentsModal from '@/components/CommentsModal';
 import ReelOptionsModal from '@/components/ReelOptionsModal';
 import { API_BASE_URL } from '@/constants/Config';
 import { useUser } from '@/context/UserContext';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
@@ -44,11 +44,16 @@ export default function MediaViewScreen() {
     const lastTap = React.useRef(0);
 
     useEffect(() => {
-        if (post) {
+        if (post && user) {
             setEditedCaption(post.caption || '');
-            if (user) {
-                setIsSaved(user.saved?.includes(post._id) || false);
-            }
+            const savedIds = user.saved || [];
+            const saved = savedIds.some((id: any) => String(id) === String(post._id) || String(id) === String(post.id));
+            setIsSaved(saved);
+            
+            const likedIds = post.likes || [];
+            const liked = likedIds.some((id: any) => String(id) === String(user._id) || String(id) === String(user.id));
+            setIsLiked(liked);
+            setLikesCount(likedIds.length);
         }
     }, [post, user]);
 
@@ -226,24 +231,34 @@ export default function MediaViewScreen() {
             try {
                 const { status } = await MediaLibrary.requestPermissionsAsync();
                 if (status !== 'granted') {
-                    Toast.show({ type: 'info', text1: 'Permission', text2: 'Please grant permission' });
+                    Toast.show({ type: 'info', text1: 'Permission', text2: 'Please grant gallery access in settings' });
                     return;
                 }
 
-                const fs = FileSystem as any;
-                const downloadDir = fs.cacheDirectory || fs.documentDirectory;
-                const baseDir = downloadDir.endsWith('/') ? downloadDir : `${downloadDir}/`;
-                const fileUri = baseDir + filename;
-                
-                const downloadRes = await FileSystem.downloadAsync(url, fileUri);
+                let finalUri = url;
 
-                if (downloadRes.status === 200) {
-                    await MediaLibrary.saveToLibraryAsync(downloadRes.uri);
-                    Toast.show({ type: 'success', text1: 'Saved', text2: 'Media saved to gallery' });
+                // Only download if it's a remote URL
+                if (url.startsWith('http')) {
+                    const downloadDir = FileSystem.cacheDirectory || FileSystem.documentDirectory;
+                    const baseDir = downloadDir?.endsWith('/') ? downloadDir : `${downloadDir}/`;
+                    const fileUri = baseDir + filename;
+                    
+                    const downloadRes = await FileSystem.downloadAsync(url, fileUri);
+                    if (downloadRes.status !== 200) {
+                        throw new Error(`Download failed with status ${downloadRes.status}`);
+                    }
+                    finalUri = downloadRes.uri;
                 }
+
+                await MediaLibrary.saveToLibraryAsync(finalUri);
+                Toast.show({ type: 'success', text1: 'Saved', text2: 'Media saved to gallery' });
             } catch (error: any) {
-                console.error(error);
-                Toast.show({ type: 'error', text1: 'Error', text2: 'Download failed' });
+                console.error("Download Error:", error);
+                Toast.show({ 
+                    type: 'error', 
+                    text1: 'Download failed', 
+                    text2: error.message || 'Something went wrong'
+                });
             }
         }
     };
@@ -263,10 +278,6 @@ export default function MediaViewScreen() {
             if (response.ok) {
                 const data = await response.json();
                 setPost(data);
-                setLikesCount(data.likes?.length || 0);
-                if (user) {
-                    setIsLiked(data.likes?.includes(user._id) || false);
-                }
             }
         } catch (error) {
             console.error('Error fetching post:', error);
@@ -281,7 +292,19 @@ export default function MediaViewScreen() {
     return (
         <View style={styles.container}>
             <StatusBar barStyle="light-content" translucent />
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+            
+            {/* Ambient Background Blur */}
+            <View style={StyleSheet.absoluteFill}>
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+                {activeUri && (
+                    <Image 
+                        source={{ uri: activeUri }} 
+                        style={styles.ambientBlur}
+                        blurRadius={100}
+                    />
+                )}
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.6)' }]} />
+            </View>
 
             {/* Media Content Area */}
             <View style={[
@@ -628,5 +651,9 @@ const styles = StyleSheet.create({
     bigHeartOverlay: {
         position: 'absolute',
         zIndex: 20,
+    },
+    ambientBlur: {
+        ...StyleSheet.absoluteFillObject,
+        opacity: 0.5,
     }
 });

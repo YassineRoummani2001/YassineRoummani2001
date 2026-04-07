@@ -13,7 +13,7 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import ProcessingModal from '../components/ProcessingModal';
 import ImageConfirmModal from '../components/ImageConfirmModal';
 import { uploadFile } from '@/utils/uploadHelper';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { LinearGradient } from 'expo-linear-gradient';
 
 // Helper to normalize URIs (Copied from ProfileScreen for consistency)

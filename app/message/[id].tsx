@@ -1350,107 +1350,136 @@ export default function MessageScreen() {
                         </TouchableOpacity>
                     )}
                 </View>
-                <View style={{
-                    backgroundColor: isDark ? '#000' : '#FFF',
-                    borderTopColor: isDark ? '#262626' : '#F2F2F2',
-                    borderTopWidth: 1,
-                    paddingBottom: Platform.OS === 'ios' ? (keyboardVisible ? 10 : insets.bottom + 10) : 10,
-                }}>
-                    {/* Replying To Banner */}
-                    {replyingTo && (
-                        <View style={{
-                            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                            paddingHorizontal: 16, paddingVertical: 8,
-                            backgroundColor: isDark ? '#1a1a1a' : '#f0f0f0',
-                            borderLeftWidth: 4, borderLeftColor: colors.primary
-                        }}>
-                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={{ fontWeight: '700', color: colors.text }}>Replying to {replyingTo.sender === user?._id ? 'Yourself' : (replyingTo.sender?.name || 'User')}</Text>
-                                    <Text numberOfLines={1} style={{ color: colors.textSecondary, fontSize: 12 }}>
-                                        {replyingTo.type === 'text' ? replyingTo.content : (replyingTo.type === 'image' ? 'Image' : `[${replyingTo.type}]`)}
-                                    </Text>
-                                </View>
-                                {replyingTo.type === 'image' && (
-                                    <ExpoImage
-                                        source={{ uri: getCorrectUrl(replyingTo.content) }}
-                                        style={{ width: 40, height: 40, borderRadius: 6 }}
-                                        contentFit="cover"
-                                    />
-                                )}
-                            </View>
-                            <TouchableOpacity onPress={() => setReplyingTo(null)} style={{ padding: 4 }}>
-                                <Ionicons name="close" size={20} color={colors.textSecondary} />
+
+                {/* BLOCK STATE UI */}
+                {(recipient?.isBlockedByMe || recipient?.isBlockingMe) ? (
+                    <View style={{ 
+                        padding: 20, 
+                        backgroundColor: isDark ? '#1a1a1a' : '#F9F9F9', 
+                        borderTopWidth: 1, 
+                        borderTopColor: isDark ? '#333' : '#EEE',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        paddingBottom: insets.bottom + 20
+                    }}>
+                        <Ionicons name="ban-outline" size={24} color={colors.textSecondary} style={{ marginBottom: 8 }} />
+                        <Text style={{ color: colors.textSecondary, fontSize: 13, textAlign: 'center' }}>
+                            {recipient?.isBlockedByMe 
+                                ? "You have blocked this user. Unblock them to continue messaging." 
+                                : "This user has restricted their communication. You cannot message them at this time."}
+                        </Text>
+                        {recipient?.isBlockedByMe && (
+                            <TouchableOpacity 
+                                style={{ marginTop: 12, paddingVertical: 8, paddingHorizontal: 20, borderRadius: 20, backgroundColor: colors.danger }}
+                                onPress={() => router.push(`/user/${userId}`)}
+                            >
+                                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Go to Profile to Unblock</Text>
                             </TouchableOpacity>
-                        </View>
-                    )}
-
-                    {/* Editing Banner */}
-                    {editingMessage && (
-                        <View style={{
-                            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                            paddingHorizontal: 16, paddingVertical: 8,
-                            backgroundColor: isDark ? '#1a1a1a' : '#f0f0f0',
-                            borderLeftWidth: 4, borderLeftColor: colors.primary
-                        }}>
-                            <View>
-                                <Text style={{ fontWeight: '700', color: colors.text }}>Editing Message</Text>
-                            </View>
-                            <TouchableOpacity onPress={() => { setEditingMessage(null); setInputText(''); }}>
-                                <Ionicons name="close" size={20} color={colors.textSecondary} />
-                            </TouchableOpacity>
-                        </View>
-                    )}
-
-                    {/* Main Input */}
-                    <View style={styles.inputContainer}>
-                        {recorder.isRecording ? (
-                            /* Recording UI */
-                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#FF3B30', opacity: recordingDuration % 2 === 0 ? 1 : 0.5 }} />
-                                    <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>{formatDuration(recordingDuration)}</Text>
-                                </View>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-                                    <TouchableOpacity onPress={cancelRecording}>
-                                        <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Cancel</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity onPress={stopRecording} style={[styles.iconWrapper, { backgroundColor: colors.primary }]}>
-                                        <Ionicons name="stop" size={24} color="#FFF" />
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        ) : (
-                            /* Standard Input UI */
-                            <>
-                                <TouchableOpacity onPress={pickImage} style={[styles.iconWrapper, { backgroundColor: isDark ? '#262626' : '#F3F4F6' }]}>
-                                    <Ionicons name="image-outline" size={20} color={colors.primary} />
-                                </TouchableOpacity>
-
-                                <View style={[styles.inputField, { backgroundColor: isDark ? '#262626' : '#F3F4F6' }]}>
-                                    <TextInput
-                                        value={inputText}
-                                        onChangeText={setInputText}
-                                        placeholder="Message..."
-                                        placeholderTextColor={isDark ? '#888' : '#9CA3AF'}
-                                        style={{ flex: 1, fontSize: 16, color: colors.text, maxHeight: 100 }}
-                                        multiline
-                                    />
-                                </View>
-
-                                {inputText.trim() || editingMessage ? (
-                                    <TouchableOpacity onPress={() => handleSend()} style={[styles.iconWrapper, { backgroundColor: colors.primary }]}>
-                                        {editingMessage ? <Ionicons name="checkmark" size={20} color="#FFF" /> : <Ionicons name="send" size={20} color="#FFF" />}
-                                    </TouchableOpacity>
-                                ) : (
-                                    <TouchableOpacity onPress={startRecording} style={[styles.iconWrapper, { backgroundColor: isDark ? '#262626' : '#F3F4F6' }]}>
-                                        <Ionicons name="mic-outline" size={20} color={colors.text} />
-                                    </TouchableOpacity>
-                                )}
-                            </>
                         )}
                     </View>
-                </View>
+                ) : (
+                    <View style={{
+                        backgroundColor: isDark ? '#000' : '#FFF',
+                        borderTopColor: isDark ? '#262626' : '#F2F2F2',
+                        borderTopWidth: 1,
+                        paddingBottom: Platform.OS === 'ios' ? (keyboardVisible ? 10 : insets.bottom + 10) : 10,
+                    }}>
+                        {/* Replying To Banner */}
+                        {replyingTo && (
+                            <View style={{
+                                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                                paddingHorizontal: 16, paddingVertical: 8,
+                                backgroundColor: isDark ? '#1a1a1a' : '#f0f0f0',
+                                borderLeftWidth: 4, borderLeftColor: colors.primary
+                            }}>
+                                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ fontWeight: '700', color: colors.text }}>Replying to {replyingTo.sender === user?._id ? 'Yourself' : (replyingTo.sender?.name || 'User')}</Text>
+                                        <Text numberOfLines={1} style={{ color: colors.textSecondary, fontSize: 12 }}>
+                                            {replyingTo.type === 'text' ? replyingTo.content : (replyingTo.type === 'image' ? 'Image' : `[${replyingTo.type}]`)}
+                                        </Text>
+                                    </View>
+                                    {replyingTo.type === 'image' && (
+                                        <ExpoImage
+                                            source={{ uri: getCorrectUrl(replyingTo.content) }}
+                                            style={{ width: 40, height: 40, borderRadius: 6 }}
+                                            contentFit="cover"
+                                        />
+                                    )}
+                                </View>
+                                <TouchableOpacity onPress={() => setReplyingTo(null)} style={{ padding: 4 }}>
+                                    <Ionicons name="close" size={20} color={colors.textSecondary} />
+                                </TouchableOpacity>
+                            </View>
+                        )}
+
+                        {/* Editing Banner */}
+                        {editingMessage && (
+                            <View style={{
+                                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                                paddingHorizontal: 16, paddingVertical: 8,
+                                backgroundColor: isDark ? '#1a1a1a' : '#f0f0f0',
+                                borderLeftWidth: 4, borderLeftColor: colors.primary
+                            }}>
+                                <View>
+                                    <Text style={{ fontWeight: '700', color: colors.text }}>Editing Message</Text>
+                                </View>
+                                <TouchableOpacity onPress={() => { setEditingMessage(null); setInputText(''); }}>
+                                    <Ionicons name="close" size={20} color={colors.textSecondary} />
+                                </TouchableOpacity>
+                            </View>
+                        )}
+
+                        {/* Main Input */}
+                        <View style={styles.inputContainer}>
+                            {recorder.isRecording ? (
+                                /* Recording UI */
+                                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#FF3B30', opacity: recordingDuration % 2 === 0 ? 1 : 0.5 }} />
+                                        <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>{formatDuration(recordingDuration)}</Text>
+                                    </View>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                                        <TouchableOpacity onPress={cancelRecording}>
+                                            <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Cancel</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity onPress={stopRecording} style={[styles.iconWrapper, { backgroundColor: colors.primary }]}>
+                                            <Ionicons name="stop" size={24} color="#FFF" />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            ) : (
+                                /* Standard Input UI */
+                                <>
+                                    <TouchableOpacity onPress={pickImage} style={[styles.iconWrapper, { backgroundColor: isDark ? '#262626' : '#F3F4F6' }]}>
+                                        <Ionicons name="image-outline" size={20} color={colors.primary} />
+                                    </TouchableOpacity>
+
+                                    <View style={[styles.inputField, { backgroundColor: isDark ? '#262626' : '#F3F4F6' }]}>
+                                        <TextInput
+                                            value={inputText}
+                                            onChangeText={setInputText}
+                                            placeholder="Message..."
+                                            placeholderTextColor={isDark ? '#888' : '#9CA3AF'}
+                                            style={{ flex: 1, fontSize: 16, color: colors.text, maxHeight: 100 }}
+                                            multiline
+                                        />
+                                    </View>
+
+                                    {inputText.trim() || editingMessage ? (
+                                        <TouchableOpacity onPress={() => handleSend()} style={[styles.iconWrapper, { backgroundColor: colors.primary }]}>
+                                            {editingMessage ? <Ionicons name="checkmark" size={20} color="#FFF" /> : <Ionicons name="send" size={20} color="#FFF" />}
+                                        </TouchableOpacity>
+                                    ) : (
+                                        <TouchableOpacity onPress={startRecording} style={[styles.iconWrapper, { backgroundColor: isDark ? '#262626' : '#F3F4F6' }]}>
+                                            <Ionicons name="mic-outline" size={20} color={colors.text} />
+                                        </TouchableOpacity>
+                                    )}
+                                </>
+                            )}
+                        </View>
+                    </View>
+                )}
             </KeyboardAvoidingView>
 
             {/* Long Press Modal */}
