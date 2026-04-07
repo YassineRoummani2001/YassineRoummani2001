@@ -31,8 +31,8 @@ export default function SavedScreen() {
     const { user } = (useUser() || {}) as any;
     const { width: windowWidth } = useWindowDimensions();
     const isDesktop = Platform.OS === 'web' && windowWidth > 768;
-    // Central content area width matches WebLayout.tsx logic
-    const contentWidth = isDesktop ? Math.min(windowWidth - 320, 650) : windowWidth;
+    // Central content area width matches WebLayout.tsx logic, accounting for its padding (40px on both sides)
+    const contentWidth = isDesktop ? Math.min(windowWidth - 320, 650) - 80 : windowWidth;
     const { colors, isDark } = useThemeContext();
 
     // 0: All, 1: Posts, 2: Reels, or Collection object
@@ -131,14 +131,11 @@ export default function SavedScreen() {
                 layout={Layout.springify()}
             >
                 <TouchableOpacity
-                    style={[
-                        styles.gridItem, 
-                        { 
-                            width: itemSize, 
-                            height: itemSize, 
-                            margin: gap 
-                        }
-                    ]}
+                    style={{ 
+                        width: itemSize, 
+                        height: itemSize, 
+                        margin: gap 
+                    }}
                     activeOpacity={0.9}
                     onPress={() => router.push({
                         pathname: '/media-view',
@@ -524,6 +521,7 @@ const styles = StyleSheet.create({
         borderRadius: 4,
         overflow: 'hidden',
         position: 'relative',
+        backgroundColor: '#111',
     },
     gridImage: {
         width: '100%',
