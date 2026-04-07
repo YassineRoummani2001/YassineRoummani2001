@@ -18,27 +18,25 @@ const { width } = Dimensions.get('window');
 
 // Helper to normalize URIs
 const getValidUri = (uri?: string) => {
-    if (!uri) return '';
-    if (uri.startsWith('data:') || uri.startsWith('file:')) return uri;
-    
-    // Auto-fix our backend URLs if they have the wrong IP/localhost
-    if (uri.startsWith('http') && uri.includes('/uploads/')) {
-        const parts = uri.split('/uploads/');
-        return `${API_BASE_URL}/uploads/${parts[1]}`;
-    }
-    
-    // External URLs
-    if (uri.startsWith('http')) return uri;
+    if (!uri || typeof uri !== 'string' || uri.trim() === '') return undefined;
+    const clean = uri.trim();
+    if (clean.length === 0) return undefined;
 
-    // Handle relative uploads
-    if (uri.startsWith('/uploads/')) return `${API_BASE_URL}${uri}`;
-    if (uri.includes('/uploads/')) {
-        const parts = uri.split('/uploads/');
+    if (clean.startsWith('blob:') || clean.startsWith('data:') || clean.startsWith('file:')) return clean;
+
+    if (clean.startsWith('http') && clean.includes('/uploads/')) {
+        const parts = clean.split('/uploads/');
         return `${API_BASE_URL}/uploads/${parts[1]}`;
     }
 
-    // Default fallback
-    return `${API_BASE_URL}${uri.startsWith('/') ? '' : '/'}${uri}`;
+    if (clean.startsWith('http')) return clean;
+    if (clean.startsWith('/uploads/')) return `${API_BASE_URL}${clean}`;
+    if (clean.includes('/uploads/')) {
+        const parts = clean.split('/uploads/');
+        return `${API_BASE_URL}/uploads/${parts[1]}`;
+    }
+
+    return `${API_BASE_URL}/uploads/${clean}`;
 };
 
 // --- STABLE FEED VIDEO COMPONENT (expo-video) ---
@@ -401,7 +399,7 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
 
     const [isMuted, setIsMuted] = useState(false);
     const [showFullCaption, setShowFullCaption] = useState(false);
-    const { user, followUser } = (useUser() || {}) as any;
+    const { user, followUser, savePost: globalSavePost } = (useUser() || {}) as any;
 
     const [isEditing, setIsEditing] = useState(false);
     const [editedCaption, setEditedCaption] = useState(post.caption || '');
@@ -459,8 +457,15 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
     const [viewsCount, setViewsCount] = useState(post.views || 0);
 
     // Save state
-    const [isSaved, setIsSaved] = useState(post.isSaved || (user?.saved?.includes(post.id || post._id)) || false);
+    const [isSaved, setIsSaved] = useState(false);
     const saveScale = React.useRef(new Animated.Value(1)).current;
+
+    // Synchronize isSaved with post or user data
+    useEffect(() => {
+        const postId = post.id || post._id;
+        const savedInUser = user?.saved?.some((id: string) => id === postId);
+        setIsSaved(!!(post.isSaved || savedInUser));
+    }, [post.isSaved, user?.saved, post.id, post._id]);
 
     // Follow state
     const [userIsFollowing, setUserIsFollowing] = useState(false);
@@ -726,11 +731,11 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
                 }
             });
 
-            // console.log('📥 Save response status:', response.status);
-
             if (response.ok) {
-                // console.log('✅ Post save/unsave toggled successfully');
-                // State already updated optimistically
+                // Update global state
+                if (globalSavePost) {
+                    await globalSavePost(postId, newIsSaved);
+                }
             } else {
                 const errorText = await response.text();
                 setIsSaved(wasSaved); // Revert
@@ -884,7 +889,7 @@ export default function FeedPost({ post, onDelete, active }: { post: any, onDele
                         }
                     }}
                 >
-                    <Image source={{ uri: getValidUri(post.user?.avatar) || 'https://i.pravatar.cc/100?u=user_fallback' }} style={styles.avatar} />
+                    <Image source={{ uri: getValidUri(post.user?.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.user?.name || 'User')}&background=random` }} style={styles.avatar} />
                     <View style={styles.usernameContainer}>
                         <Text style={styles.username}>{post.user?.name || 'Unknown'}</Text>
                         <View style={styles.metaRow}>

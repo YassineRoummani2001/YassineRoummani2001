@@ -28,16 +28,25 @@ import { LinearGradient } from 'expo-linear-gradient';
 import VibeConfirmModal from '@/components/VibeConfirmModal';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const getCorrectUrl = (url: string) => {
-    if (!url || typeof url !== 'string') return '';
-    if (url.startsWith('blob:')) return '';
-    if (url.includes('/uploads/')) {
-        const uploadIndex = url.indexOf('/uploads/');
-        return `${API_BASE_URL}${url.substring(uploadIndex)}`;
+const getCorrectUrl = (url: string | null | undefined) => {
+    if (!url || typeof url !== 'string' || url.trim() === '') return undefined;
+    const clean = url.trim();
+
+    if (clean.startsWith('blob:') || clean.startsWith('file:') || clean.startsWith('data:')) return clean;
+
+    if (clean.startsWith('http') && clean.includes('/uploads/')) {
+        const parts = clean.split('/uploads/');
+        return `${API_BASE_URL}/uploads/${parts[1]}`;
     }
-    if (url.startsWith('data:')) return url;
-    if (url.startsWith('http')) return url;
-    return `${API_BASE_URL}/uploads/${url}`;
+
+    if (clean.startsWith('http')) return clean;
+    if (clean.startsWith('/uploads/')) return `${API_BASE_URL}${clean}`;
+    if (clean.includes('/uploads/')) {
+        const parts = clean.split('/uploads/');
+        return `${API_BASE_URL}/uploads/${parts[1]}`;
+    }
+
+    return `${API_BASE_URL}/uploads/${clean}`;
 };
 
 const formatCount = (n: number) => {
@@ -49,7 +58,7 @@ const formatCount = (n: number) => {
 
 // ─── Grid Video Item ──────────────────────────────────────────────────────────
 function GridVideoItem({ uri, style }: { uri: string; style: any }) {
-    const player = useVideoPlayer(getCorrectUrl(uri), (player) => {
+    const player = useVideoPlayer(getCorrectUrl(uri) || '', (player) => {
         player.loop = true;
         player.muted = true;
     });
@@ -583,7 +592,7 @@ export default function UserProfileScreen() {
                                 >
                                     <View style={[styles.avatarInner, { backgroundColor: colors.background }]}>
                                         <Image
-                                            source={{ uri: getCorrectUrl(userData?.avatar) || 'https://i.pravatar.cc/150' }}
+                                            source={{ uri: getCorrectUrl(userData?.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData?.name || 'User')}&background=random` }}
                                             style={styles.avatarImage}
                                         />
                                     </View>
@@ -686,7 +695,7 @@ export default function UserProfileScreen() {
                                 >
                                     <View style={[styles.mobileAvatarInner, { backgroundColor: colors.background }]}>
                                         <Image
-                                            source={{ uri: getCorrectUrl(userData?.avatar) || 'https://i.pravatar.cc/150' }}
+                                            source={{ uri: getCorrectUrl(userData?.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData?.name || 'User')}&background=random` }}
                                             style={styles.mobileAvatarImage}
                                         />
                                     </View>

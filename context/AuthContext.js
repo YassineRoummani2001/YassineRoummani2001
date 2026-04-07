@@ -99,7 +99,9 @@ export const UserProvider = ({ children }) => {
                 followers: userWithoutToken.followers || [],
                 sentRequests: userWithoutToken.sentRequests || [],
                 stories: userWithoutToken.stories || [],
-                links: userWithoutToken.links || [], // Added links
+                links: userWithoutToken.links || [], 
+                coverImage: userWithoutToken.coverImage,
+                saved: userWithoutToken.saved || [],
             };
             
             setUser(userData); 
@@ -139,7 +141,11 @@ export const UserProvider = ({ children }) => {
                 const finalUser = { ...user, stories: updatedStories };
                 setUser(finalUser);
                 const { token, ...dataToCache } = finalUser;
-                await AsyncStorage.setItem(USER_KEY, JSON.stringify(dataToCache));
+                const essentialDataToCache = {
+                    ...dataToCache,
+                    coverImage: finalUser.coverImage
+                };
+                await AsyncStorage.setItem(USER_KEY, JSON.stringify(essentialDataToCache));
             }
         } catch (error) {
             console.error('Add story error:', error);
@@ -232,6 +238,30 @@ export const UserProvider = ({ children }) => {
         }
     }, [user]);
 
+    const savePost = useCallback(async (postId, isSaving) => {
+        if (!user || !user.token) return;
+        
+        const currentSaved = user.saved || [];
+        let updatedSaved;
+        
+        if (isSaving) {
+            updatedSaved = [...currentSaved, postId];
+        } else {
+            updatedSaved = currentSaved.filter(id => id !== postId);
+        }
+        
+        const updatedUser = { ...user, saved: updatedSaved };
+        setUser(updatedUser);
+        
+        // Cache updated user data
+        const { token, ...dataToCache } = updatedUser;
+        await AsyncStorage.setItem(USER_KEY, JSON.stringify(dataToCache));
+        
+        // No need to wait for backend here if we want optimistic UI
+        // But we return success/fail if needed
+        return { success: true };
+    }, [user]);
+
     const deleteAccount = useCallback(async () => {
         if (!user || !user.token) return { success: false };
         try {
@@ -279,11 +309,12 @@ export const UserProvider = ({ children }) => {
             addStory,
             updateProfile,
             followUser,
+            savePost,
             refreshUser,
             deleteAccount,
             loading
         };
-    }, [user, login, logout, addStory, updateProfile, followUser, refreshUser, deleteAccount, loading]);
+    }, [user, login, logout, addStory, updateProfile, followUser, savePost, refreshUser, deleteAccount, loading]);
 
     // console.log('🛡️ UserProvider Rendering. Children:', !!children);
 

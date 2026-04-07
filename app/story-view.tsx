@@ -6,16 +6,41 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { ChevronLeft, ChevronRight, Edit3, Eye, Heart, MoreHorizontal, Plus, Send, Share2, Trash2, X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Alert, Animated, Dimensions, Image, KeyboardAvoidingView, Modal, Platform, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Dimensions, Image, Keyboard, KeyboardAvoidingView, Modal, Platform, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import VibeConfirmModal from '@/components/VibeConfirmModal';
+import { useThemeContext } from '@/context/ThemeContext';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window') || { width: 0, height: 0 };
 const isDesktop = SCREEN_WIDTH > 768;
 
+// Helper to normalize URIs
+const getCorrectUrl = (uri?: string | null) => {
+    if (!uri || typeof uri !== 'string' || uri.trim() === '') return undefined;
+    const clean = uri.trim();
+    if (clean.length === 0) return undefined;
+
+    if (clean.startsWith('blob:') || clean.startsWith('data:') || clean.startsWith('file:')) return clean;
+
+    if (clean.startsWith('http') && clean.includes('/uploads/')) {
+        const parts = clean.split('/uploads/');
+        return `${API_BASE_URL}/uploads/${parts[1]}`;
+    }
+
+    if (clean.startsWith('http')) return clean;
+    if (clean.startsWith('/uploads/')) return `${API_BASE_URL}${clean}`;
+    if (clean.includes('/uploads/')) {
+        const parts = clean.split('/uploads/');
+        return `${API_BASE_URL}/uploads/${parts[1]}`;
+    }
+
+    return `${API_BASE_URL}/uploads/${clean}`;
+};
+
 export default function StoryViewScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { colors, isDark } = useThemeContext();
     const { userId, userStr, initialIndex, mode } = useLocalSearchParams();
 
     // 1. Hooks
@@ -32,6 +57,9 @@ export default function StoryViewScreen() {
     const [showOptions, setShowOptions] = useState(false);
     const [mediaError, setMediaError] = useState(false);
     const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
+
+    const [message, setMessage] = useState('');
+    const [isSending, setIsSending] = useState(false);
 
     // Reset error when story changes
     useEffect(() => {
@@ -313,6 +341,56 @@ export default function StoryViewScreen() {
         }
     }, [isPaused, storyType, player]);
 
+    const handleSendMessage = async () => {
+        if (!message.trim() || !user?._id || !currentUser?.token || isSending) return;
+
+        setIsSending(true);
+        setIsPaused(true);
+
+        try {
+            // 1. Find or create chat with story owner
+            const chatRes = await fetch(`${API_BASE_URL}/api/chats`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${currentUser.token}`
+                },
+                body: JSON.stringify({ userId: user._id })
+            });
+
+            if (!chatRes.ok) throw new Error('Failed to start chat');
+            const chatData = await chatRes.json();
+            const resultData = chatData.data || chatData;
+            const chatId = resultData._id;
+
+            // 2. Send message to the owner
+            const msgRes = await fetch(`${API_BASE_URL}/api/chats/${chatId}/messages`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${currentUser.token}`
+                },
+                body: JSON.stringify({
+                    content: message,
+                    type: 'text',
+                    replyToStory: activeStory?._id 
+                })
+            });
+
+            if (msgRes.ok) {
+                setMessage('');
+                setIsPaused(false);
+                Keyboard.dismiss();
+                alert(`Message sent to ${user.name}!`);
+            }
+        } catch (e) {
+            console.error('Failed to send message', e);
+            alert('Failed to send message. Please try again.');
+        } finally {
+            setIsSending(false);
+        }
+    };
+
     const handleClose = () => {
         if (router.canGoBack()) {
             router.back();
@@ -410,15 +488,19 @@ export default function StoryViewScreen() {
         <View style={styles.container}>
             <StatusBar hidden />
 
-            {/* Ambient Ambient Background */}
+            {/* Ambient Background with Premium Gradient fallback */}
             {isDesktop && (
                 <View style={StyleSheet.absoluteFill}>
+                    <LinearGradient
+                        colors={isDark ? ['#1a1a2e', '#0f0c29', '#302b63'] : ['#fdfbfb', '#ebedee']}
+                        style={StyleSheet.absoluteFill}
+                    />
                     <Image 
                         source={{ uri: storyUri }} 
                         style={styles.ambientBlur}
-                        blurRadius={100}
+                        blurRadius={80}
                     />
-                    <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.65)' }]} />
+                    <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.2)' }]} />
                 </View>
             )}
 
@@ -558,7 +640,10 @@ export default function StoryViewScreen() {
                     {/* Header */}
                     <View style={styles.header}>
                         <View style={styles.userInfo}>
-                            <Image source={{ uri: user.avatar || 'https://cdn-icons-png.flaticon.com/512/149/149071.png' }} style={styles.avatar} />
+                            <Image 
+                                source={{ uri: getCorrectUrl(user.avatar) || 'https://cdn-icons-png.flaticon.com/512/149/149071.png' }} 
+                                style={styles.avatar} 
+                            />
                             <View>
                                 <Text style={styles.userName}>{user.name}</Text>
                                 <Text style={styles.timeAgo}>{timeAgo}</Text>
@@ -635,10 +720,24 @@ export default function StoryViewScreen() {
                                         placeholder="Send message..."
                                         placeholderTextColor="rgba(255,255,255,0.7)"
                                         onFocus={() => setIsPaused(true)}
-                                        onBlur={() => setIsPaused(false)}
+                                        onBlur={() => {
+                                            if (!message.trim()) setIsPaused(false);
+                                        }}
+                                        value={message}
+                                        onChangeText={setMessage}
+                                        multiline={false}
+                                        editable={!isSending}
                                     />
-                                    <TouchableOpacity onPress={() => alert('Toast: Message Sent!')} style={styles.sendButton}>
-                                        <Send size={18} color="white" />
+                                    <TouchableOpacity 
+                                        onPress={handleSendMessage} 
+                                        style={[styles.sendButton, { opacity: message.trim() ? 1 : 0.5 }]}
+                                        disabled={!message.trim() || isSending}
+                                    >
+                                        {isSending ? (
+                                            <ActivityIndicator size="small" color="white" />
+                                        ) : (
+                                            <Send size={18} color="white" />
+                                        )}
                                     </TouchableOpacity>
                                 </BlurView>
 
@@ -686,14 +785,14 @@ export default function StoryViewScreen() {
                         ) : (
                             <View>
                                 {viewersList.map((viewer: any) => (
-                                    <View key={viewer._id} style={styles.viewerItem}>
+                                    <View key={viewer._id || viewer.id} style={styles.viewerItem}>
                                         <Image
-                                            source={{ uri: viewer.avatar || 'https://cdn-icons-png.flaticon.com/512/149/149071.png' }}
+                                            source={{ uri: getCorrectUrl(viewer.avatar) || 'https://cdn-icons-png.flaticon.com/512/149/149071.png' }}
                                             style={styles.viewerAvatar}
                                         />
                                         <View>
                                             <Text style={styles.viewerName}>{viewer.name}</Text>
-                                            <Text style={styles.viewerHandle}>{viewer.handle}</Text>
+                                            <Text style={styles.viewerHandle}>@{viewer.username || viewer.handle || 'user'}</Text>
                                         </View>
                                     </View>
                                 ))}
@@ -787,8 +886,8 @@ const styles = StyleSheet.create({
         textShadowRadius: 15,
     },
     ambientBlur: {
-        width: SCREEN_WIDTH,
-        height: SCREEN_HEIGHT,
+        width: '100%',
+        height: '100%',
         opacity: 0.6,
     },
     desktopNav: {
@@ -929,14 +1028,10 @@ const styles = StyleSheet.create({
     },
     input: {
         flex: 1,
-        height: 48,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.5)',
-        borderRadius: 24,
-        paddingHorizontal: 20,
+        height: 50,
         color: 'white',
-        fontSize: 16,
-        marginRight: 16,
+        fontSize: 15,
+        paddingHorizontal: 12,
     },
     viewCountBadge: {
         flexDirection: 'row',

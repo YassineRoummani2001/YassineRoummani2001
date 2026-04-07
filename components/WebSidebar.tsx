@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/constants/Config';
 import { useUser } from '@/context/AuthContext';
 import { useMessages } from '@/context/MessagesContext';
 import { useNotifications } from '@/context/NotificationContext';
@@ -27,6 +28,29 @@ export default function WebSidebar() {
     const { user } = (useUser() || {}) as any;
     const { unreadCount: unreadMessages } = useMessages();
     const { unreadCount: unreadNotifications } = useNotifications();
+    
+    // Helper to normalize URIs
+    const getCorrectUrl = (uri?: string) => {
+        if (!uri || typeof uri !== 'string' || uri.trim() === '') return undefined;
+        const clean = uri.trim();
+        if (clean.length === 0) return undefined;
+
+        if (clean.startsWith('blob:') || clean.startsWith('data:') || clean.startsWith('file:')) return clean;
+
+        if (clean.startsWith('http') && clean.includes('/uploads/')) {
+            const parts = clean.split('/uploads/');
+            return `${API_BASE_URL}/uploads/${parts[1]}`;
+        }
+
+        if (clean.startsWith('http')) return clean;
+        if (clean.startsWith('/uploads/')) return `${API_BASE_URL}${clean}`;
+        if (clean.includes('/uploads/')) {
+            const parts = clean.split('/uploads/');
+            return `${API_BASE_URL}/uploads/${parts[1]}`;
+        }
+
+        return `${API_BASE_URL}/uploads/${clean}`;
+    };
 
     const SIDEBAR_WIDTH = 280;
 
@@ -110,7 +134,7 @@ export default function WebSidebar() {
                         ]}
                     >
                         <Image
-                            source={{ uri: user.avatar || 'https://i.pravatar.cc/150' }}
+                            source={{ uri: getCorrectUrl(user.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random` }}
                             style={styles.userAvatar}
                         />
                         <View style={styles.userInfoWrapper}>

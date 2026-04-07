@@ -29,6 +29,29 @@ export default function FollowRequestsScreen() {
     const router = useRouter();
     const { user, followUser, refreshUser } = (useUser() || {}) as any;
     const { colors, isDark } = useThemeContext();
+    
+    // Helper to normalize URIs
+    const getCorrectUrl = (uri?: string) => {
+        if (!uri || typeof uri !== 'string' || uri.trim() === '') return undefined;
+        const clean = uri.trim();
+        if (clean.length === 0) return undefined;
+
+        if (clean.startsWith('blob:') || clean.startsWith('data:') || clean.startsWith('file:')) return clean;
+
+        if (clean.startsWith('http') && clean.includes('/uploads/')) {
+            const parts = clean.split('/uploads/');
+            return `${API_BASE_URL}/uploads/${parts[1]}`;
+        }
+
+        if (clean.startsWith('http')) return clean;
+        if (clean.startsWith('/uploads/')) return `${API_BASE_URL}${clean}`;
+        if (clean.includes('/uploads/')) {
+            const parts = clean.split('/uploads/');
+            return `${API_BASE_URL}/uploads/${parts[1]}`;
+        }
+
+        return `${API_BASE_URL}/uploads/${clean}`;
+    };
     const insets = useSafeAreaInsets();
 
     const [isLoading, setIsLoading] = useState(true);
@@ -126,7 +149,10 @@ export default function FollowRequestsScreen() {
     const renderRequestItem = ({ item }: { item: any }) => (
         <View style={styles.requestItem}>
             <TouchableOpacity onPress={() => router.push(`/user/${item._id}`)}>
-                <Image source={{ uri: item.avatar || 'https://i.pravatar.cc/150' }} style={styles.avatarLarge} />
+                <Image 
+                    source={{ uri: getCorrectUrl(item.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || 'User')}&background=random` }} 
+                    style={styles.avatarLarge} 
+                />
             </TouchableOpacity>
             <View style={styles.requestInfo}>
                 <Text style={[styles.name, { color: colors.text }]}>{item.name}</Text>
@@ -160,7 +186,10 @@ export default function FollowRequestsScreen() {
         return (
             <View style={styles.suggestionItem}>
                 <TouchableOpacity onPress={() => router.push(`/user/${item._id}`)} style={styles.suggestionLeft}>
-                    <Image source={{ uri: item.avatar || 'https://i.pravatar.cc/150' }} style={styles.avatar} />
+                    <Image 
+                        source={{ uri: getCorrectUrl(item.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || 'User')}&background=random` }} 
+                        style={styles.avatar} 
+                    />
                     <View style={styles.suggestionInfo}>
                         <Text style={[styles.name, { color: colors.text }]}>{item.name}</Text>
                         <Text style={[styles.handle, { color: colors.textSecondary }]}>{item.handle}</Text>

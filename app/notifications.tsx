@@ -23,6 +23,28 @@ import Animated, { useAnimatedStyle, useSharedValue, withDelay, withRepeat, with
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /* ================= UTILS ================= */
+const getCorrectUrl = (url: string | undefined | null) => {
+    if (!url || typeof url !== 'string' || url.trim() === '') return undefined;
+    const clean = url.trim();
+    if (clean.length === 0) return undefined;
+
+    if (clean.startsWith('blob:') || clean.startsWith('data:') || clean.startsWith('file:')) return clean;
+
+    if (clean.startsWith('http') && clean.includes('/uploads/')) {
+        const parts = clean.split('/uploads/');
+        return `${API_BASE_URL}/uploads/${parts[1]}`;
+    }
+
+    if (clean.startsWith('http')) return clean;
+    if (clean.startsWith('/uploads/')) return `${API_BASE_URL}${clean}`;
+    if (clean.includes('/uploads/')) {
+        const parts = clean.split('/uploads/');
+        return `${API_BASE_URL}/uploads/${parts[1]}`;
+    }
+
+    return `${API_BASE_URL}/uploads/${clean}`;
+};
+
 const formatTime = (dateString: string) => {
     try {
         return formatDistanceToNow(new Date(dateString), { addSuffix: true });
@@ -216,7 +238,7 @@ export default function NotificationsScreen() {
                 >
                     <View style={styles.avatarWrapper}>
                         <Image
-                            source={{ uri: item.sender?.avatar || 'https://i.pravatar.cc/100' }}
+                            source={{ uri: getCorrectUrl(item.sender?.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.sender?.name || 'User')}&background=random` }}
                             style={styles.avatar}
                         />
                         <AnimatedNotificationIcon type={type} color={colors.primary} borderColor={colors.background} />
@@ -238,9 +260,9 @@ export default function NotificationsScreen() {
                         {item.subText && <Text style={[styles.subText, { color: colors.textSecondary }]}>{item.subText}</Text>}
                     </View>
 
-                    {item.post && (item.post.image || item.post.thumbnail) && (
+                    {item.post && (item.post.image || item.post.thumbnail || item.post.uri) && (
                         <Image
-                            source={{ uri: item.post.image || item.post.thumbnail || item.post.uri }}
+                            source={{ uri: getCorrectUrl(item.post.image || item.post.thumbnail || item.post.uri) }}
                             style={styles.postThumbnail}
                         />
                     )}

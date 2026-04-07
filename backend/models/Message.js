@@ -45,6 +45,10 @@ const messageSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Message'
   },
+  replyToStory: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Story'
+  },
   noteRepliedTo: {
     type: Object, // Stores content and potentially music info
     required: false

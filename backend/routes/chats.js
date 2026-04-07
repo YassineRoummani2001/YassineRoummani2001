@@ -249,6 +249,7 @@ router.get('/:chatId/messages', protect, async (req, res) => {
                 select: 'content type sender',
                 populate: { path: 'sender', select: 'name' }
             })
+            .populate('replyToStory', 'type uri content color user')
             .sort({ createdAt: -1 }) // Newest first
             .limit(limit);
 
@@ -332,6 +333,7 @@ router.post('/:chatId/messages', protect, upload.single('file'), async (req, res
             marketitemId: req.body.marketitemId,
             noteRepliedTo: req.body.noteRepliedTo ? JSON.parse(req.body.noteRepliedTo) : null,
             replyTo: req.body.replyTo,
+            replyToStory: req.body.replyToStory || null,
             expireAt: expireAt
         });
 
@@ -344,6 +346,7 @@ router.post('/:chatId/messages', protect, upload.single('file'), async (req, res
         const fullMessage = await Message.findById(message._id)
             .populate('sender', 'name handle avatar')
             .populate('marketitemId')
+            .populate('replyToStory', 'type uri content color user')
             .populate({
                 path: 'replyTo',
                 select: 'content type sender',

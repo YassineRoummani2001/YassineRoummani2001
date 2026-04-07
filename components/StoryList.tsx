@@ -12,19 +12,26 @@ export default function StoryList() {
     const router = useRouter();
     const { colors: themeColors, isDark } = useThemeContext();
 
-    const getCorrectUrl = (url: string) => {
-        if (!url || typeof url !== 'string') return 'https://ui-avatars.com/api/?name=User&background=random';
-        if (url.startsWith('blob:')) return 'https://ui-avatars.com/api/?name=User&background=random';
+    const getCorrectUrl = (url: string | undefined | null) => {
+        if (!url || typeof url !== 'string' || url.trim() === '') return undefined;
+        const clean = url.trim();
+        if (clean.length === 0) return undefined;
 
-        // Force use of current API_BASE_URL for any internal uploads
-        if (url.includes('/uploads/')) {
-            const uploadIndex = url.indexOf('/uploads/');
-            return `${API_BASE_URL}${url.substring(uploadIndex)}`;
+        if (clean.startsWith('blob:') || clean.startsWith('data:') || clean.startsWith('file:')) return clean;
+
+        if (clean.startsWith('http') && clean.includes('/uploads/')) {
+            const parts = clean.split('/uploads/');
+            return `${API_BASE_URL}/uploads/${parts[1]}`;
         }
 
-        if (url.startsWith('data:')) return url;
-        if (url.startsWith('http')) return url;
-        return `${API_BASE_URL}/uploads/${url}`;
+        if (clean.startsWith('http')) return clean;
+        if (clean.startsWith('/uploads/')) return `${API_BASE_URL}${clean}`;
+        if (clean.includes('/uploads/')) {
+            const parts = clean.split('/uploads/');
+            return `${API_BASE_URL}/uploads/${parts[1]}`;
+        }
+
+        return `${API_BASE_URL}/uploads/${clean}`;
     };
 
     const { user, refreshUser } = (useUser() || {}) as any;
@@ -102,12 +109,12 @@ export default function StoryList() {
                                                     style={styles.gradientBorder}
                                                 >
                                                     <View style={[styles.whiteBorder, { backgroundColor: themeColors.background }]}>
-                                                        <Image source={{ uri: getCorrectUrl(user.avatar) }} style={styles.avatar} />
+                                                        <Image source={{ uri: getCorrectUrl(user.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random` }} style={styles.avatar} />
                                                     </View>
                                                 </LinearGradient>
                                             ) : (
                                                 <View style={[styles.whiteBorder, { backgroundColor: themeColors.background, width: 68, height: 68, borderRadius: 34, borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
-                                                    <Image source={{ uri: getCorrectUrl(user.avatar) }} style={[styles.avatar, { width: 64, height: 64, borderRadius: 32 }]} />
+                                                    <Image source={{ uri: getCorrectUrl(user.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random` }} style={[styles.avatar, { width: 64, height: 64, borderRadius: 32 }]} />
                                                 </View>
                                             )}
                                         </TouchableOpacity>
@@ -149,7 +156,7 @@ export default function StoryList() {
                                     style={styles.gradientBorder}
                                 >
                                     <View style={[styles.whiteBorder, { backgroundColor: themeColors.background }]}>
-                                        <Image source={{ uri: getCorrectUrl(item.avatar) }} style={styles.avatar} />
+                                        <Image source={{ uri: getCorrectUrl(item.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || 'User')}&background=random` }} style={styles.avatar} />
                                     </View>
                                 </LinearGradient>
                             </View>

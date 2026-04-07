@@ -29,54 +29,95 @@ import {
     View,
 } from 'react-native';
 
+// Helper to normalize URIs
+const getCorrectUrl = (uri?: string | null) => {
+    if (!uri || typeof uri !== 'string' || uri.trim() === '') return undefined;
+    const clean = uri.trim();
+    if (clean.length === 0) return undefined;
+
+    if (clean.startsWith('blob:') || clean.startsWith('data:') || clean.startsWith('file:')) return clean;
+
+    if (clean.startsWith('http') && clean.includes('/uploads/')) {
+        const parts = clean.split('/uploads/');
+        return `${API_BASE_URL}/uploads/${parts[1]}`;
+    }
+
+    if (clean.startsWith('http')) return clean;
+    if (clean.startsWith('/uploads/')) return `${API_BASE_URL}${clean}`;
+    if (clean.includes('/uploads/')) {
+        const parts = clean.split('/uploads/');
+        return `${API_BASE_URL}/uploads/${parts[1]}`;
+    }
+
+    return `${API_BASE_URL}/uploads/${clean}`;
+};
+
 const UserNoteBubble = ({ note, isDark }: { note: any, isDark: boolean }) => {
     if (!note) return null;
     return (
         <View style={{
             position: 'absolute',
-            bottom: 60,
+            bottom: 65,
             alignSelf: 'center',
-            backgroundColor: isDark ? '#262626' : '#FFFFFF',
-            borderRadius: 20,
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            alignItems: 'center',
-            justifyContent: 'center',
-            minWidth: 60,
-            maxWidth: 100,
             zIndex: 100,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.15,
-            shadowRadius: 4,
-            elevation: 5,
-            borderWidth: 1,
-            borderColor: isDark ? '#333' : '#EEE',
+            alignItems: 'center',
         }}>
-            {note.music ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Ionicons name="musical-notes" size={12} color={isDark ? '#FFF' : '#000'} />
-                    <Text numberOfLines={1} style={{ fontSize: 11, color: isDark ? '#FFF' : '#000', fontWeight: '600' }}>
-                        {note.music.track}
+            {/* Main Bubble */}
+            <View style={{
+                backgroundColor: isDark ? '#262626' : '#FFFFFF',
+                borderRadius: 20,
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                alignItems: 'center',
+                justifyContent: 'center',
+                minWidth: 80,
+                maxWidth: 120,
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.15,
+                shadowRadius: 4,
+                elevation: 5,
+                borderWidth: 1,
+                borderColor: isDark ? '#333' : '#EEE',
+            }}>
+                {note.music ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Ionicons name="musical-notes" size={12} color={isDark ? '#FFF' : '#000'} />
+                        <Text numberOfLines={1} style={{ fontSize: 12, color: isDark ? '#FFF' : '#000', fontWeight: '600' }}>
+                            {note.music.track}
+                        </Text>
+                    </View>
+                ) : (
+                    <Text numberOfLines={2} style={{ fontSize: 13, color: isDark ? '#FFF' : '#000', textAlign: 'center', fontWeight: '600' }}>
+                        {note.content}
                     </Text>
-                </View>
-            ) : (
-                <Text numberOfLines={2} style={{ fontSize: 11, color: isDark ? '#FFF' : '#000', textAlign: 'center', fontWeight: '500' }}>
-                    {note.content}
-                </Text>
-            )}
+                )}
+            </View>
 
+            {/* Thought Bubble Dots - positioned to the left side like original Instagram notes */}
             <View style={{
                 position: 'absolute',
-                bottom: -5,
-                width: 10,
-                height: 10,
+                bottom: -8,
+                left: 18,
+                width: 14,
+                height: 14,
+                borderRadius: 7,
                 backgroundColor: isDark ? '#262626' : '#FFFFFF',
-                transform: [{ rotate: '45deg' }],
-                zIndex: -1,
-                borderRightWidth: 1,
-                borderBottomWidth: 1,
+                borderWidth: 1,
                 borderColor: isDark ? '#333' : '#EEE',
+                zIndex: -1,
+            }} />
+            <View style={{
+                position: 'absolute',
+                bottom: -16,
+                left: 14,
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: isDark ? '#262626' : '#FFFFFF',
+                borderWidth: 1,
+                borderColor: isDark ? '#333' : '#EEE',
+                zIndex: -2,
             }} />
         </View>
     );
@@ -355,7 +396,7 @@ export default function ChatScreen() {
                                                     <UserNoteBubble note={note} isDark={isDark} />
                                                     <Image
                                                         source={{
-                                                            uri: item.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || 'User')}&background=random`,
+                                                            uri: getCorrectUrl(item.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || 'User')}&background=random`,
                                                         }}
                                                         style={{
                                                             width: 72, height: 72, borderRadius: 36,
@@ -411,20 +452,14 @@ export default function ChatScreen() {
                         </View>
                     }
                     renderItem={({ item }) => {
-                        const other = item.participants.find((p: any) => p._id !== user._id) || item.participants[0];
+                        const other = item.participants.find((p: any) => p._id.toString() !== user?._id?.toString()) || item.participants[0];
                         
                         const chatName = item.isGroup ? item.groupName : (other?.name || 'Vibe User');
-                        let rawAvatar = item.isGroup ? item.groupAvatar : other?.avatar;
-                        if (rawAvatar && rawAvatar.startsWith('/uploads/')) {
-                            rawAvatar = `${API_BASE_URL}${rawAvatar}`;
-                        } else if (rawAvatar && !rawAvatar.startsWith('http') && !rawAvatar.startsWith('data:')) {
-                            rawAvatar = `${API_BASE_URL}/uploads/${rawAvatar}`;
-                        }
-                        const chatAvatar = rawAvatar;
+                        const chatAvatar = getCorrectUrl(item.isGroup ? item.groupAvatar : other?.avatar);
 
                         return (
                             <ChatItem
-                                avatar={chatAvatar}
+                                avatar={chatAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(chatName)}&background=random`}
                                 name={chatName}
                                 lastMessage={
                                     item.lastMessageType === 'audio'
@@ -440,7 +475,10 @@ export default function ChatScreen() {
                                     if (item.isGroup) {
                                         router.push({ pathname: `/message/${item._id}`, params: { isGroup: 'true' } } as any);
                                     } else {
-                                        router.push(`/message/${other?._id}`);
+                                        router.push({ 
+                                            pathname: `/message/${other?._id}`, 
+                                            params: { chatId: item._id } 
+                                        } as any);
                                     }
                                 }}
                                 onLongPress={() => {
@@ -450,10 +488,7 @@ export default function ChatScreen() {
                                 onStoryPress={item.hasStory && !item.isGroup && other ? () => {
                                     router.push({
                                         pathname: '/story-view',
-                                        params: {
-                                            userId: other._id,
-                                            userStr: JSON.stringify({ _id: other._id, name: other.name, avatar: other.avatar, stories: other.stories || [] })
-                                        }
+                                        params: { userId: other._id }
                                     } as any);
                                 } : undefined}
                                 isPinned={item.isPinned}

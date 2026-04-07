@@ -38,19 +38,29 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
+import { SkeletonProfile } from '@/components/Skeletons';
 
-const getCorrectUrl = (url: string) => {
-    if (!url) return '';
-    try {
-        if (url.startsWith('/uploads/')) return encodeURI(`${API_BASE_URL}${url}`);
-        if (url.includes('/uploads/')) {
-            const parts = url.split('/uploads/');
-            return encodeURI(`${API_BASE_URL}/uploads/${parts[1]}`);
-        }
-        return url.startsWith('http') ? encodeURI(url) : url;
-    } catch (e) {
-        return url;
+// Helper to normalize URIs
+const getCorrectUrl = (uri?: string | null) => {
+    if (!uri || typeof uri !== 'string' || uri.trim() === '') return undefined;
+    const clean = uri.trim();
+    if (clean.length === 0) return undefined;
+
+    if (clean.startsWith('blob:') || clean.startsWith('data:') || clean.startsWith('file:')) return clean;
+
+    if (clean.startsWith('http') && clean.includes('/uploads/')) {
+        const parts = clean.split('/uploads/');
+        return `${API_BASE_URL}/uploads/${parts[1]}`;
     }
+
+    if (clean.startsWith('http')) return clean;
+    if (clean.startsWith('/uploads/')) return `${API_BASE_URL}${clean}`;
+    if (clean.includes('/uploads/')) {
+        const parts = clean.split('/uploads/');
+        return `${API_BASE_URL}/uploads/${parts[1]}`;
+    }
+
+    return `${API_BASE_URL}/uploads/${clean}`;
 };
 
 // Helper component for horizontal dots
@@ -320,11 +330,7 @@ export default function UserInfoScreen() {
 
 
     if (loading) {
-        return (
-            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-        );
+        return <SkeletonProfile />;
     }
 
     if (!recipient) {
@@ -358,7 +364,7 @@ export default function UserInfoScreen() {
                 {/* Profile Section */}
                 <View style={styles.profileSection}>
                     <Image
-                        source={{ uri: getCorrectUrl(recipient.coverImage || 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&fit=crop&q=80') }}
+                        source={{ uri: getCorrectUrl(recipient.coverImage) || 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&fit=crop&q=80' }}
                         style={styles.coverBg}
                     />
                     <LinearGradient
@@ -372,7 +378,7 @@ export default function UserInfoScreen() {
                         style={styles.avatarWrapper}
                     >
                         <Image
-                            source={{ uri: getCorrectUrl(recipient.avatar || 'https://i.pravatar.cc/150') }}
+                            source={{ uri: getCorrectUrl(recipient.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(recipient.name || 'User')}&background=random` }}
                             style={styles.avatar}
                         />
                     </TouchableOpacity>

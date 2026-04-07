@@ -12,19 +12,27 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 // Helper to normalize URIs
-const getCorrectUrl = (url: string) => {
-    if (!url || typeof url !== 'string') return '';
-    if (url.startsWith('blob:')) return '';
+const getCorrectUrl = (url: string | null | undefined) => {
+    if (!url || typeof url !== 'string' || url.trim() === '') return undefined;
+    let clean = url.trim();
+    
+    // 1. Direct pass-through for local or data URIs
+    if (clean.startsWith('blob:') || clean.startsWith('file:') || clean.startsWith('data:')) return clean;
 
-    // Force use of current API_BASE_URL for any internal uploads
-    if (url.includes('/uploads/')) {
-        const uploadIndex = url.indexOf('/uploads/');
-        return `${API_BASE_URL}${url.substring(uploadIndex)}`;
+    // 2. Handle absolute URLs
+    if (clean.startsWith('http')) {
+        // If it's our own backend but as localhost (from web view/cached), strip it to re-base with current API_BASE_URL
+        if (clean.includes('/uploads/')) {
+            const parts = clean.split('/uploads/');
+            return `${API_BASE_URL}/uploads/${parts[1]}`;
+        }
+        return clean;
     }
 
-    if (url.startsWith('data:')) return url;
-    if (url.startsWith('http')) return url;
-    return `${API_BASE_URL}/uploads/${url}`;
+    // 3. For relative paths or stripped filenames, ensure we have the correct base
+    const filename = clean.replace(/^.*\/uploads\//, '').replace(/^uploads\//, '').replace(/^\//, '');
+    
+    return `${API_BASE_URL}/uploads/${filename}`;
 };
 
 const formatCount = (n: number): string => {
@@ -34,7 +42,7 @@ const formatCount = (n: number): string => {
 };
 
 function GridVideoItem({ uri, style }: { uri: string, style: any }) {
-    const player = useVideoPlayer(getCorrectUrl(uri), player => {
+    const player = useVideoPlayer(getCorrectUrl(uri) || '', player => {
         player.loop = true;
         player.muted = true;
     });

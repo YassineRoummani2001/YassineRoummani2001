@@ -25,6 +25,7 @@ export function WebLayout({ children }: { children: React.ReactNode }) {
     const isCreate = pathname.includes('/create');
     const isMarketplaceDetail = pathname.startsWith('/marketplace/') && pathname !== '/marketplace';
     const isHome = (pathname === '/' || pathname === '/(tabs)' || pathname === '/index') && !isCreate;
+    const isStoryView = pathname.includes('/story-view');
 
     const showRightSidebar = isLargeScreen && width > 1200 && !isReels && !isMarketplaceDetail;
     const sidebarWidth = 280;
@@ -32,7 +33,7 @@ export function WebLayout({ children }: { children: React.ReactNode }) {
 
     // Calculate dynamic widths for web
     let feedMaxWidth: any = 650;
-    if (isReels) feedMaxWidth = '100%'; 
+    if (isReels || isStoryView) feedMaxWidth = '100%'; 
     else if (isChat) feedMaxWidth = 850;
     else if (isMarketplaceDetail) feedMaxWidth = 1100;
     else if (isMarketplace) feedMaxWidth = 850;
@@ -45,7 +46,7 @@ export function WebLayout({ children }: { children: React.ReactNode }) {
     return (
         <View style={[styles.container as any, { backgroundColor: colors.background }]}>
             {isLargeScreen && (
-                <View style={[styles.sidebarArea as any, { width: sidebarWidth }]}>
+                <View style={[styles.sidebarArea as any, { width: sidebarWidth, backgroundColor: colors.background }]}>
                     <WebSidebar />
                 </View>
             )}
@@ -68,7 +69,7 @@ export function WebLayout({ children }: { children: React.ReactNode }) {
                     </View>
 
                     {showRightSidebar && (
-                        <View style={[styles.rightSidebar as any, { width: rightSidebarWidth }]}>
+                        <View style={[styles.rightSidebar as any, { width: rightSidebarWidth, backgroundColor: colors.background }]}>
                             <DesktopRightSidebar />
                         </View>
                     )}

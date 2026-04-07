@@ -170,6 +170,27 @@ export function SkeletonChat() {
     );
 }
 
+export function SkeletonMessages() {
+    const { isDark } = useThemeContext();
+    return (
+        <View style={{ flex: 1, padding: 16, gap: 16 }}>
+            {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                <View key={i} style={{
+                    alignSelf: i % 3 === 0 ? 'flex-end' : 'flex-start',
+                    width: i % 2 === 0 ? '65%' : '45%',
+                    height: i % 4 === 0 ? 100 : 45,
+                    borderRadius: 20,
+                    borderBottomRightRadius: i % 3 === 0 ? 4 : 20,
+                    borderBottomLeftRadius: i % 3 === 0 ? 20 : 4,
+                    overflow: 'hidden'
+                }}>
+                    <AnimatedView style={{ flex: 1 }} />
+                </View>
+            ))}
+        </View>
+    );
+}
+
 const styles = StyleSheet.create({
     // Story
     storyContainer: {

@@ -1,7 +1,7 @@
 import { Colors } from '@/constants/Colors';
 import { API_BASE_URL } from '@/constants/Config';
 import { useUser } from '@/context/UserContext';
-import { Audio } from 'expo-av';
+import { setAudioModeAsync } from 'expo-audio';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -35,27 +35,25 @@ import LikersModal from './LikersModal';
 
 // Helper to construct valid URIs
 const getValidUri = (uri?: string) => {
-    if (!uri) return '';
-    if (uri.startsWith('data:') || uri.startsWith('file:')) return uri;
-    
-    // Auto-fix our backend URLs if they have the wrong IP/localhost
-    if (uri.startsWith('http') && uri.includes('/uploads/')) {
-        const parts = uri.split('/uploads/');
-        return `${API_BASE_URL}/uploads/${parts[1]}`;
-    }
-    
-    // External URLs
-    if (uri.startsWith('http')) return uri;
+    if (!uri || typeof uri !== 'string' || uri.trim() === '') return undefined;
+    const clean = uri.trim();
+    if (clean.length === 0) return undefined;
 
-    // Handle relative uploads
-    if (uri.startsWith('/uploads/')) return `${API_BASE_URL}${uri}`;
-    if (uri.includes('/uploads/')) {
-        const parts = uri.split('/uploads/');
+    if (clean.startsWith('blob:') || clean.startsWith('data:') || clean.startsWith('file:')) return clean;
+
+    if (clean.startsWith('http') && clean.includes('/uploads/')) {
+        const parts = clean.split('/uploads/');
         return `${API_BASE_URL}/uploads/${parts[1]}`;
     }
 
-    // Default fallback
-    return `${API_BASE_URL}${uri.startsWith('/') ? '' : '/'}${uri}`;
+    if (clean.startsWith('http')) return clean;
+    if (clean.startsWith('/uploads/')) return `${API_BASE_URL}${clean}`;
+    if (clean.includes('/uploads/')) {
+        const parts = clean.split('/uploads/');
+        return `${API_BASE_URL}/uploads/${parts[1]}`;
+    }
+
+    return `${API_BASE_URL}/uploads/${clean}`;
 };
 
 interface ReelItemProps {
@@ -276,10 +274,10 @@ export default function ReelItem({ item, active, isMuted, width, height }: ReelI
     const lastTap = useRef(0);
 
     useEffect(() => {
-        Audio.setAudioModeAsync({
-            playsInSilentModeIOS: true,
-            staysActiveInBackground: false,
-            shouldDuckAndroid: true,
+        setAudioModeAsync({
+            playsInSilentMode: true,
+            shouldPlayInBackground: false,
+            interruptionMode: 'duckOthers',
         });
     }, []);
 

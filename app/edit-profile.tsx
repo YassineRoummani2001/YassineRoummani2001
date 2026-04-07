@@ -14,23 +14,30 @@ import ProcessingModal from '../components/ProcessingModal';
 import ImageConfirmModal from '../components/ImageConfirmModal';
 import { uploadFile } from '@/utils/uploadHelper';
 import * as FileSystem from 'expo-file-system';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Helper to normalize URIs (Copied from ProfileScreen for consistency)
-const getCorrectUrl = (url: string) => {
-    if (!url || typeof url !== 'string') return '';
-    let clean = url.trim();
-    if (clean.length === 0 || clean.startsWith('blob:')) return '';
-    if (clean.startsWith('data:')) return clean;
+const getCorrectUrl = (url: string | null | undefined) => {
+    if (!url || typeof url !== 'string' || url.trim() === '') return undefined;
+    const clean = url.trim();
+    if (clean.length === 0) return undefined;
     
-    // Fix: If it's a localhost URL from web, strip it so it can be re-prefixed
-    if (clean.includes('localhost:5000') || clean.includes('127.0.0.1:5000')) {
-        clean = clean.split('/uploads/')[1] || clean;
+    // 1. Direct pass-through for local or data URIs
+    if (clean.startsWith('blob:') || clean.startsWith('file:') || clean.startsWith('data:')) return clean;
+
+    // 2. Handle absolute URLs
+    if (clean.startsWith('http')) {
+        // If it's our own backend but as localhost (from web view/cached), strip it to re-base with current API_BASE_URL
+        if (clean.includes('/uploads/')) {
+            const parts = clean.split('/uploads/');
+            return `${API_BASE_URL}/uploads/${parts[1]}`;
+        }
+        return clean;
     }
 
-    if (clean.startsWith('http') && !clean.includes('localhost')) return clean;
+    // 3. For relative paths or stripped filenames, ensure we have the correct base
+    const filename = clean.replace(/^.*\/uploads\//, '').replace(/^uploads\//, '').replace(/^\//, '');
     
-    // Normalize to filename/path relative to uploads
-    const filename = clean.replace('/uploads/', '').replace(/^\//, '');
     return `${API_BASE_URL}/uploads/${filename}`;
 };
 
@@ -162,13 +169,27 @@ export default function EditProfileScreen() {
         let finalCover = coverImage;
 
         try {
-            if (avatar && (avatar.startsWith('file:') || avatar.startsWith('blob:') || avatar.startsWith('ph:'))) {
-                 // console.log('📤 Uploading new avatar...');
-                 finalAvatar = await uploadFile(avatar, user.token, 'image');
+            // Helper: convert data: URI to blob: URI for web upload
+            const toUploadableUri = async (uri: string): Promise<string> => {
+                if (uri.startsWith('data:') && typeof document !== 'undefined') {
+                    // Convert base64 data URI to a Blob URL for uploading on web
+                    const res = await fetch(uri);
+                    const blob = await res.blob();
+                    return URL.createObjectURL(blob);
+                }
+                return uri;
+            };
+
+            const needsUpload = (uri: string) =>
+                uri && (uri.startsWith('file:') || uri.startsWith('blob:') || uri.startsWith('ph:') || uri.startsWith('data:'));
+
+            if (needsUpload(avatar)) {
+                const uploadUri = await toUploadableUri(avatar);
+                finalAvatar = await uploadFile(uploadUri, user.token, 'image');
             }
-            if (coverImage && (coverImage.startsWith('file:') || coverImage.startsWith('blob:') || coverImage.startsWith('ph:'))) {
-                 // console.log('📤 Uploading new cover image...');
-                 finalCover = await uploadFile(coverImage, user.token, 'image');
+            if (needsUpload(coverImage)) {
+                const uploadUri = await toUploadableUri(coverImage);
+                finalCover = await uploadFile(uploadUri, user.token, 'image');
             }
         } catch (error) {
             console.error('❌ Image upload failed:', error);
@@ -320,7 +341,20 @@ export default function EditProfileScreen() {
                     {/* Visual & Avatar Section */}
                     <View style={styles.visualSection}>
                         <View style={[styles.coverWrapper, isDesktop && { height: 200, borderRadius: 12, overflow: 'hidden' }]}>
-                            <Image source={{ uri: getCorrectUrl(coverImage) }} style={styles.coverImage} resizeMode="cover" />
+                            {getCorrectUrl(coverImage) ? (
+                                <Image
+                                    source={{ uri: getCorrectUrl(coverImage) }}
+                                    style={styles.coverImage}
+                                    resizeMode="cover"
+                                />
+                            ) : (
+                                <LinearGradient
+                                    colors={['#667eea', '#764ba2', '#f093fb']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                    style={styles.coverImage}
+                                />
+                            )}
                             <TouchableOpacity style={styles.changeCoverBtn} onPress={() => pickImage('cover')}>
                                 <Camera size={18} color="white" />
                                 <Text style={styles.changeCoverText}>Edit Cover</Text>

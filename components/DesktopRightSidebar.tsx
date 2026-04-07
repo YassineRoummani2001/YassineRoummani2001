@@ -90,23 +90,26 @@ export default function DesktopRightSidebar() {
         return result.slice(0, 10); // Show top 10
     }, [allUsers, user, searchQuery, activeFilter]);
 
-    const getCorrectUrl = (uri: string) => {
-        if (!uri || typeof uri !== 'string') return 'https://via.placeholder.com/150';
-        if (uri.startsWith('blob:') || uri.startsWith('data:') || uri.startsWith('file:')) return uri;
+    const getCorrectUrl = (uri?: string | null) => {
+        if (!uri || typeof uri !== 'string' || uri.trim() === '') return undefined;
+        const clean = uri.trim();
+        if (clean.length === 0) return undefined;
 
-        if (uri.startsWith('http') && uri.includes('/uploads/')) {
-            const parts = uri.split('/uploads/');
+        if (clean.startsWith('blob:') || clean.startsWith('data:') || clean.startsWith('file:')) return clean;
+
+        if (clean.startsWith('http') && clean.includes('/uploads/')) {
+            const parts = clean.split('/uploads/');
             return `${API_BASE_URL}/uploads/${parts[1]}`;
         }
         
-        if (uri.startsWith('http')) return uri;
-        if (uri.startsWith('/uploads/')) return `${API_BASE_URL}${uri}`;
-        if (uri.includes('/uploads/')) {
-            const parts = uri.split('/uploads/');
+        if (clean.startsWith('http')) return clean;
+        if (clean.startsWith('/uploads/')) return `${API_BASE_URL}${clean}`;
+        if (clean.includes('/uploads/')) {
+            const parts = clean.split('/uploads/');
             return `${API_BASE_URL}/uploads/${parts[1]}`;
         }
 
-        return `${API_BASE_URL}${uri.startsWith('/') ? '' : '/'}${uri}`;
+        return `${API_BASE_URL}/uploads/${clean}`;
     };
 
     const cardBg = isDark ? '#111' : '#f9f9f9';
@@ -170,7 +173,7 @@ export default function DesktopRightSidebar() {
                         ]}
                     >
                         <Image
-                            source={{ uri: getCorrectUrl(u.avatar) }}
+                            source={{ uri: getCorrectUrl(u.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || 'User')}&background=random` }}
                             style={[styles.avatar, { borderColor: colors.primary + '30' }]}
                         />
                         <View style={styles.userMeta}>

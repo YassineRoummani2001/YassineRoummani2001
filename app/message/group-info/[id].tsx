@@ -25,6 +25,7 @@ import {
     Dimensions
 } from 'react-native';
 import Toast from 'react-native-toast-message';
+import { SkeletonProfile } from '@/components/Skeletons';
 import AddParticipantModal from '@/components/AddParticipantModal';
 import ConfirmModal from '@/components/ConfirmModal';
 import ProcessingModal from '@/components/ProcessingModal';
@@ -32,21 +33,27 @@ import ImageConfirmModal from '@/components/ImageConfirmModal';
 import { uploadFile } from '@/utils/uploadHelper';
 import * as FileSystem from 'expo-file-system';
 
-const getCorrectUrl = (url: string | undefined | null) => {
-    if (!url || typeof url !== 'string') return undefined;
-    let clean = url.trim();
+// Helper to normalize URIs
+const getCorrectUrl = (uri?: string | null) => {
+    if (!uri || typeof uri !== 'string' || uri.trim() === '') return undefined;
+    const clean = uri.trim();
     if (clean.length === 0) return undefined;
-    
-    // If it's a localhost URL from web, strip it so it can be re-prefixed with current API_BASE_URL
-    if (clean.includes('localhost:5000') || clean.includes('127.0.0.1:5000')) {
-        clean = clean.split('/uploads/')[1] || clean;
+
+    if (clean.startsWith('blob:') || clean.startsWith('data:') || clean.startsWith('file:')) return clean;
+
+    if (clean.startsWith('http') && clean.includes('/uploads/')) {
+        const parts = clean.split('/uploads/');
+        return `${API_BASE_URL}/uploads/${parts[1]}`;
     }
 
-    if (/^(https?|file|data):/i.test(clean) && !clean.includes('localhost')) return clean;
-    
-    // Clean potential /uploads/ prefix if it's already there
-    const filename = clean.replace('/uploads/', '').replace(/^\//, '');
-    return `${API_BASE_URL}/uploads/${filename.replace(/\\/g, '/')}`;
+    if (clean.startsWith('http')) return clean;
+    if (clean.startsWith('/uploads/')) return `${API_BASE_URL}${clean}`;
+    if (clean.includes('/uploads/')) {
+        const parts = clean.split('/uploads/');
+        return `${API_BASE_URL}/uploads/${parts[1]}`;
+    }
+
+    return `${API_BASE_URL}/uploads/${clean}`;
 };
 
 export default function GroupInfoScreen() {
@@ -332,11 +339,7 @@ export default function GroupInfoScreen() {
     };
 
     if (loading) {
-        return (
-            <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-        );
+        return <SkeletonProfile />;
     }
 
     if (!groupData) {
@@ -371,9 +374,9 @@ export default function GroupInfoScreen() {
                         {groupData.groupCoverImage ? (
                             <Image source={{ uri: getCorrectUrl(groupData.groupCoverImage) }} style={styles.coverGradient} />
                         ) : (
-                            <LinearGradient
-                                colors={[colors.primary, '#8b5cf6', '#ec4899']}
-                                style={styles.coverGradient}
+                            <Image 
+                                source={{ uri: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&fit=crop&q=80' }} 
+                                style={styles.coverGradient} 
                             />
                         )}
                             <TouchableOpacity 
@@ -387,15 +390,10 @@ export default function GroupInfoScreen() {
 
                     <View style={styles.profileInfo}>
                         <View style={[styles.avatarContainer, { borderColor: colors.background }]}>
-                            {groupData.groupAvatar ? (
-                                <Image source={{ uri: getCorrectUrl(groupData.groupAvatar) }} style={styles.avatar} />
-                            ) : (
-                                <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
-                                    <Text style={styles.avatarText}>
-                                        {groupData.groupName?.substring(0, 2).toUpperCase() || 'GP'}
-                                    </Text>
-                                </View>
-                            )}
+                            <Image 
+                                source={{ uri: getCorrectUrl(groupData.groupAvatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(groupData.groupName || 'Group')}&background=random` }} 
+                                style={styles.avatar} 
+                            />
                             <TouchableOpacity 
                                 style={styles.editAvatarBtn} 
                                 onPress={() => pickImage('avatar')}
@@ -491,7 +489,7 @@ export default function GroupInfoScreen() {
                                 >
                                     <View>
                                         <Image
-                                            source={{ uri: getCorrectUrl(participant.avatar) || 'https://i.pravatar.cc/100' }}
+                                            source={{ uri: getCorrectUrl(participant.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(participant.name || 'User')}&background=random` }}
                                             style={styles.participantAvatar}
                                         />
                                         {isGroupAdmin && (

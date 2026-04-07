@@ -8,6 +8,30 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
+import { AudioModule } from 'expo-audio';
+
+// Patch AudioPlayer constructor for version compatibility
+if (AudioModule && AudioModule.AudioPlayer) {
+  const NativeAudioPlayer = AudioModule.AudioPlayer;
+  // @ts-ignore
+  AudioModule.AudioPlayer = function (...args) {
+    if (args.length === 4) {
+      try {
+        // @ts-ignore
+        return new NativeAudioPlayer(...args);
+      } catch (err) {
+        // Fallback for older native modules that expect 3 args
+        console.log('[AudioPatch] constructor failed with 4 args, trying 3');
+        // @ts-ignore
+        return new NativeAudioPlayer(args[0], args[1], args[2]);
+      }
+    }
+    // @ts-ignore
+    return new NativeAudioPlayer(...args);
+  };
+  // Ensure the prototype is preserved so instance checks and methods work
+  AudioModule.AudioPlayer.prototype = NativeAudioPlayer.prototype;
+}
 
 
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -30,6 +54,9 @@ ErrorHandler.init();
 // Ignore specific warnings
 LogBox.ignoreLogs([
   'Video component from `expo-av` is deprecated',
+  '"shadow*" style props are deprecated. Use "boxShadow".',
+  '"textShadow*" style props are deprecated. Use "textShadow".',
+  '[expo-notifications] Listening to push token changes is not yet fully supported on web',
 ]);
 
 // Root Layout Configuration

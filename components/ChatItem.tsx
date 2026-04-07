@@ -54,102 +54,120 @@ const ChatItem = memo(({
     const pressedColor = isDark ? '#1C1C1E' : '#F2F2F2';
 
     return (
-        <Pressable
-            onPress={onPress}
-            onLongPress={onLongPress}
-            android_ripple={{ color: isDark ? '#333' : '#EEE' }}
-            style={({ pressed }) => [
-                styles.container,
-                { backgroundColor: pressed && Platform.OS === 'ios' ? pressedColor : bgColor }
-            ]}
-        >
-            {/* Avatar */}
-            <View style={styles.avatarContainer}>
-                <View style={hasStory ? {
-                    padding: 2,
-                    borderRadius: 32, // (56 + 2*2 + 2*2)/2 = 32
-                    borderWidth: 2,
-                    borderColor: storyViewed ? '#A0A0A0' : '#E1306C', // Grey if viewed, Pink if new
-                } : {}}>
-                    {avatar ? (
-                        <Image
-                            source={{ uri: avatar }}
-                            style={styles.avatar}
-                            contentFit="cover"
-                            transition={200}
-                        />
-                    ) : (
-                        <View style={[
-                            styles.avatarFallback,
-                            { backgroundColor: isDark ? '#333' : '#E0E0E0' }
-                        ]}>
-                            <Text style={[styles.initials, { color: isDark ? '#FFF' : '#555' }]}>{initials}</Text>
-                        </View>
-                    )}
-                </View>
-                {online && <View style={[styles.onlineDot, { borderColor: bgColor }]} />}
-                {hasStory && onStoryPress && (
-                    <Pressable
-                        onPress={onStoryPress}
-                        style={[styles.storyPlayIcon, { 
-                            backgroundColor: storyViewed ? '#A0A0A0' : '#E1306C',
-                            borderColor: bgColor 
-                        }]}
-                    >
-                        <Ionicons name="play" size={8} color="#FFF" style={{ marginLeft: 1 }} />
-                    </Pressable>
-                )}
-            </View>
-
-            {/* Info */}
-            <View style={styles.content}>
-                <View style={[styles.row, { gap: 4 }]}>
-                    <Text numberOfLines={1} style={[styles.name, { color: textColor, flex: 1 }]}>{name}</Text>
-                    <Text style={[styles.time, { color: subTextColor }]}>{time}</Text>
-                </View>
-
-                <View style={styles.row}>
-                    <Text
-                        numberOfLines={1}
-                        style={[
-                            styles.message,
-                            {
-                                color: unread > 0 ? (isDark ? '#FFF' : '#000') : subTextColor,
-                                fontWeight: unread > 0 ? '700' : '400'
-                            }
-                        ]}
-                    >
-                        {lastMessage}
-                    </Text>
-
-                    {isPinned && (
-                        <View style={[styles.pinnedCircle, { backgroundColor: isDark ? '#333' : '#F0F0F0' }]}>
-                            <AntDesign 
-                                name="pushpin" 
-                                size={12} 
-                                color={isDark ? '#AAA' : '#666'} 
+        <View style={styles.container}>
+            {/* 1. Clickable Avatar (Story) */}
+            <Pressable 
+                onPress={onStoryPress || onPress}
+                style={({ pressed }) => [
+                    styles.avatarPressable,
+                    { opacity: pressed ? 0.7 : 1 }
+                ]}
+            >
+                <View style={styles.avatarContainer}>
+                    <View style={hasStory ? {
+                        padding: 2,
+                        borderRadius: 32,
+                        borderWidth: 2,
+                        borderColor: storyViewed ? '#A0A0A0' : '#E1306C',
+                    } : {}}>
+                        {avatar ? (
+                            <Image
+                                source={{ uri: avatar }}
+                                style={styles.avatar}
+                                contentFit="cover"
+                                transition={200}
                             />
+                        ) : (
+                            <View style={[
+                                styles.avatarFallback,
+                                { backgroundColor: isDark ? '#333' : '#E0E0E0' }
+                            ]}>
+                                <Text style={[styles.initials, { color: isDark ? '#FFF' : '#555' }]}>{initials}</Text>
+                            </View>
+                        )}
+                    </View>
+                    {online && <View style={[styles.onlineDot, { borderColor: bgColor }]} />}
+                    {hasStory && onStoryPress && (
+                        <View
+                            style={[styles.storyPlayIcon, { 
+                                backgroundColor: storyViewed ? '#A0A0A0' : '#E1306C',
+                                borderColor: bgColor 
+                            }]}
+                        >
+                            <Ionicons name="play" size={8} color="#FFF" style={{ marginLeft: 1 }} />
                         </View>
                     )}
-
-                    {unread > 0 && (
-                        <View style={styles.unreadDot} />
-                    )}
                 </View>
-            </View>
-        </Pressable>
+            </Pressable>
+
+            {/* 2. Clickable Info (Chat) */}
+            <Pressable
+                onPress={onPress}
+                onLongPress={onLongPress}
+                android_ripple={{ color: isDark ? '#333' : '#EEE' }}
+                style={({ pressed }) => [
+                    styles.contentPressable,
+                    { backgroundColor: pressed && Platform.OS === 'ios' ? pressedColor : 'transparent' }
+                ]}
+            >
+                <View style={styles.content}>
+                    <View style={[styles.row, { gap: 4 }]}>
+                        <Text numberOfLines={1} style={[styles.name, { color: textColor, flex: 1 }]}>{name}</Text>
+                        <Text style={[styles.time, { color: subTextColor }]}>{time}</Text>
+                    </View>
+
+                    <View style={styles.row}>
+                        <Text
+                            numberOfLines={1}
+                            style={[
+                                styles.message,
+                                {
+                                    color: unread > 0 ? (isDark ? '#FFF' : '#000') : subTextColor,
+                                    fontWeight: unread > 0 ? '700' : '400'
+                                }
+                            ]}
+                        >
+                            {lastMessage}
+                        </Text>
+
+                        {isPinned && (
+                            <View style={[styles.pinnedCircle, { backgroundColor: isDark ? '#333' : '#F0F0F0' }]}>
+                                <AntDesign 
+                                    name="pushpin" 
+                                    size={12} 
+                                    color={isDark ? '#AAA' : '#666'} 
+                                />
+                            </View>
+                        )}
+
+                        {unread > 0 && (
+                            <View style={styles.unreadDot} />
+                        )}
+                    </View>
+                </View>
+            </Pressable>
+        </View>
     );
 });
 
 const styles = StyleSheet.create({
     container: {
         flexDirection: 'row',
-        paddingHorizontal: 16,
+        alignItems: 'stretch',
+    },
+    avatarPressable: {
+        paddingLeft: 16,
         paddingVertical: 12,
-        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    contentPressable: {
+        flex: 1,
+        paddingVertical: 12,
+        paddingRight: 16,
+        paddingLeft: 12,
+        justifyContent: 'center',
     },
     avatarContainer: {
-        marginRight: 14,
         position: 'relative',
     },
     noteBubble: {

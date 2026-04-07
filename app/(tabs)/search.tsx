@@ -157,27 +157,30 @@ export default function SearchScreen() {
         }
     };
 
-    const getCorrectUrl = (uri: string) => {
-        if (!uri || typeof uri !== 'string') return 'https://via.placeholder.com/400';
-        if (uri.startsWith('blob:') || uri.startsWith('data:') || uri.startsWith('file:')) return uri;
+    const getCorrectUrl = (uri: string | null | undefined) => {
+        if (!uri || typeof uri !== 'string' || uri.trim() === '') return undefined;
+        const clean = uri.trim();
+        if (clean.length === 0) return undefined;
 
-        if (uri.startsWith('http') && uri.includes('/uploads/')) {
-            const parts = uri.split('/uploads/');
-            return `${API_BASE_URL}/uploads/${parts[1]}`;
-        }
-        
-        if (uri.startsWith('http')) return uri;
-        if (uri.startsWith('/uploads/')) return `${API_BASE_URL}${uri}`;
-        if (uri.includes('/uploads/')) {
-            const parts = uri.split('/uploads/');
+        if (clean.startsWith('blob:') || clean.startsWith('data:') || clean.startsWith('file:')) return clean;
+
+        if (clean.startsWith('http') && clean.includes('/uploads/')) {
+            const parts = clean.split('/uploads/');
             return `${API_BASE_URL}/uploads/${parts[1]}`;
         }
 
-        return `${API_BASE_URL}${uri.startsWith('/') ? '' : '/'}${uri}`;
+        if (clean.startsWith('http')) return clean;
+        if (clean.startsWith('/uploads/')) return `${API_BASE_URL}${clean}`;
+        if (clean.includes('/uploads/')) {
+            const parts = clean.split('/uploads/');
+            return `${API_BASE_URL}/uploads/${parts[1]}`;
+        }
+
+        return `${API_BASE_URL}/uploads/${clean}`;
     };
 
     const GridVideoItem = ({ uri, style }: { uri: string, style: any }) => {
-        const player = useVideoPlayer(getCorrectUrl(uri), player => {
+        const player = useVideoPlayer(getCorrectUrl(uri) || '', player => {
             player.loop = true;
             player.muted = true;
         });
@@ -304,13 +307,10 @@ export default function SearchScreen() {
                                             onPress={() => router.push(`/user/${u._id}` as any)}
                                         >
                                             <View style={styles.suggestedAvatar}>
-                                                {u.avatar ? (
-                                                    <Image source={{ uri: getCorrectUrl(u.avatar) }} style={styles.avatarFull} />
-                                                ) : (
-                                                    <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary + '20' }]}>
-                                                       <UserIcon size={32} color={colors.primary} />
-                                                    </View>
-                                                )}
+                                                <Image 
+                                                    source={{ uri: getCorrectUrl(u.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || 'User')}&background=random` }} 
+                                                    style={styles.avatarFull} 
+                                                />
                                             </View>
                                             <Text style={[styles.suggestedName, { color: colors.text }]} numberOfLines={1}>{u.name}</Text>
                                             <Text style={[styles.suggestedHandle, { color: colors.textSecondary }]} numberOfLines={1}>@{u.handle}</Text>
@@ -372,11 +372,10 @@ export default function SearchScreen() {
                                                 onPress={() => handleResultPress('user', user)}
                                             >
                                                 <View style={styles.avatar}>
-                                                    {user.avatar ? (
-                                                        <Image source={{ uri: getCorrectUrl(user.avatar) }} style={styles.avatarImg} />
-                                                    ) : (
-                                                        <UserIcon color="white" size={20} />
-                                                    )}
+                                                    <Image 
+                                                        source={{ uri: getCorrectUrl(user.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random` }} 
+                                                        style={styles.avatarImg} 
+                                                    />
                                                 </View>
                                                 <View style={{ flex: 1 }}>
                                                     <Text style={[styles.userName, { color: colors.text }]}>{user.name}</Text>

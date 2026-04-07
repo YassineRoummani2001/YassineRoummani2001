@@ -3,14 +3,14 @@ import { useMessages } from '@/context/MessagesContext';
 import { useThemeContext } from '@/context/ThemeContext';
 import { useUser } from '@/context/UserContext';
 import { ApiClient } from '@/utils/api';
-import { Audio } from 'expo-av';
+import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus, useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, getRecordingPermissionsAsync } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Image as ExpoImage } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -31,14 +31,16 @@ import {
     View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SkeletonMessages } from '@/components/Skeletons';
 
 /* -------------------------------------------------------------------------- */
 /*                                   Helpers                                  */
 /* -------------------------------------------------------------------------- */
 
-const getCorrectUrl = (url: string | undefined | null) => {
-    if (!url || typeof url !== 'string') return undefined;
-    const clean = url.trim();
+// Helper to normalize URIs
+const getCorrectUrl = (uri?: string | null) => {
+    if (!uri || typeof uri !== 'string' || uri.trim() === '') return undefined;
+    const clean = uri.trim();
     if (clean.length === 0) return undefined;
 
     if (clean.startsWith('blob:') || clean.startsWith('data:') || clean.startsWith('file:')) return clean;
@@ -47,7 +49,7 @@ const getCorrectUrl = (url: string | undefined | null) => {
         const parts = clean.split('/uploads/');
         return `${API_BASE_URL}/uploads/${parts[1]}`;
     }
-    
+
     if (clean.startsWith('http')) return clean;
     if (clean.startsWith('/uploads/')) return `${API_BASE_URL}${clean}`;
     if (clean.includes('/uploads/')) {
@@ -69,21 +71,45 @@ const formatDividerDate = (dateStr: string) => {
     return `${day} ${time}`;
 };
 
-const AvatarImage = ({ uri, name, size = 32 }: { uri?: string, name?: string, size?: number }) => {
+const AvatarImage = ({ uri, name, size = 32, hasStory, storyViewed }: { uri?: string, name?: string, size?: number, hasStory?: boolean, storyViewed?: boolean }) => {
     const validUri = getCorrectUrl(uri);
-    const initials = name?.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() || '?';
-
+    const { colors } = useThemeContext();
+    
     return (
-        <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: '#E0E0E0', justifyContent: 'center', alignItems: 'center' }}>
-            {validUri ? (
+        <View style={{ 
+            width: size + 4, 
+            height: size + 4, 
+            borderRadius: (size + 4) / 2, 
+            justifyContent: 'center', 
+            alignItems: 'center',
+            borderWidth: hasStory ? 2 : 0,
+            borderColor: storyViewed ? '#888' : colors.primary,
+            padding: hasStory ? 2 : 0
+        }}>
+            <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: '#E0E0E0', justifyContent: 'center', alignItems: 'center' }}>
                 <ExpoImage
-                    source={{ uri: validUri }}
+                    source={{ uri: validUri || `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=random` }}
                     style={{ width: '100%', height: '100%' }}
                     contentFit="cover"
                     transition={200}
                 />
-            ) : (
-                <Text style={{ fontSize: size * 0.4, fontWeight: '700', color: '#666' }}>{initials}</Text>
+            </View>
+            {hasStory && !storyViewed && (
+                <View style={{
+                    position: 'absolute',
+                    bottom: -2,
+                    right: -2,
+                    width: 14,
+                    height: 14,
+                    borderRadius: 7,
+                    backgroundColor: colors.primary,
+                    borderWidth: 2,
+                    borderColor: 'white',
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                }}>
+                    <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: 'white' }} />
+                </View>
             )}
         </View>
     );
@@ -96,75 +122,36 @@ const AvatarImage = ({ uri, name, size = 32 }: { uri?: string, name?: string, si
 const WAVEFORM_BARS = [4, 6, 8, 14, 12, 8, 10, 16, 20, 14, 10, 8, 12, 18, 16, 10, 8, 6, 4, 10, 12, 16, 20, 18, 12, 10, 8, 6, 4];
 
 const VoiceMessage = ({ uri, itemsDuration, isMe, colors }: { uri: string, itemsDuration?: number, isMe: boolean, colors: any }) => {
-    const [sound, setSound] = useState<Audio.Sound | null>(null);
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [duration, setDuration] = useState(itemsDuration ? itemsDuration * 1000 : 0);
-    const [position, setPosition] = useState(0);
+    // Attempt to use the hook, but wrap in a try-catch pattern if it causes constructor errors
+    // Since useAudioPlayer is a hook, we can't try-catch it directly.
+    // However, the error usually happens during the constructor call inside the hook.
+    const player = useAudioPlayer(getCorrectUrl(uri) || '');
+    const status = useAudioPlayerStatus(player);
     const progress = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-        return () => {
-            if (sound) sound.unloadAsync();
-        };
-    }, [sound]);
-
-    const loadAndPlay = async () => {
-        try {
-            if (sound) {
-                const status = await sound.getStatusAsync();
-                if (status.isLoaded) {
-                    if (isPlaying) {
-                        await sound.pauseAsync();
-                        setIsPlaying(false);
-                    } else {
-                        await sound.playAsync();
-                        setIsPlaying(true);
-                    }
-                    return;
-                } else {
-                    // Sound object exists but is not loaded (likely was unloaded)
-                    await sound.unloadAsync().catch(() => {});
-                    setSound(null);
-                }
-            }
-
-            const { sound: newSound, status } = await Audio.Sound.createAsync(
-                { uri: getCorrectUrl(uri) || '' },
-                { shouldPlay: true },
-                onPlaybackStatusUpdate
-            );
-            setSound(newSound);
-            setIsPlaying(true);
-            // @ts-ignore
-            if (status.durationMillis) setDuration(status.durationMillis);
-        } catch (error) {
-            console.error("Audio Play Error:", error);
+        if (status.duration > 0) {
+            const percent = status.currentTime / status.duration;
+            Animated.timing(progress, {
+                toValue: percent,
+                duration: 500,
+                useNativeDriver: false
+            }).start();
         }
+        
+        if (status.didJustFinish) {
+            progress.setValue(0);
+            player.seekTo(0);
+        }
+    }, [status.currentTime, status.duration, status.didJustFinish]);
+
+    const loadAndPlay = () => {
+        if (status.playing) player.pause();
+        else player.play();
     };
 
-    const onPlaybackStatusUpdate = (status: any) => {
-        if (status.isLoaded) {
-            setDuration(status.durationMillis || 0);
-            setPosition(status.positionMillis);
-            setIsPlaying(status.isPlaying);
+// Using the new hook
 
-            if (status.durationMillis > 0) {
-                const percent = status.positionMillis / status.durationMillis;
-                Animated.timing(progress, {
-                    toValue: percent,
-                    duration: 100,
-                    useNativeDriver: false
-                }).start();
-            }
-
-            if (status.didJustFinish) {
-                setIsPlaying(false);
-                setPosition(0);
-                progress.setValue(0);
-                // Reset animation
-            }
-        }
-    };
 
     const formatDuration = (millis: number) => {
         const totalSeconds = Math.floor(millis / 1000);
@@ -192,7 +179,7 @@ const VoiceMessage = ({ uri, itemsDuration, isMe, colors }: { uri: string, items
                 backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : colors.primary,
                 alignItems: 'center', justifyContent: 'center'
             }}>
-                {isPlaying ?
+                {status.playing ?
                     <Ionicons name="pause" size={18} color="#FFF" /> :
                     <Ionicons name="play" size={18} color="#FFF" style={{ marginLeft: 2 }} />
                 }
@@ -229,7 +216,7 @@ const VoiceMessage = ({ uri, itemsDuration, isMe, colors }: { uri: string, items
                     width: 35,
                     textAlign: 'right'
                 }}>
-                    {formatDuration(position > 0 ? position : duration)}
+                    {formatDuration((status.currentTime > 0 ? status.currentTime : (status.duration > 0 ? status.duration : (itemsDuration || 0))) * 1000)}
                 </Text>
             </View>
         </View>
@@ -242,7 +229,7 @@ const VoiceMessage = ({ uri, itemsDuration, isMe, colors }: { uri: string, items
 
 export default function MessageScreen() {
     const params = useLocalSearchParams();
-    const { id, product, isGroup, name: paramName, avatar: paramAvatar } = params;
+    const { id, product, isGroup, name: paramName, avatar: paramAvatar, chatId: paramChatId } = params;
     const router = useRouter();
     const { user } = useUser() as any;
     const { colors, isDark } = useThemeContext();
@@ -253,6 +240,7 @@ export default function MessageScreen() {
 
     // State
     const [messages, setMessages] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
     const [inputText, setInputText] = useState('');
     const [keyboardVisible, setKeyboardVisible] = useState(false);
     const [showSearch, setShowSearch] = useState(params.search === 'true');
@@ -284,7 +272,7 @@ export default function MessageScreen() {
     const [recipient, setRecipient] = useState<any>(
         paramName ? { name: paramName, avatar: paramAvatar, _id: userId } : null
     );
-    const [chatId, setChatId] = useState<string | null>(null);
+    const [chatId, setChatId] = useState<string | null>(paramChatId as string || null);
     const [chat, setChat] = useState<any>(null); // Store full chat object
     const [isTyping, setIsTyping] = useState(false);
 
@@ -302,8 +290,7 @@ export default function MessageScreen() {
     const [hasMore, setHasMore] = useState(true);
 
     // Audio State
-    const [recording, setRecording] = useState<Audio.Recording | undefined>(undefined);
-    const [permissionResponse, requestPermission] = Audio.usePermissions();
+    const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
     const [recordingDuration, setRecordingDuration] = useState(0);
     const durationInterval = useRef<any>(null);
 
@@ -322,69 +309,101 @@ export default function MessageScreen() {
             if (!user?._id || !userId) return;
 
             const init = async () => {
+                setLoading(true);
                 try {
+                    const authHeader = { 'Authorization': `Bearer ${user.token}` };
+
                     if (isGroup === 'true') {
-                        const chatRes = await ApiClient.get<any>(`/api/chats/${userId}`, { 'Authorization': `Bearer ${user.token}` });
-                        if (chatRes.success && chatRes.data) {
-                            setChatId(chatRes.data._id);
-                            setChat(chatRes.data);
-                            const mRes = await ApiClient.get<any[]>(`/api/chats/${chatRes.data._id}/messages?limit=50`, { 'Authorization': `Bearer ${user.token}` });
-                            if (mRes.success && mRes.data) {
-                                setMessages(mRes.data);
-                                if (mRes.data.length < 50) setHasMore(false);
+                        const chatRes = await fetch(`${API_BASE_URL}/api/chats/${userId}`, { headers: authHeader });
+                        if (chatRes.ok) {
+                            const chatData = await chatRes.json();
+                            setChatId(chatData._id);
+                            setChat(chatData);
+                            const mRes = await fetch(`${API_BASE_URL}/api/chats/${chatData._id}/messages?limit=50`, { headers: authHeader });
+                            if (mRes.ok) {
+                                const mData = await mRes.json();
+                                const msgs = Array.isArray(mData) ? mData : (mData.messages || mData.data || []);
+                                setMessages(msgs);
+                                if (msgs.length < 50) setHasMore(false);
                             }
                         }
                     } else {
-                        // Parallel Fetch: User Info & Find/Create Chat
-                    const [uRes, cRes] = await Promise.all([
-                        ApiClient.get<any>(`/api/auth/user/${userId}`, { 'Authorization': `Bearer ${user.token}` }),
-                        ApiClient.post<any>('/api/chats', { userId: userId, isMarketplace: !!product }, { 'Authorization': `Bearer ${user.token}` })
-                    ]);
+                        // Fetch user info
+                        const uRes = await fetch(`${API_BASE_URL}/api/auth/user/${userId}`, { headers: authHeader });
+                        if (uRes.ok) setRecipient(await uRes.json());
 
-                    if (uRes.success) setRecipient(uRes.data);
+                        // Resolve chatId: use passed param first, otherwise find/create
+                        const existingChatId = Array.isArray(paramChatId) ? paramChatId[0] : paramChatId as string | undefined;
 
-                    if (cRes.success && cRes.data) {
-                        setChatId(cRes.data._id);
-                        setChat(cRes.data);
-                        // Initial fetch (limit 50)
-                        const mRes = await ApiClient.get<any[]>(`/api/chats/${cRes.data._id}/messages?limit=50`, { 'Authorization': `Bearer ${user.token}` });
-                        if (mRes.success && mRes.data) {
-                            setMessages(mRes.data);
-                            if (mRes.data.length < 50) setHasMore(false);
+                        let resolvedChatId: string | null = null;
+
+                        if (existingChatId) {
+                            const chatRes = await fetch(`${API_BASE_URL}/api/chats/${existingChatId}`, { headers: authHeader });
+                            if (chatRes.ok) {
+                                const chatData = await chatRes.json();
+                                resolvedChatId = chatData._id;
+                                setChatId(chatData._id);
+                                setChat(chatData);
+                            }
                         }
 
-                        // Handle Product sharing
-                        if (product && !productSentRef.current) {
-                            try {
-                                const productData = JSON.parse(decodeURIComponent(product as string));
-                                // Deduplicate check
-                                const lastMsg = mRes.data?.[0]; // Newest is at 0
-                                if (lastMsg?.marketitemId?._id === productData.id || lastMsg?.marketitemId === productData.id) {
-                                    productSentRef.current = true;
-                                    return;
-                                }
-
-                                const body = {
-                                    content: "Check out this product",
-                                    type: 'text',
-                                    marketitemId: productData.id
-                                };
-                                const pRes = await ApiClient.post(`/api/chats/${cRes.data._id}/messages`, body, { 'Authorization': `Bearer ${user.token}` });
-                                if (pRes.success) {
-                                    setMessages(prev => [pRes.data, ...prev]);
-                                    socket?.emit('message:send', { chatId: cRes.data._id, message: pRes.data });
-                                }
-                                productSentRef.current = true;
-                            } catch (e) { console.error("Error sending product:", e); }
+                        if (!resolvedChatId) {
+                            const cRes = await fetch(`${API_BASE_URL}/api/chats`, {
+                                method: 'POST',
+                                headers: { ...authHeader, 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ userId, isMarketplace: !!product })
+                            });
+                            if (cRes.ok) {
+                                const cData = await cRes.json();
+                                const chatData = cData.data || cData;
+                                resolvedChatId = chatData._id;
+                                setChatId(chatData._id);
+                                setChat(chatData);
+                            }
                         }
+
+                        // Fetch messages
+                        if (resolvedChatId) {
+                            const mRes = await fetch(`${API_BASE_URL}/api/chats/${resolvedChatId}/messages?limit=50`, { headers: authHeader });
+                            if (mRes.ok) {
+                                const mData = await mRes.json();
+                                const msgs = Array.isArray(mData) ? mData : (mData.messages || mData.data || mData.docs || []);
+                                setMessages(msgs);
+                                if (msgs.length < 50) setHasMore(false);
+
+                                // Handle Product sharing
+                                if (product && !productSentRef.current) {
+                                    try {
+                                        const productData = JSON.parse(decodeURIComponent(product as string));
+                                        const lastMsg = msgs[0];
+                                        if (lastMsg?.marketitemId?._id === productData.id || lastMsg?.marketitemId === productData.id) {
+                                            productSentRef.current = true;
+                                            return;
+                                        }
+                                        const pRes = await fetch(`${API_BASE_URL}/api/chats/${resolvedChatId}/messages`, {
+                                            method: 'POST',
+                                            headers: { ...authHeader, 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ content: 'Check out this product', type: 'text', marketitemId: productData.id })
+                                        });
+                                        if (pRes.ok) {
+                                            const pMsg = await pRes.json();
+                                            setMessages(prev => [pMsg, ...prev]);
+                                            socket?.emit('message:send', { chatId: resolvedChatId, message: pMsg });
+                                        }
+                                        productSentRef.current = true;
+                                    } catch (e) { console.error('Error sending product:', e); }
+                                }
+                            }
                         }
                     }
                 } catch (e) {
-                    console.error("Chat Init Error:", e);
+                    console.error('Chat Init Error:', e);
+                } finally {
+                    setLoading(false);
                 }
             };
             init();
-        }, [user, userId, product])
+        }, [user, userId, product, paramChatId])
     );
 
     // 2. Socket Listeners
@@ -394,7 +413,8 @@ export default function MessageScreen() {
         socket.emit('chat:join', chatId);
 
         const onMsg = (newMsg: any) => {
-            if (newMsg.chatId === chatId || newMsg.chat === chatId) {
+            const msgChatId = newMsg.chatId || (typeof newMsg.chat === 'object' ? newMsg.chat?._id : newMsg.chat);
+            if (msgChatId === chatId) {
                 setMessages(prev => {
                     if (prev.find(m => m._id === newMsg._id)) return prev;
                     return [newMsg, ...prev]; // Prepend newest
@@ -680,16 +700,17 @@ export default function MessageScreen() {
     // 5. Audio Recording Logic
     const startRecording = async () => {
         try {
-            if (permissionResponse?.status !== 'granted') {
-                const resp = await requestPermission();
-                if (resp.status !== 'granted') {
+            const permission = await getRecordingPermissionsAsync();
+            if (permission.status !== 'granted') {
+                const req = await requestRecordingPermissionsAsync();
+                if (req.status !== 'granted') {
                     Alert.alert("Permission Required", "Please allow microphone access to record voice messages.");
                     return;
                 }
             }
-            await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-            const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-            setRecording(recording);
+            await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+            await recorder.prepareToRecordAsync();
+            recorder.record();
             setRecordingDuration(0);
             durationInterval.current = setInterval(() => setRecordingDuration(d => d + 1), 1000);
         } catch (err) {
@@ -698,22 +719,20 @@ export default function MessageScreen() {
     };
 
     const stopRecording = async () => {
-        setRecording(undefined);
         clearInterval(durationInterval.current);
-        if (!recording) return;
+        if (!recorder.isRecording) return;
 
-        await recording.stopAndUnloadAsync();
-        const uri = recording.getURI();
+        await recorder.stop();
+        const uri = recorder.uri;
         if (uri) {
             uploadAudio(uri);
         }
     };
 
     const cancelRecording = async () => {
-        setRecording(undefined);
         clearInterval(durationInterval.current);
-        if (recording) {
-            await recording.stopAndUnloadAsync();
+        if (recorder.isRecording) {
+            await recorder.stop();
         }
     };
 
@@ -752,13 +771,13 @@ export default function MessageScreen() {
         // Divider logic: compare with the next older message (index + 1 in inverted list)
         let showDivider = false;
         let dividerText = '';
-        
-        const nextMsg = messages[index + 1]; 
+
+        const nextMsg = messages[index + 1];
         if (nextMsg) {
             const currentDate = new Date(item.createdAt);
             const nextDate = new Date(nextMsg.createdAt);
             const diff = currentDate.getTime() - nextDate.getTime();
-            
+
             // Show divider if more than 30 minutes gap
             if (diff > 30 * 60 * 1000) {
                 showDivider = true;
@@ -774,7 +793,7 @@ export default function MessageScreen() {
             const isMeAction = item.sender?._id === user._id || item.sender === user._id;
             const systemContent = (
                 <View style={{ width: '100%', alignItems: 'center', marginVertical: 14 }}>
-                    <View style={{ 
+                    <View style={{
                         backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
                         paddingHorizontal: 20,
                         paddingVertical: 8,
@@ -783,10 +802,10 @@ export default function MessageScreen() {
                         borderWidth: 1,
                         borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'
                     }}>
-                        <Text style={{ 
-                            fontSize: 12, 
-                            color: colors.textSecondary, 
-                            textAlign: 'center', 
+                        <Text style={{
+                            fontSize: 12,
+                            color: colors.textSecondary,
+                            textAlign: 'center',
                             lineHeight: 18,
                             fontWeight: '500'
                         }}>
@@ -848,10 +867,10 @@ export default function MessageScreen() {
                         <Text numberOfLines={1} style={{ fontSize: 11, color: isMe ? 'rgba(255,255,255,0.8)' : colors.textSecondary }}>{rContent}</Text>
                     </View>
                     {rImageUrl && (
-                        <ExpoImage 
-                            source={{ uri: rImageUrl }} 
-                            style={{ width: 34, height: 34, borderRadius: 4 }} 
-                            contentFit="cover" 
+                        <ExpoImage
+                            source={{ uri: rImageUrl }}
+                            style={{ width: 34, height: 34, borderRadius: 4 }}
+                            contentFit="cover"
                         />
                     )}
                 </View>
@@ -880,13 +899,85 @@ export default function MessageScreen() {
                 }}>
                     <View style={{ flex: 1 }}>
                         <Text numberOfLines={1} style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', color: isMe ? 'rgba(255,255,255,0.7)' : colors.primary, marginBottom: 4, letterSpacing: 0.5 }}>
-                           Replying to note
+                            Replying to note
                         </Text>
                         <Text numberOfLines={1} style={{ fontSize: 13, color: isMe ? '#FFF' : colors.text, fontWeight: '600' }}>
-                           {noteContent}
+                            {noteContent}
                         </Text>
                     </View>
                     <Ionicons name="chatbubble-ellipses" size={16} color={isMe ? 'rgba(255,255,255,0.5)' : colors.textSecondary} />
+                </View>
+            );
+        };
+
+        // Story Reply Block
+        const StoryReplyBlock = () => {
+            if (!item.replyToStory) return null;
+            const story = item.replyToStory;
+            const storyUri = getCorrectUrl(story.uri);
+
+            return (
+                <View style={{
+                    margin: 4,
+                    marginBottom: 6,
+                    borderRadius: 12,
+                    overflow: 'hidden',
+                    borderWidth: 1,
+                    borderColor: isMe ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
+                    minWidth: 180,
+                }}>
+                    {/* Label */}
+                    <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        backgroundColor: isMe ? 'rgba(0,0,0,0.15)' : 'rgba(0,0,0,0.04)',
+                    }}>
+                        <Ionicons name="albums-outline" size={12} color={isMe ? 'rgba(255,255,255,0.7)' : colors.textSecondary} />
+                        <Text style={{ fontSize: 11, color: isMe ? 'rgba(255,255,255,0.7)' : colors.textSecondary, fontWeight: '600' }}>
+                            Replied to story
+                        </Text>
+                    </View>
+
+                    {/* Story Preview */}
+                    {story.type === 'text' ? (
+                        // Text story preview
+                        <View style={{
+                            backgroundColor: story.color || colors.primary,
+                            paddingHorizontal: 14,
+                            paddingVertical: 12,
+                            minHeight: 60,
+                            justifyContent: 'center',
+                        }}>
+                            <Text numberOfLines={3} style={{ fontSize: 13, color: '#FFF', fontWeight: '600', lineHeight: 18 }}>
+                                {story.content}
+                            </Text>
+                        </View>
+                    ) : storyUri ? (
+                        // Image/Video story preview
+                        <View style={{ width: '100%', height: 100, position: 'relative' }}>
+                            <ExpoImage
+                                source={{ uri: storyUri }}
+                                style={{ width: '100%', height: '100%' }}
+                                contentFit="cover"
+                            />
+                            {story.type === 'video' && (
+                                <View style={{
+                                    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                                    alignItems: 'center', justifyContent: 'center',
+                                    backgroundColor: 'rgba(0,0,0,0.3)'
+                                }}>
+                                    <Ionicons name="play-circle" size={30} color="#FFF" />
+                                </View>
+                            )}
+                        </View>
+                    ) : (
+                        <View style={{ height: 60, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? '#333' : '#EEE' }}>
+                            <Ionicons name="image-outline" size={24} color={colors.textSecondary} />
+                        </View>
+                    )}
                 </View>
             );
         };
@@ -948,10 +1039,10 @@ export default function MessageScreen() {
                                 )}
                                 {imageUrl ? (
                                     <View style={{ width: '100%', height: 220, backgroundColor: isDark ? '#333' : '#E0E0E0' }}>
-                                        <ExpoImage 
-                                            source={{ uri: imageUrl }} 
-                                            style={{ width: '100%', height: '100%' }} 
-                                            contentFit="cover" 
+                                        <ExpoImage
+                                            source={{ uri: imageUrl }}
+                                            style={{ width: '100%', height: '100%' }}
+                                            contentFit="cover"
                                             onLoad={() => console.log('Image loaded successfully')}
                                             onError={() => console.log('Image failed to load URL:', imageUrl)}
                                         />
@@ -1072,11 +1163,11 @@ export default function MessageScreen() {
             <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
             {/* Header */}
-            <View style={[styles.header, { 
-                paddingTop: isDesktop ? 0 : insets.top, 
+            <View style={[styles.header, {
+                paddingTop: isDesktop ? 0 : insets.top,
                 height: isDesktop ? 60 : 70 + insets.top,
-                backgroundColor: isDark ? '#000' : '#FFF', 
-                borderBottomColor: isDark ? '#262626' : '#F2F2F2' 
+                backgroundColor: isDark ? '#000' : '#FFF',
+                borderBottomColor: isDark ? '#262626' : '#F2F2F2'
             }]}>
                 {showSearch ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingHorizontal: 4 }}>
@@ -1084,12 +1175,12 @@ export default function MessageScreen() {
                             <Ionicons name="arrow-back" size={24} color={colors.text} />
                         </TouchableOpacity>
                         <TextInput
-                            style={{ 
-                                flex: 1, 
-                                height: 40, 
-                                backgroundColor: isDark ? '#262626' : '#F3F4F6', 
-                                borderRadius: 20, 
-                                paddingHorizontal: 15, 
+                            style={{
+                                flex: 1,
+                                height: 40,
+                                backgroundColor: isDark ? '#262626' : '#F3F4F6',
+                                borderRadius: 20,
+                                paddingHorizontal: 15,
                                 color: colors.text,
                                 fontSize: 15
                             }}
@@ -1113,8 +1204,8 @@ export default function MessageScreen() {
                             </TouchableOpacity>
 
                             {isGroup === 'true' && chat ? (
-                                <TouchableOpacity 
-                                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }} 
+                                <TouchableOpacity
+                                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
                                     onPress={() => router.push({ pathname: `/message/group-info/${chat._id}` } as any)}
                                 >
                                     <AvatarImage uri={chat.groupAvatar} name={chat.groupName} size={isDesktop ? 40 : 36} />
@@ -1124,16 +1215,42 @@ export default function MessageScreen() {
                                     </View>
                                 </TouchableOpacity>
                             ) : recipient ? (
-                                <TouchableOpacity 
-                                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }} 
-                                    onPress={() => router.push(`/message/user-info/${userId}`)}
-                                >
-                                    <AvatarImage uri={recipient.avatar} name={recipient.name} size={isDesktop ? 40 : 36} />
-                                    <View style={{ marginLeft: 12, flex: 1 }}>
+                                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                                    {/* 1. Avatar - Stories view */}
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            const hasActiveStory = recipient.stories && recipient.stories.length > 0;
+                                            if (hasActiveStory) {
+                                                router.push({
+                                                    pathname: '/story-view',
+                                                    params: {
+                                                        userId: recipient._id,
+                                                        userStr: JSON.stringify(recipient)
+                                                    }
+                                                } as any);
+                                            } else {
+                                                router.push(`/message/user-info/${userId}`);
+                                            }
+                                        }}
+                                    >
+                                        <AvatarImage 
+                                            uri={recipient.avatar} 
+                                            name={recipient.name} 
+                                            size={isDesktop ? 40 : 36} 
+                                            hasStory={recipient.stories && recipient.stories.length > 0}
+                                            storyViewed={false}
+                                        />
+                                    </TouchableOpacity>
+
+                                    {/* 2. Info - Profile view */}
+                                    <TouchableOpacity
+                                        style={{ marginLeft: 12, flex: 1 }}
+                                        onPress={() => router.push(`/message/user-info/${userId}`)}
+                                    >
                                         <Text numberOfLines={1} style={{ fontSize: isDesktop ? 18 : 16, fontWeight: '700', color: colors.text }}>{recipient.name}</Text>
                                         <Text numberOfLines={1} style={{ fontSize: 12, color: colors.textSecondary }}>{isTyping ? 'Typing...' : (recipient.username || 'View profile')}</Text>
-                                    </View>
-                                </TouchableOpacity>
+                                    </TouchableOpacity>
+                                </View>
                             ) : (
                                 <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
                                     <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: isDark ? '#262626' : '#EEE' }} />
@@ -1145,8 +1262,6 @@ export default function MessageScreen() {
                             <TouchableOpacity onPress={() => setShowSearch(true)}>
                                 <Ionicons name="search-outline" size={22} color={colors.text} />
                             </TouchableOpacity>
-                            <TouchableOpacity><Ionicons name="call-outline" size={22} color={colors.text} /></TouchableOpacity>
-                            <TouchableOpacity><Ionicons name="videocam-outline" size={24} color={colors.text} /></TouchableOpacity>
                         </View>
                     </>
                 )}
@@ -1168,29 +1283,43 @@ export default function MessageScreen() {
                 keyboardVerticalOffset={0}
             >
                 <View style={{ flex: 1 }}>
-                    <FlatList
-                        ref={flatListRef}
-                        data={showSearch && searchQuery.trim() ? filteredMessages : messages}
-                        inverted
-                        keyExtractor={item => item._id}
-                        onEndReached={loadMoreMessages}
-                        onEndReachedThreshold={0.5}
-                        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 10, ...(showSearch && searchQuery.trim() && filteredMessages.length === 0 ? { flex: 1 } : {}) }}
-                        renderItem={renderMessageItem}
-                        ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.primary} /> : null}
-                        ListEmptyComponent={showSearch && searchQuery.trim() ? (
-                            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', transform: [{ scaleY: -1 }] }}>
-                                <Ionicons name="search-outline" size={48} color={colors.textSecondary} style={{ opacity: 0.4, marginBottom: 12 }} />
-                                <Text style={{ fontSize: 16, color: colors.textSecondary, fontWeight: '600' }}>No messages found</Text>
-                                <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4, opacity: 0.7 }}>Try a different search term</Text>
-                            </View>
-                        ) : null}
-                        onScroll={(event) => {
-                            const offsetY = event.nativeEvent.contentOffset.y;
-                            setShowScrollBottom(offsetY > 200);
-                        }}
-                        scrollEventThrottle={16}
-                    />
+                    {loading ? (
+                        <SkeletonMessages />
+                    ) : (
+                        <FlatList
+                            ref={flatListRef}
+                            data={showSearch && searchQuery.trim() ? filteredMessages : messages}
+                            inverted
+                            keyExtractor={item => item._id}
+                            onEndReached={loadMoreMessages}
+                            onEndReachedThreshold={0.5}
+                            contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 10, ...(showSearch && searchQuery.trim() && filteredMessages.length === 0 ? { flex: 1 } : {}) }}
+                            renderItem={renderMessageItem}
+                            ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.primary} /> : null}
+                            ListEmptyComponent={showSearch && searchQuery.trim() ? (
+                                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', transform: [{ scaleY: -1 }] }}>
+                                    <Ionicons name="search-outline" size={48} color={colors.textSecondary} style={{ opacity: 0.4, marginBottom: 12 }} />
+                                    <Text style={{ fontSize: 16, color: colors.textSecondary, fontWeight: '600' }}>No messages found</Text>
+                                    <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4, opacity: 0.7 }}>Try a different search term</Text>
+                                </View>
+                            ) : (
+                                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', transform: [{ scaleY: -1 }], paddingBottom: 100 }}>
+                                    <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: isDark ? '#262626' : '#F3F4F6', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+                                        <Ionicons name="chatbubble-ellipses-outline" size={40} color={colors.primary} />
+                                    </View>
+                                    <Text style={{ fontSize: 18, fontWeight: '700', color: colors.text }}>No messages yet</Text>
+                                    <Text style={{ fontSize: 14, color: colors.textSecondary, marginTop: 8, textAlign: 'center', paddingHorizontal: 40 }}>
+                                        Send a message to start the conversation with {recipient?.name || 'this user'}.
+                                    </Text>
+                                </View>
+                            )}
+                            onScroll={(event) => {
+                                const offsetY = event.nativeEvent.contentOffset.y;
+                                setShowScrollBottom(offsetY > 200);
+                            }}
+                            scrollEventThrottle={16}
+                        />
+                    )}
                     {showScrollBottom && (
                         <TouchableOpacity
                             activeOpacity={0.8}
@@ -1239,10 +1368,10 @@ export default function MessageScreen() {
                                     </Text>
                                 </View>
                                 {replyingTo.type === 'image' && (
-                                    <ExpoImage 
-                                        source={{ uri: getCorrectUrl(replyingTo.content) }} 
-                                        style={{ width: 40, height: 40, borderRadius: 6 }} 
-                                        contentFit="cover" 
+                                    <ExpoImage
+                                        source={{ uri: getCorrectUrl(replyingTo.content) }}
+                                        style={{ width: 40, height: 40, borderRadius: 6 }}
+                                        contentFit="cover"
                                     />
                                 )}
                             </View>
@@ -1271,7 +1400,7 @@ export default function MessageScreen() {
 
                     {/* Main Input */}
                     <View style={styles.inputContainer}>
-                        {recording ? (
+                        {recorder.isRecording ? (
                             /* Recording UI */
                             <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -1323,40 +1452,40 @@ export default function MessageScreen() {
             {/* Long Press Modal */}
             <Modal visible={!!selectedMessage} transparent animationType="fade" onRequestClose={() => setSelectedMessage(null)}>
                 <TouchableWithoutFeedback onPress={() => setSelectedMessage(null)}>
-                    <View style={{ 
-                        flex: 1, 
-                        backgroundColor: 'rgba(0,0,0,0.4)', 
-                        justifyContent: 'center', 
-                        alignItems: 'center' 
+                    <View style={{
+                        flex: 1,
+                        backgroundColor: 'rgba(0,0,0,0.4)',
+                        justifyContent: 'center',
+                        alignItems: 'center'
                     }}>
                         <TouchableWithoutFeedback>
                             <View style={{
-                                width: isDesktop ? 450 : '85%', 
+                                width: isDesktop ? 450 : '85%',
                                 backgroundColor: isDark ? '#1a1a1a' : '#FFF',
-                                borderRadius: 24, 
-                                padding: isDesktop ? 24 : 20, 
+                                borderRadius: 24,
+                                padding: isDesktop ? 24 : 20,
                                 gap: 4,
-                                shadowColor: "#000", 
-                                shadowOffset: { width: 0, height: 10 }, 
-                                shadowOpacity: 0.3, 
-                                shadowRadius: 20, 
+                                shadowColor: "#000",
+                                shadowOffset: { width: 0, height: 10 },
+                                shadowOpacity: 0.3,
+                                shadowRadius: 20,
                                 elevation: 8,
                                 borderWidth: isDark ? 1 : 0,
                                 borderColor: '#333'
                             }}>
                                 {/* Reactions */}
-                                <View style={{ 
-                                    flexDirection: 'row', 
+                                <View style={{
+                                    flexDirection: 'row',
                                     flexWrap: 'wrap',
-                                    justifyContent: 'center', 
+                                    justifyContent: 'center',
                                     gap: isDesktop ? 12 : 8,
                                     marginBottom: 16
                                 }}>
                                     {['❤️', '😂', '😮', '😢', '👍', '🙏', '🔥', '✨', '👏', '😠'].map(emoji => (
-                                        <TouchableOpacity 
-                                            key={emoji} 
-                                            onPress={() => handleAction('react', emoji)} 
-                                            style={{ 
+                                        <TouchableOpacity
+                                            key={emoji}
+                                            onPress={() => handleAction('react', emoji)}
+                                            style={{
                                                 padding: 8,
                                                 borderRadius: 12,
                                                 backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)'
@@ -1366,7 +1495,7 @@ export default function MessageScreen() {
                                         </TouchableOpacity>
                                     ))}
                                 </View>
-                                
+
                                 <View style={{ height: 1, backgroundColor: isDark ? '#333' : '#F2F2F2', marginVertical: 8, marginHorizontal: -20 }} />
 
                                 {/* Actions Group */}
@@ -1471,9 +1600,9 @@ const styles = StyleSheet.create({
         width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 0
     },
     actionRow: {
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        gap: 16, 
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 16,
         paddingVertical: 10,
         paddingHorizontal: 8,
         borderRadius: 12,
@@ -1486,7 +1615,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     actionText: {
-        fontSize: 16, 
+        fontSize: 16,
         fontWeight: '500'
     }
 });

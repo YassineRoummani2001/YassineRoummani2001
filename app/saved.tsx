@@ -34,8 +34,8 @@ export default function SavedScreen() {
     const contentWidth = isDesktop ? Math.min(windowWidth - 320, 650) : windowWidth;
     const { colors, isDark } = useThemeContext();
 
-    // 0: All (Posts), 1: Reels
-    const [activeTab, setActiveTab] = useState(params.tab === 'reels' ? 1 : 0);
+    // 0: All, 1: Posts, 2: Reels
+    const [activeTab, setActiveTab] = useState(params.tab === 'reels' ? 2 : 0);
     const [savedPosts, setSavedPosts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -78,6 +78,8 @@ export default function SavedScreen() {
     const getFilteredPosts = useMemo(() => {
         let filtered = savedPosts;
         if (activeTab === 1) {
+            filtered = savedPosts.filter(p => p.type !== 'reel' && p.type !== 'video');
+        } else if (activeTab === 2) {
             filtered = savedPosts.filter(p => p.type === 'reel' || p.type === 'video');
         }
         
@@ -92,7 +94,7 @@ export default function SavedScreen() {
     const renderGridItem = useCallback(({ item, index }: { item: any, index: number }) => {
         const isVideo = item.type === 'reel' || item.type === 'video' || item.uri?.endsWith('.mp4');
         const gap = 1;
-        const columns = 4;
+        const columns = 3;
         const itemSize = (contentWidth / columns) - (gap * 2);
 
         return (
@@ -186,15 +188,22 @@ export default function SavedScreen() {
                         style={[styles.tabPill, activeTab === 0 && { backgroundColor: isDark ? '#fff' : '#000' }]}
                         onPress={() => setActiveTab(0)}
                     >
-                        <Grid3X3 size={18} color={activeTab === 0 ? (isDark ? '#000' : '#fff') : colors.textSecondary} />
-                        <Text style={[styles.tabPillText, { color: activeTab === 0 ? (isDark ? '#000' : '#fff') : colors.textSecondary }]}>Posts</Text>
+                        <Layers size={18} color={activeTab === 0 ? (isDark ? '#000' : '#fff') : colors.textSecondary} />
+                        <Text style={[styles.tabPillText, { color: activeTab === 0 ? (isDark ? '#000' : '#fff') : colors.textSecondary }]}>All</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                         style={[styles.tabPill, activeTab === 1 && { backgroundColor: isDark ? '#fff' : '#000' }]}
                         onPress={() => setActiveTab(1)}
                     >
-                        <Clapperboard size={18} color={activeTab === 1 ? (isDark ? '#000' : '#fff') : colors.textSecondary} />
-                        <Text style={[styles.tabPillText, { color: activeTab === 1 ? (isDark ? '#000' : '#fff') : colors.textSecondary }]}>Reels</Text>
+                        <Grid3X3 size={18} color={activeTab === 1 ? (isDark ? '#000' : '#fff') : colors.textSecondary} />
+                        <Text style={[styles.tabPillText, { color: activeTab === 1 ? (isDark ? '#000' : '#fff') : colors.textSecondary }]}>Posts</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                        style={[styles.tabPill, activeTab === 2 && { backgroundColor: isDark ? '#fff' : '#000' }]}
+                        onPress={() => setActiveTab(2)}
+                    >
+                        <Clapperboard size={18} color={activeTab === 2 ? (isDark ? '#000' : '#fff') : colors.textSecondary} />
+                        <Text style={[styles.tabPillText, { color: activeTab === 2 ? (isDark ? '#000' : '#fff') : colors.textSecondary }]}>Reels</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -225,22 +234,22 @@ export default function SavedScreen() {
                 </View>
             ) : (
                 <FlatList
-                    key={`grid-4`}
+                    key={`grid-3`}
                     data={getFilteredPosts}
                     keyExtractor={(item, index) => item._id || index.toString()}
                     renderItem={renderGridItem}
-                    numColumns={4}
+                    numColumns={3}
                     ListHeaderComponent={ListHeader}
                     ListEmptyComponent={
                         <Animated.View entering={FadeInDown} style={styles.emptyState}>
                             <View style={[styles.emptyIconContainer, { backgroundColor: colors.gray + '20' }]}>
-                                {activeTab === 0 ? <Grid3X3 size={40} color={colors.primary} /> : <Clapperboard size={40} color={colors.primary} />}
+                                {activeTab === 2 ? <Clapperboard size={40} color={colors.primary} /> : <Grid3X3 size={40} color={colors.primary} />}
                             </View>
                             <Text style={[styles.emptyStateTitle, { color: colors.text }]}>
-                                No {activeTab === 0 ? 'posts' : 'reels'} yet
+                                No {activeTab === 2 ? 'reels' : activeTab === 1 ? 'posts' : 'content'} yet
                             </Text>
                             <Text style={[styles.emptyStateSub, { color: colors.textSecondary }]}>
-                                {activeTab === 0 ? 'Save your favorite posts to see them here!' : 'Browse reels and save the ones you love.'}
+                                {activeTab === 2 ? 'Browse reels and save the ones you love.' : 'Save your favorite content to see it here!'}
                             </Text>
                             <TouchableOpacity 
                                 style={[styles.exploreBtn, { backgroundColor: colors.primary }]}

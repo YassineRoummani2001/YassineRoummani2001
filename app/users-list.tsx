@@ -12,6 +12,29 @@ export default function UsersListScreen() {
     const { type, userId, title } = useLocalSearchParams(); // type: 'followers', 'following', 'likes'
     const { user: currentUser, followUser } = useUser();
     const { colors, isDark } = useThemeContext();
+    
+    // Helper to normalize URIs
+    const getCorrectUrl = (uri?: string) => {
+        if (!uri || typeof uri !== 'string' || uri.trim() === '') return undefined;
+        const clean = uri.trim();
+        if (clean.length === 0) return undefined;
+
+        if (clean.startsWith('blob:') || clean.startsWith('data:') || clean.startsWith('file:')) return clean;
+
+        if (clean.startsWith('http') && clean.includes('/uploads/')) {
+            const parts = clean.split('/uploads/');
+            return `${API_BASE_URL}/uploads/${parts[1]}`;
+        }
+
+        if (clean.startsWith('http')) return clean;
+        if (clean.startsWith('/uploads/')) return `${API_BASE_URL}${clean}`;
+        if (clean.includes('/uploads/')) {
+            const parts = clean.split('/uploads/');
+            return `${API_BASE_URL}/uploads/${parts[1]}`;
+        }
+
+        return `${API_BASE_URL}/uploads/${clean}`;
+    };
 
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -93,7 +116,10 @@ export default function UsersListScreen() {
             activeOpacity={0.7}
         >
             <View style={styles.avatarContainer}>
-                <Image source={{ uri: item.avatar }} style={styles.avatar} />
+                <Image 
+                    source={{ uri: getCorrectUrl(item.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || 'User')}&background=random` }} 
+                    style={styles.avatar} 
+                />
                 <OnlineIndicator isOnline={true} size={12} style={styles.onlineIndicator} />
             </View>
             <View style={styles.userInfo}>
