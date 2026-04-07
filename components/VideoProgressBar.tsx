@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
     Animated,
     PanResponder,
+    Platform,
     StyleSheet,
     Text,
     View,
@@ -81,7 +82,7 @@ export default function VideoProgressBar({
     return (
         <View style={[styles.container, { bottom: bottomOffset }]}>
             {/* Conditional Time Display (Pill style) */}
-            {showTime && duration > 0 && (
+            {showTime && typeof duration === 'number' && duration > 0 && isFinite(duration) && (
                 <View style={styles.timeWrapper}>
                     <View style={styles.timePill}>
                         <Text style={styles.timeText}>
@@ -93,7 +94,19 @@ export default function VideoProgressBar({
             )}
 
             {/* Progress Bar */}
-            <View style={styles.touchArea} {...panResponder.panHandlers}>
+            <View 
+                style={styles.touchArea} 
+                {...panResponder.panHandlers}
+                // @ts-ignore web
+                onClick={(e: any) => {
+                    if (Platform.OS === 'web' && duration > 0) {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const x = e.clientX - rect.left;
+                        const progress = Math.min(Math.max(0, x / rect.width), 1);
+                        onSeek(progress * duration);
+                    }
+                }}
+            >
                 <View style={styles.trackBackground} />
                 <Animated.View
                     style={[
@@ -116,6 +129,8 @@ const styles = StyleSheet.create({
         right: 0,
         zIndex: 50,
         paddingHorizontal: 20,
+        // @ts-ignore web
+        cursor: 'pointer',
     },
     timeWrapper: {
         alignItems: 'center',
@@ -145,9 +160,9 @@ const styles = StyleSheet.create({
         position: 'absolute',
         left: 0,
         right: 0,
-        height: 1.5,
+        height: 3,
         backgroundColor: 'rgba(255, 255, 255, 0.25)',
-        borderRadius: 1,
+        borderRadius: 2,
     },
     trackFill: {
         position: 'absolute',

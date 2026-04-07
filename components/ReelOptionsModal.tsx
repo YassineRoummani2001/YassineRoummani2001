@@ -1,7 +1,8 @@
 
 import { BlurView } from 'expo-blur';
 import * as Clipboard from 'expo-clipboard';
-import { Bookmark, Copy, Edit, Flag, Trash2 } from 'lucide-react-native';
+import { Bookmark, Copy, Edit, Flag, Trash2, EyeOff, Share2, Music } from 'lucide-react-native';
+import { Share, Platform } from 'react-native';
 import React from 'react';
 import { Dimensions, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Toast from 'react-native-toast-message';
@@ -14,10 +15,13 @@ interface ReelOptionsModalProps {
     onSave: () => void;
     onReport: () => void;
     postLink?: string;
+    isSaved?: boolean;
     isOwner?: boolean;
     onEdit?: () => void;
     onDelete?: () => void;
     onCopyLink?: () => void;
+    onNotInterested?: () => void;
+    onShare?: () => void;
 }
 
 export default function ReelOptionsModal({
@@ -26,11 +30,30 @@ export default function ReelOptionsModal({
     onSave,
     onReport,
     postLink,
+    isSaved,
     isOwner,
     onEdit,
     onDelete,
-    onCopyLink
+    onCopyLink,
+    onNotInterested,
+    onShare
 }: ReelOptionsModalProps) {
+
+    const handleShare = async () => {
+        if (onShare) {
+            onShare();
+        } else if (postLink) {
+            try {
+                await Share.share({
+                    message: `Check out this Reel on Vibe! ${postLink}`,
+                    url: Platform.OS === 'ios' ? postLink : undefined,
+                });
+            } catch (error) {
+                console.error('Error sharing:', error);
+            }
+        }
+        onClose();
+    };
 
     const handleCopyLink = async () => {
         if (onCopyLink) {
@@ -81,9 +104,11 @@ export default function ReelOptionsModal({
 
                             <TouchableOpacity style={styles.option} onPress={onSave}>
                                 <View style={styles.iconContainer}>
-                                    <Bookmark size={24} color="white" />
+                                    <Bookmark size={24} color={isSaved ? '#FACD00' : 'white'} fill={isSaved ? '#FACD00' : 'transparent'} />
                                 </View>
-                                <Text style={styles.optionText}>Save Reel</Text>
+                                <Text style={[styles.optionText, isSaved && { color: '#FACD00' }]}>
+                                    {isSaved ? 'Saved' : 'Save Reel'}
+                                </Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity style={styles.option} onPress={handleCopyLink}>
@@ -91,6 +116,29 @@ export default function ReelOptionsModal({
                                     <Copy size={24} color="white" />
                                 </View>
                                 <Text style={styles.optionText}>Copy Link</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity style={styles.option} onPress={handleShare}>
+                                <View style={styles.iconContainer}>
+                                    <Share2 size={24} color="white" />
+                                </View>
+                                <Text style={styles.optionText}>Share to...</Text>
+                            </TouchableOpacity>
+
+                            <View style={{ height: 1, backgroundColor: '#333', marginVertical: 4 }} />
+
+                            <TouchableOpacity style={styles.option} onPress={() => { onClose(); if (onNotInterested) onNotInterested(); }}>
+                                <View style={styles.iconContainer}>
+                                    <EyeOff size={24} color="white" />
+                                </View>
+                                <Text style={styles.optionText}>Not Interested</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity style={styles.option} onPress={() => { onClose(); }}>
+                                <View style={styles.iconContainer}>
+                                    <Music size={24} color="white" />
+                                </View>
+                                <Text style={styles.optionText}>Remix this Reel</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity style={styles.option} onPress={onReport}>
@@ -121,49 +169,53 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
     },
     sheet: {
-        backgroundColor: '#1A1A1A',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
+        backgroundColor: '#151515',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
         padding: 20,
         paddingBottom: 40,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.08)',
     },
     handle: {
-        width: 40,
-        height: 4,
+        width: 36,
+        height: 5,
         backgroundColor: '#333',
-        borderRadius: 2,
+        borderRadius: 3,
         alignSelf: 'center',
-        marginBottom: 20,
+        marginBottom: 24,
     },
     optionsContainer: {
-        gap: 16,
+        gap: 12,
     },
     option: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 12,
-        borderRadius: 12,
-        backgroundColor: '#2A2A2A',
+        paddingVertical: 14,
+        borderRadius: 16,
+        backgroundColor: '#222',
         paddingHorizontal: 16,
     },
     iconContainer: {
         marginRight: 16,
+        width: 24,
+        alignItems: 'center',
     },
     optionText: {
         color: 'white',
         fontSize: 16,
-        fontWeight: '600',
+        fontWeight: '700',
     },
     cancelButton: {
         marginTop: 20,
         alignItems: 'center',
-        paddingVertical: 12,
-        borderTopWidth: 1,
-        borderTopColor: '#333',
+        paddingVertical: 14,
+        borderRadius: 16,
+        backgroundColor: 'rgba(255,255,255,0.05)',
     },
     cancelText: {
-        color: '#999',
+        color: '#fff',
         fontSize: 16,
-        fontWeight: '500',
+        fontWeight: '800',
     }
 });

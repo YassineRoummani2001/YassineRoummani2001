@@ -3,6 +3,7 @@ import { API_BASE_URL } from '@/constants/Config';
 import { useMessages } from '@/context/MessagesContext';
 import { useNotifications } from '@/context/NotificationContext';
 import { useThemeContext } from '@/context/ThemeContext';
+import { getCorrectUrl } from '@/utils/api';
 import { lazyLoad } from '@/utils/lazyLoad';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
@@ -268,6 +269,20 @@ export default function HomeScreen() {
         </View>
       )}
 
+      {isDesktop && (
+        <View style={{ 
+          borderBottomWidth: 1, 
+          borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+          backgroundColor: colors.background,
+          zIndex: 10,
+          width: '100%',
+          maxWidth: 480,
+          alignSelf: 'center'
+        }}>
+          <StoryList />
+        </View>
+      )}
+
       <FlatList
         data={posts}
         extraData={[viewableItems, isFocused]}
@@ -276,10 +291,10 @@ export default function HomeScreen() {
         keyExtractor={(item) => item._id}
         renderItem={renderItem}
         contentContainerStyle={[
-          styles.listContent,
+          styles.scrollContent,
           isDesktop && { paddingHorizontal: 20, alignItems: 'center' }
         ]}
-        ListHeaderComponent={<StoryList />}
+        ListHeaderComponent={!isDesktop ? <StoryList /> : null}
         ListFooterComponent={
           isFetchingMore ? (
             <View style={{ backgroundColor: isDark ? '#000' : '#fff', paddingBottom: 40 }}>

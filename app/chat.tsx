@@ -637,55 +637,67 @@ export default function ChatScreen() {
                                 </TouchableOpacity>
                             ))}
 
-                            {/* signup Account */}
+                            {/* Sign up / Add Account */}
                             <TouchableOpacity 
                                 style={sheetStyles.accountItem} 
                                 activeOpacity={0.7} 
                                 onPress={() => {
                                     setIsAccountsSheetVisible(false);
+                                    // Small delay to allow modal to close smoothly before navigation
                                     setTimeout(() => {
-                                        router.replace('/auth/signup' as any);
-                                    }, 100);
+                                        router.push('/auth/signup' as any);
+                                    }, 150);
                                 }}
                             >
-                                <View style={[sheetStyles.avatarContainer, sheetStyles.addIconContainer, { borderColor: isDark ? '#444' : '#DDD' }]}>
-                                    <Ionicons name="person-add-outline" size={24} color={colors.text} />
+                                <View style={[sheetStyles.avatarContainer, sheetStyles.addIconContainer, { borderColor: isDark ? '#333' : '#EEE', backgroundColor: isDark ? '#1A1A1A' : '#F9F9F9' }]}>
+                                    <Ionicons name="add-circle-outline" size={24} color={colors.text} />
                                 </View>
-                                <Text style={[sheetStyles.accountName, { color: colors.text }]}>
-                                    Sign up
+                                <Text style={[sheetStyles.accountName, { color: colors.text, fontWeight: '600' }]}>
+                                    Create new account
                                 </Text>
                             </TouchableOpacity>
 
-                            {/* Logout Account */}
+                            {/* Logout */}
                             <TouchableOpacity 
                                 style={sheetStyles.accountItem} 
                                 activeOpacity={0.7} 
                                 onPress={async () => {
                                     setIsAccountsSheetVisible(false);
-                                    await logout();
-                                    router.replace('/auth/login' as any);
+                                    setTimeout(async () => {
+                                        await logout();
+                                        router.replace('/auth/login' as any);
+                                    }, 150);
                                 }}
                             >
-                                <View style={[sheetStyles.avatarContainer, sheetStyles.logoutIconContainer, { borderColor: isDark ? '#444' : '#DDD' }]}>
+                                <View style={[sheetStyles.avatarContainer, sheetStyles.logoutIconContainer, { borderColor: isDark ? '#333' : '#EEE', backgroundColor: isDark ? '#1A1A1A' : '#F9F9F9' }]}>
                                     <Ionicons name="log-out-outline" size={24} color="#FF3B30" />
                                 </View>
-                                <Text style={[sheetStyles.accountName, { color: '#FF3B30' }]}>
+                                <Text style={[sheetStyles.accountName, { color: '#FF3B30', fontWeight: '600' }]}>
                                     Log out
                                 </Text>
                             </TouchableOpacity>
 
                             <View style={[sheetStyles.divider, { backgroundColor: isDark ? '#333' : '#EEE', marginVertical: 8 }]} />
 
-                            {/* Accounts Center Button */}
-                            <TouchableOpacity style={[sheetStyles.footerButton, { borderColor: isDark ? '#444' : '#E0E0E0' }]}>
-                                <Text style={[sheetStyles.footerButtonText, { color: colors.text }]}>
+                             {/* Accounts Center Button */}
+                            <TouchableOpacity 
+                                style={[sheetStyles.footerButton, { borderColor: isDark ? '#444' : '#E0E0E0' }]}
+                                onPress={() => {
+                                    setIsAccountsSheetVisible(false);
+                                    setTimeout(() => {
+                                        router.push('/settings');
+                                    }, 150);
+                                }}
+                            >
+                                <Text style={[sheetStyles.footerButtonText, { color: colors.text, fontWeight: '700' }]}>
                                     Go to Accounts Center
                                 </Text>
+                                <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
                             </TouchableOpacity>
 
                             <View style={sheetStyles.metaFooter}>
-                                <View style={[sheetStyles.logoCircle, { backgroundColor: '#0095F6' }]}>
-                                    <Ionicons name="flash" size={12} color="#FFF" />
+                                <View style={[sheetStyles.logoCircle, { backgroundColor: colors.primary }]}>
+                                    <Ionicons name="flash" size={14} color="#FFF" />
                                 </View>
                                 <Text style={[sheetStyles.metaText, { color: colors.text }]}>Vibe</Text>
                             </View>
@@ -875,11 +887,13 @@ const sheetStyles = StyleSheet.create({
     footerButton: {
         marginHorizontal: 20,
         marginTop: 24,
-        height: 48,
-        borderRadius: 8,
+        height: 52,
+        borderRadius: 12,
         borderWidth: 1,
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'space-between',
+        flexDirection: 'row',
+        paddingHorizontal: 16,
     },
     footerButtonText: {
         fontSize: 15,

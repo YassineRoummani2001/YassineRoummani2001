@@ -22,6 +22,7 @@ import { BlurView } from 'expo-blur';
 import Animated, { FadeInUp, FadeInDown, Layout } from 'react-native-reanimated';
 
 import { useThemeContext } from '@/context/ThemeContext';
+import { getCorrectUrl } from '@/utils/api';
 
 export default function SavedScreen() {
     const router = useRouter();
@@ -121,7 +122,7 @@ export default function SavedScreen() {
     const renderGridItem = useCallback(({ item, index }: { item: any, index: number }) => {
         const isVideo = item.type === 'reel' || item.type === 'video' || item.uri?.endsWith('.mp4');
         const gap = 1;
-        const columns = 3;
+        const columns = 4;
         const itemSize = (contentWidth / columns) - (gap * 2);
 
         return (
@@ -149,7 +150,7 @@ export default function SavedScreen() {
                     })}
                 >
                     <Image
-                        source={{ uri: item.image || item.uri }}
+                        source={{ uri: getCorrectUrl(item.image || item.uri) }}
                         style={styles.gridImage}
                         resizeMode="cover"
                     />
@@ -187,7 +188,7 @@ export default function SavedScreen() {
                             {previewPosts.map((p: any, i: number) => (
                                 <Image 
                                     key={i} 
-                                    source={{ uri: p.image || p.uri }} 
+                                    source={{ uri: getCorrectUrl(p.image || p.uri) }} 
                                     style={[styles.gridThumb, { width: '48%', height: '48%' }]} 
                                 />
                             ))}
@@ -329,11 +330,11 @@ export default function SavedScreen() {
                 </View>
             ) : (
                 <FlatList
-                    key={`grid-3`}
+                    key={`grid-4`}
                     data={getFilteredPosts}
                     keyExtractor={(item, index) => item._id || index.toString()}
                     renderItem={renderGridItem}
-                    numColumns={3}
+                    numColumns={4}
                     ListHeaderComponent={ListHeader}
                     ListEmptyComponent={
                         <Animated.View entering={FadeInDown} style={styles.emptyState}>
@@ -441,13 +442,13 @@ const styles = StyleSheet.create({
     },
     collectionCard: {
         alignItems: 'center',
-        width: 80,
+        width: 64,
     },
     collectionPreview: {
-        width: 80,
-        height: 80,
-        borderRadius: 24,
-        marginBottom: 8,
+        width: 64,
+        height: 64,
+        borderRadius: 18,
+        marginBottom: 6,
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
@@ -479,13 +480,15 @@ const styles = StyleSheet.create({
         backgroundColor: '#222',
     },
     collName: {
-        fontSize: 13,
+        fontSize: 11,
         fontWeight: '700',
         marginBottom: 1,
+        textAlign: 'center',
     },
     collCount: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '500',
+        opacity: 0.6,
     },
     divider: {
         height: 1,

@@ -119,6 +119,7 @@ export default function NotificationsScreen() {
     const [notifications, setNotifications] = useState<any[]>([]);
     const [sections, setSections] = useState<any[]>([]);
     const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+    const [pendingRequests, setPendingRequests] = useState<any[]>([]);
 
     const groupNotifications = (data: any[]) => {
         const groups: { [key: string]: any[] } = {
@@ -177,6 +178,7 @@ export default function NotificationsScreen() {
             if (reqResponse.ok) {
                 const reqData = await reqResponse.json();
                 setPendingRequestsCount(reqData.length);
+                setPendingRequests(reqData);
             }
         } catch (error) {
             console.error('Fetch notifications error:', error);
@@ -309,8 +311,27 @@ export default function NotificationsScreen() {
                     >
                         <View style={styles.requestsBannerContent}>
                             <View style={styles.avatarStack}>
-                                <View style={[styles.avatarCircle, styles.avatarBack, { backgroundColor: isDark ? '#444' : '#e0e0e0', borderColor: colors.background }]} />
-                                <View style={[styles.avatarCircle, styles.avatarFront, { backgroundColor: isDark ? '#333' : '#d0d0d0', borderColor: colors.background }]} />
+                                {pendingRequestsCount > 0 ? (
+                                    <>
+                                        {pendingRequests[1] && (
+                                            <Image 
+                                                source={{ uri: getCorrectUrl(pendingRequests[1].avatar || pendingRequests[1].sender?.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(pendingRequests[1].name || pendingRequests[1].sender?.name || 'User')}&background=random` }} 
+                                                style={[styles.avatarCircle, styles.avatarBack, { borderColor: colors.background }]} 
+                                            />
+                                        )}
+                                        {pendingRequests[0] && (
+                                            <Image 
+                                                source={{ uri: getCorrectUrl(pendingRequests[0].avatar || pendingRequests[0].sender?.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(pendingRequests[0].name || pendingRequests[0].sender?.name || 'User')}&background=random` }} 
+                                                style={[styles.avatarCircle, styles.avatarFront, { borderColor: colors.background }]} 
+                                            />
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        <View style={[styles.avatarCircle, styles.avatarBack, { backgroundColor: isDark ? '#444' : '#e0e0e0', borderColor: colors.background }]} />
+                                        <View style={[styles.avatarCircle, styles.avatarFront, { backgroundColor: isDark ? '#333' : '#d0d0d0', borderColor: colors.background }]} />
+                                    </>
+                                )}
                             </View>
                             <View style={styles.requestsBannerTextContainer}>
                                 <Text style={[styles.requestsBannerTitle, { color: colors.text }]}>Follow requests</Text>

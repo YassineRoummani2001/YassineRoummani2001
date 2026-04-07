@@ -188,10 +188,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     },
     avatarWrapper: {
         position: 'relative',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
+        // @ts-ignore
+        boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.1)',
         borderRadius: 37,
         backgroundColor: colors.background,
         elevation: 4,

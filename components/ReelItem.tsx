@@ -508,11 +508,10 @@ export default function ReelItem({ item, active, isMuted, width, height }: ReelI
 
                     {/* RIGHT ACTIONS */}
                     <View style={styles.rightActions}>
-
                         <TouchableOpacity onPress={toggleLike} style={styles.actionButton} activeOpacity={0.7}>
                             <View style={styles.iconCircle}>
                                 <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                                    <Heart size={28} color={liked ? '#ff2d55' : 'white'} fill={liked ? '#ff2d55' : 'transparent'} strokeWidth={2.5} />
+                                    <Heart size={24} color={liked ? '#ff2d55' : 'white'} fill={liked ? '#ff2d55' : 'transparent'} strokeWidth={2.5} />
                                 </Animated.View>
                             </View>
                             <Text style={styles.actionText}>{likesCount > 1000 ? `${(likesCount / 1000).toFixed(1)}k` : likesCount}</Text>
@@ -520,14 +519,14 @@ export default function ReelItem({ item, active, isMuted, width, height }: ReelI
 
                         <TouchableOpacity onPress={() => setShowComments(true)} style={styles.actionButton} activeOpacity={0.7}>
                             <View style={styles.iconCircle}>
-                                <MessageCircle size={28} color="white" strokeWidth={2.5} />
+                                <MessageCircle size={24} color="white" strokeWidth={2.5} />
                             </View>
                             <Text style={styles.actionText}>{commentsCount > 1000 ? `${(commentsCount / 1000).toFixed(1)}k` : commentsCount}</Text>
                         </TouchableOpacity>
                         
                         <TouchableOpacity onPress={() => setShowShare(true)} style={styles.actionButton} activeOpacity={0.7}>
                             <View style={styles.iconCircle}>
-                                <Send size={26} color="white" strokeWidth={2.5} />
+                                <Send size={22} color="white" strokeWidth={2.5} />
                             </View>
                             <Text style={styles.actionText}>{Math.floor(likesCount / 4.5) > 1000 ? `${((likesCount / 4.5) / 1000).toFixed(1)}k` : Math.floor(likesCount / 4.5)}</Text>
                         </TouchableOpacity>
@@ -535,14 +534,14 @@ export default function ReelItem({ item, active, isMuted, width, height }: ReelI
                         <TouchableOpacity onPress={handleSaveReel} style={styles.actionButton} activeOpacity={0.7}>
                             <View style={styles.iconCircle}>
                                 <Animated.View style={{ transform: [{ scale: saveScaleAnim }] }}>
-                                    <Bookmark size={28} color={isSaved ? '#FACD00' : 'white'} fill={isSaved ? '#FACD00' : 'transparent'} strokeWidth={isSaved ? 0 : 2.5} />
+                                    <Bookmark size={24} color={isSaved ? '#FACD00' : 'white'} fill={isSaved ? '#FACD00' : 'transparent'} strokeWidth={isSaved ? 0 : 2.5} />
                                 </Animated.View>
                             </View>
                         </TouchableOpacity>
 
                         <TouchableOpacity onPress={() => setShowOptions(true)} style={styles.actionButton} activeOpacity={0.7}>
                             <View style={styles.iconCircle}>
-                                <MoreHorizontal size={26} color="white" strokeWidth={2.5} />
+                                <MoreHorizontal size={22} color="white" strokeWidth={2.5} />
                             </View>
                         </TouchableOpacity>
                     </View>
@@ -653,7 +652,14 @@ export default function ReelItem({ item, active, isMuted, width, height }: ReelI
 
             {/* MODALS */}
             <CommentsModal visible={showComments} onClose={() => setShowComments(false)} postId={item._id} />
-            <ReelOptionsModal visible={showOptions} onClose={() => setShowOptions(false)} postLink={`${API_BASE_URL}/reel/${item._id}`} onSave={handleSaveReel} onReport={() => { }} />
+            <ReelOptionsModal 
+                visible={showOptions} 
+                onClose={() => setShowOptions(false)} 
+                postLink={`${API_BASE_URL}/reel/${item._id}`} 
+                onSave={handleSaveReel} 
+                isSaved={isSaved}
+                onReport={() => { }} 
+            />
             <ShareToUsersModal visible={showShare} onClose={() => setShowShare(false)} post={item} />
             <LikersModal visible={showLikers} onClose={() => setShowLikers(false)} postId={item._id} token={user?.token} />
         </View>
@@ -704,9 +710,9 @@ const styles = StyleSheet.create({
     rightActions: { 
         position: 'absolute', 
         right: 12, 
-        bottom: 180, 
+        bottom: 150, 
         alignItems: 'center', 
-        gap: 24, 
+        gap: 20, 
         zIndex: 30 
     },
     actionButton: { 
@@ -714,9 +720,9 @@ const styles = StyleSheet.create({
         gap: 6 
     },
     iconCircle: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         backgroundColor: 'rgba(255, 255, 255, 0.12)',
         justifyContent: 'center',
         alignItems: 'center',
