@@ -1,5 +1,6 @@
 import { useSettings } from '@/context/SettingsContext';
 import { useThemeContext } from '@/context/ThemeContext';
+import { useUser } from '@/context/UserContext';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, ChevronRight, Eye, Lock, MessageCircle, UserX } from 'lucide-react-native';
 import React, { useMemo } from 'react';
@@ -13,6 +14,7 @@ export default function PrivacyScreen() {
     const styles = useMemo(() => createStyles(colors), [colors]);
 
     const { settings, updateSetting } = useSettings();
+    const { user, updateProfile } = (useUser() || {}) as any;
 
     const ToggleItem = ({ icon: Icon, title, description, value, onValueChange, isLast }: any) => (
         <View style={[styles.itemRow, isLast && { borderBottomWidth: 0 }]}>
@@ -64,9 +66,12 @@ export default function PrivacyScreen() {
                         <ToggleItem
                             icon={Lock}
                             title="Private Account"
-                            description="Only people you approve can see your photos and videos."
-                            value={settings.privateAccount}
-                            onValueChange={(val: boolean) => updateSetting('privateAccount', val)}
+                            description="Only followers can see your posts and stories. People must request to follow you."
+                            value={user?.isPrivate ?? false}
+                            onValueChange={(val: boolean) => {
+                                updateSetting('privateAccount', val);
+                                if (updateProfile) updateProfile({ isPrivate: val });
+                            }}
                             isLast={true}
                         />
                     </View>

@@ -146,8 +146,6 @@ export default function EditProfileScreen() {
         setPendingImage(null);
     };
 
-    const [isPrivate, setIsPrivate] = useState(user?.isPrivate ?? true);
-
     const handleSave = async () => {
         setSaving(true);
         // Prepare data
@@ -192,7 +190,6 @@ export default function EditProfileScreen() {
             bio,
             pronouns,
             gender,
-            isPrivate,
             phone: fullPhone,
             links: website ? [{ title: 'Website', url: website }] : [],
             avatar: finalAvatar,
@@ -459,33 +456,6 @@ export default function EditProfileScreen() {
                                     />
                                 </View>
                             </View>
-                        </View>
-
-                        {/* Section: Privacy */}
-                        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Account Privacy</Text>
-
-                        <View style={[styles.inputGroup, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF', borderColor: colors.border }]}>
-                            <TouchableOpacity 
-                                style={[styles.inputContainer, { borderBottomWidth: 0, paddingVertical: 16 }]}
-                                onPress={() => setIsPrivate(!isPrivate)}
-                            >
-                                <View style={{ flex: 1 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                                        <Text style={[styles.label, { color: colors.text, width: 'auto', marginRight: 8 }]}>
-                                            {isPrivate ? 'Private Account' : 'Public Account'}
-                                        </Text>
-                                        <View style={{ width: 44, height: 24, borderRadius: 12, backgroundColor: isPrivate ? colors.primary : '#E9E9EB', padding: 2, justifyContent: 'center' }}>
-                                            <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: 'white', alignSelf: isPrivate ? 'flex-end' : 'flex-start' }} />
-                                        </View>
-                                    </View>
-                                    <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 18 }}>
-                                        {isPrivate 
-                                            ? "Only followers can see your posts and stories. People must request to follow you."
-                                            : "Anyone can see your posts and follow you without approval."
-                                        }
-                                    </Text>
-                                </View>
-                            </TouchableOpacity>
                         </View>
                         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Security</Text>
 

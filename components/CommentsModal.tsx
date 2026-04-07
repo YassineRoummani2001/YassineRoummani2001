@@ -1,9 +1,8 @@
-import { Colors } from '@/constants/Colors';
 import { API_BASE_URL } from '@/constants/Config';
 import { useThemeContext } from '@/context/ThemeContext';
 import { useUser } from '@/context/UserContext';
 import { Send, X, MessageCircle } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -79,13 +78,23 @@ export default function CommentsModal({ visible, onClose, postId, initialComment
     const [inputText, setInputText] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [replyingTo, setReplyingTo] = useState<{ id: string, name: string } | null>(null);
-    const inputRef = React.useRef<TextInput>(null);
+    const inputRef = useRef<TextInput>(null);
+
+    // Mention state
+    const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+    const [mentionSuggestions, setMentionSuggestions] = useState<any[]>([]);
+    const [mentionedUserIds, setMentionedUserIds] = useState<string[]>([]);
 
     const quickEmojis = ['🔥', '❤️', '🙌', '💀', '💯', '🤩', '🫡', '🥺', '😂', '🤞'];
 
     useEffect(() => {
         if (visible && postId) {
             fetchComments();
+        }
+        if (!visible) {
+            setMentionQuery(null);
+            setMentionSuggestions([]);
+            setMentionedUserIds([]);
         }
     }, [visible, postId]);
 
@@ -105,6 +114,41 @@ export default function CommentsModal({ visible, onClose, postId, initialComment
             setLoading(false);
         }
     };
+
+    const handleTextChange = useCallback((text: string) => {
+        setInputText(text);
+
+        // Detect @mention: find the last @ followed by non-space chars
+        const atMatch = text.match(/@(\w*)$/);
+        if (atMatch) {
+            const query = atMatch[1].toLowerCase();
+            setMentionQuery(query);
+            // Filter from following list
+            const following: any[] = user?.following || [];
+            const filtered = following.filter((u: any) => {
+                const name = (u.name || '').toLowerCase();
+                const handle = (u.handle || '').toLowerCase();
+                return name.includes(query) || handle.includes(query);
+            });
+            setMentionSuggestions(filtered.slice(0, 6));
+        } else {
+            setMentionQuery(null);
+            setMentionSuggestions([]);
+        }
+    }, [user]);
+
+    const insertMention = useCallback((mentionUser: any) => {
+        // Replace the @query at the end with the selected user's handle/name
+        const displayName = mentionUser.handle
+            ? `@${mentionUser.handle}`
+            : `@${mentionUser.name.replace(/\s+/g, '')}` ;
+        const newText = inputText.replace(/@(\w*)$/, displayName + ' ');
+        setInputText(newText);
+        setMentionedUserIds(prev => [...prev.filter(id => id !== mentionUser._id), mentionUser._id]);
+        setMentionQuery(null);
+        setMentionSuggestions([]);
+        inputRef.current?.focus();
+    }, [inputText]);
 
     const handleLikeComment = async (commentId: string) => {
         if (!user) return;
@@ -154,7 +198,8 @@ export default function CommentsModal({ visible, onClose, postId, initialComment
                 },
                 body: JSON.stringify({ 
                     text: inputText.trim(),
-                    replyTo: replyingTo?.id // Backend might not handle this yet but good to send
+                    replyTo: replyingTo?.id,
+                    mentionedUsers: mentionedUserIds // Send mention IDs for notifications
                 })
             });
 
@@ -164,6 +209,7 @@ export default function CommentsModal({ visible, onClose, postId, initialComment
                 setComments(sorted);
                 setInputText('');
                 setReplyingTo(null);
+                setMentionedUserIds([]);
                 if (onCommentAdded) {
                     onCommentAdded(updatedComments.length);
                 }
@@ -272,6 +318,29 @@ export default function CommentsModal({ visible, onClose, postId, initialComment
                         )}
                     </View>
 
+                    {/* @ Mention Suggestions */}
+                    {mentionQuery !== null && mentionSuggestions.length > 0 && (
+                        <View style={[styles.mentionDropdown, { backgroundColor: isDark ? '#1C1C1E' : '#F9F9F9', borderTopColor: isDark ? '#333' : '#E5E5EA' }]}>
+                            {mentionSuggestions.map((mu) => (
+                                <TouchableOpacity
+                                    key={mu._id}
+                                    style={[styles.mentionItem, { borderBottomColor: isDark ? '#2C2C2C' : '#EFEFEF' }]}
+                                    onPress={() => insertMention(mu)}
+                                    activeOpacity={0.7}
+                                >
+                                    <Image
+                                        source={{ uri: mu.avatar || `https://i.pravatar.cc/100?u=${mu._id}` }}
+                                        style={styles.mentionAvatar}
+                                    />
+                                    <View style={styles.mentionInfo}>
+                                        <Text style={[styles.mentionName, { color: colors.text }]}>{mu.name}</Text>
+                                        {mu.handle && <Text style={[styles.mentionHandle, { color: colors.textSecondary }]}>@{mu.handle}</Text>}
+                                    </View>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    )}
+
                     {/* Quick Emojis Bar */}
                     <View style={[styles.emojiBar, { backgroundColor: isDark ? '#0A0A0A' : '#FFF', borderTopColor: isDark ? '#1C1C1E' : '#F2F2F7' }]}>
                         <FlatList
@@ -312,13 +381,14 @@ export default function CommentsModal({ visible, onClose, postId, initialComment
                                 placeholder={replyingTo ? `Reply to ${replyingTo.name}...` : "Write a comment..."}
                                 placeholderTextColor={colors.textSecondary}
                                 value={inputText}
-                                onChangeText={setInputText}
+                                onChangeText={handleTextChange}
                                 multiline
                                 maxLength={500}
                                 selectionColor={colors.primary}
                                 onFocus={() => {
                                     if (inputText === '' && replyingTo) {
-                                        setInputText(`@${replyingTo.name.replace(/\s+/g, '')} `);
+                                        const mention = `@${replyingTo.name.replace(/\s+/g, '')} `;
+                                        setInputText(mention);
                                     }
                                 }}
                             />
@@ -554,11 +624,40 @@ const styles = StyleSheet.create({
         borderRadius: 19,
         alignItems: 'center',
         justifyContent: 'center',
-        // Shadow for premium feel
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 5,
         elevation: 5,
+    },
+    mentionDropdown: {
+        borderTopWidth: 1,
+        maxHeight: 200,
+        overflow: 'hidden',
+    },
+    mentionItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        gap: 10,
+    },
+    mentionAvatar: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+    },
+    mentionInfo: {
+        flex: 1,
+    },
+    mentionName: {
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    mentionHandle: {
+        fontSize: 12,
+        fontWeight: '500',
+        marginTop: 1,
     }
 });
