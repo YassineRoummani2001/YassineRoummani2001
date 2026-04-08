@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const User = require('../models/User');
-const Notification = require('../models/Notification'); // Import Notification
-const sendPushNotification = require('../utils/sendPushNotification'); // Import Push Util
+const Follow = require('../models/Follow');
+const Notification = require('../models/Notification');
+const sendPushNotification = require('../utils/sendPushNotification');
 const jwt = require('jsonwebtoken');
 const { protect } = require('../middleware/auth');
 
@@ -172,6 +174,38 @@ router.post('/login', async (req, res) => {
 });
 
 
+// @desc    Get current user profile (for refreshUser)
+// @route   GET /api/auth/me
+// @access  Private
+router.get('/me', protect, async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id).select('-password').lean();
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        
+        // Fetch active stories
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const stories = await Story.find({
+            user: user._id,
+            createdAt: { $gt: twentyFourHoursAgo }
+        }).sort({ createdAt: 1 }).lean();
+
+        res.json({
+            ...user,
+            stories: stories || [],
+            followers: user.followers || [],
+            following: user.following || [],
+            sentRequests: user.sentRequests || [],
+            followerRequests: user.followerRequests || [],
+            saved: user.savedPosts || [],
+            blockedUsers: user.blockedUsers || [],
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 // @desc    Update user profile
 // @route   PUT /api/auth/profile
 // @access  Private
@@ -335,241 +369,262 @@ router.get('/user/:id/stories', async (req, res) => {
     }
 });
 
-// @desc    Follow/Unfollow a user (Handles Requests)
+// ─── Helper: safe string comparison of ObjectIds ────────────────────────────
+const eqId = (a, b) => a?.toString() === b?.toString();
+
+// @desc    Follow / Unfollow / Cancel-Request a user
 // @route   PUT /api/auth/follow/:userId
 // @access  Private
 router.put('/follow/:userId', protect, async (req, res) => {
+    const followerId  = req.user._id;
+    const followingId = req.params.userId;
+
+    if (eqId(followerId, followingId)) {
+        return res.status(400).json({ message: 'You cannot follow yourself' });
+    }
+
     try {
-        const userToFollow = await User.findById(req.params.userId);
-        const currentUser = await User.findById(req.user._id);
+        const targetUser = await User.findById(followingId).lean();
+        if (!targetUser) return res.status(404).json({ message: 'User not found' });
 
-        if (!userToFollow) {
-            return res.status(404).json({ message: 'User not found' });
+        // ── Check existing relationship ───────────────────────────────────────
+        const existing = await Follow.findOne({ follower: followerId, following: followingId }).lean();
+
+        // ── UNFOLLOW (accepted → delete) ──────────────────────────────────────
+        if (existing?.status === 'accepted') {
+            await Follow.deleteOne({ _id: existing._id });
+
+            // Atomic counter decrement (never below 0)
+            await Promise.all([
+                User.updateOne({ _id: followingId }, { $inc: { followersCount: -1 }, $pull: { followers: followerId } }),
+                User.updateOne({ _id: followerId  }, { $inc: { followingCount: -1 }, $pull: { following: followingId } }),
+            ]);
+
+            return res.json({ status: 'unfollowed' });
         }
 
-        if (req.params.userId === req.user._id.toString()) {
-            return res.status(400).json({ message: 'You cannot follow yourself' });
+        // ── CANCEL REQUEST (pending → delete) ─────────────────────────────────
+        if (existing?.status === 'pending') {
+            await Follow.deleteOne({ _id: existing._id });
+
+            await Promise.all([
+                User.updateOne({ _id: followingId }, { $pull: { followerRequests: followerId } }),
+                User.updateOne({ _id: followerId  }, { $pull: { sentRequests: followingId  } }),
+            ]);
+
+            return res.json({ status: 'cancelled' });
         }
 
-        // Initialize arrays manually if they are undefined (crucial for older docs)
-        if (!currentUser.following) currentUser.following = [];
-        if (!currentUser.sentRequests) currentUser.sentRequests = [];
-        if (!userToFollow.followers) userToFollow.followers = [];
-        if (!userToFollow.followerRequests) userToFollow.followerRequests = [];
-
-        // Helper to check existence safely
-        const followingList = currentUser.following;
-        const isFollowing = followingList.some(id => id.toString() === req.params.userId);
-        
-        const sentRequests = currentUser.sentRequests;
-        const isRequested = sentRequests.some(id => id.toString() === req.params.userId);
-
-        let responseData = {};
-
-        if (isFollowing) {
-            // Unfollow
-            if (currentUser.following) {
-                currentUser.following = currentUser.following.filter(id => id.toString() !== req.params.userId);
-            }
-            if (userToFollow.followers) {
-                userToFollow.followers = userToFollow.followers.filter(id => id.toString() !== req.user._id.toString());
-            }
-            responseData = { status: 'unfollowed', isFollowing: false };
-        } else if (isRequested) {
-            // Cancel Request
-            if (currentUser.sentRequests) {
-                currentUser.sentRequests = currentUser.sentRequests.filter(id => id.toString() !== req.params.userId);
-            }
-            if (userToFollow.followerRequests) {
-                userToFollow.followerRequests = userToFollow.followerRequests.filter(id => id.toString() !== req.user._id.toString());
-            }
-            responseData = { status: 'cancelled', isFollowing: false, isRequested: false };
-        } else {
-            // Check privacy
-            if (userToFollow.isPrivate) {
-                // Send Request
-                 // Ensure arrays exist
-                 if (!currentUser.sentRequests) currentUser.sentRequests = [];
-                 if (!userToFollow.followerRequests) userToFollow.followerRequests = [];
-
-                 if (!currentUser.sentRequests.some(id => id.toString() === req.params.userId)) {
-                    currentUser.sentRequests.push(req.params.userId);
-                    userToFollow.followerRequests.push(req.user._id);
-                    
-                    // Create Notification for Request
-                    await Notification.create({
-                        recipient: userToFollow._id,
-                        sender: req.user._id,
-                        type: 'follow_request', 
-                        text: 'sent you a follow request.',
-                        isRead: false
-                    });
-                     // Send Push Notification
-                    if (userToFollow.expoPushToken) {
-                        sendPushNotification(
-                            userToFollow.expoPushToken, 
-                            `${req.user.name} sent you a follow request.`,
-                            { type: 'request', userId: req.user._id }
-                        );
-                    }
-                 }
-                 responseData = { status: 'requested', isFollowing: false, isRequested: true };
-            } else {
-                // Public Follow
-                // Ensure arrays exist
-                if (!currentUser.following) currentUser.following = [];
-                if (!userToFollow.followers) userToFollow.followers = [];
-
-                currentUser.following.push(req.params.userId);
-                userToFollow.followers.push(req.user._id);
-
-                // Create Notification
-                await Notification.create({
-                    recipient: userToFollow._id,
-                    sender: req.user._id,
-                    type: 'follow',
-                    text: 'started following you.',
-                    isRead: false
-                });
-
-                // Send Push Notification
-                if (userToFollow.expoPushToken) {
-                    sendPushNotification(
-                        userToFollow.expoPushToken, 
-                        `${req.user.name} started following you.`,
-                        { type: 'user', userId: req.user._id }
-                    );
-                }
-                responseData = { status: 'followed', isFollowing: true };
-            }
-        }
-
-        // Explicitly mark modified to ensure persistence of array changes
-        currentUser.markModified('following');
-        currentUser.markModified('sentRequests');
-        userToFollow.markModified('followers');
-        userToFollow.markModified('followerRequests');
+        // ── NEW FOLLOW REQUEST ────────────────────────────────────────────────
+        // If the target is private, typically a request is 'pending'.
+        // BUT if the target is ALREADY following us (this is a 'Follow Back'), bypass privacy and auto-accept.
+        const isFollowBack = await Follow.exists({ follower: followingId, following: followerId, status: 'accepted' });
+        const newStatus = (targetUser.isPrivate && !isFollowBack) ? 'pending' : 'accepted';
 
         try {
-            await Promise.all([currentUser.save(), userToFollow.save()]);
-            res.json(responseData);
-        } catch (saveError) {
-            console.error('Save Error:', saveError);
-            return res.status(500).json({ message: 'Database save failed', error: saveError.message });
+            await Follow.create({ follower: followerId, following: followingId, status: newStatus });
+        } catch (dupErr) {
+            if (dupErr.code === 11000) {
+                // Race condition: another request beat us — treat as already existing
+                const race = await Follow.findOne({ follower: followerId, following: followingId }).lean();
+                if (race?.status === 'pending')  return res.json({ status: 'pending',  message: 'Request already sent' });
+                if (race?.status === 'accepted') return res.json({ status: 'accepted', message: 'Already following' });
+            }
+            throw dupErr;
         }
+
+        if (newStatus === 'pending') {
+            // Add to pending arrays
+            await Promise.all([
+                User.updateOne({ _id: followingId }, { $addToSet: { followerRequests: followerId } }),
+                User.updateOne({ _id: followerId  }, { $addToSet: { sentRequests: followingId  } }),
+            ]);
+
+            // Notify target
+            await Notification.create({
+                recipient: followingId,
+                sender:    followerId,
+                type:  'follow_request',
+                text:  'sent you a follow request.',
+                isRead: false,
+            });
+            if (targetUser.expoPushToken) {
+                sendPushNotification(
+                    targetUser.expoPushToken,
+                    `${req.user.name} sent you a follow request.`,
+                    { type: 'request', userId: followerId }
+                );
+            }
+            return res.json({ status: 'pending' });
+        }
+
+        // Public follow → accepted immediately
+        await Promise.all([
+            User.updateOne({ _id: followingId }, { $inc: { followersCount: 1 }, $addToSet: { followers: followerId } }),
+            User.updateOne({ _id: followerId  }, { $inc: { followingCount: 1 }, $addToSet: { following: followingId } }),
+        ]);
+
+        await Notification.create({
+            recipient: followingId,
+            sender:    followerId,
+            type:  'follow',
+            text:  'started following you.',
+            isRead: false,
+        });
+        if (targetUser.expoPushToken) {
+            sendPushNotification(
+                targetUser.expoPushToken,
+                `${req.user.name} started following you.`,
+                { type: 'user', userId: followerId }
+            );
+        }
+
+        return res.json({ status: 'accepted' });
+
     } catch (error) {
-        console.error('Follow Error:', error);
+        console.error('Follow error:', error);
         res.status(500).json({ message: error.message });
     }
 });
 
-// @desc    Get follow requests
+// @desc    Get follow requests received
 // @route   GET /api/auth/requests
 // @access  Private
 router.get('/requests', protect, async (req, res) => {
     try {
         const user = await User.findById(req.user._id)
-            .populate('followerRequests', 'name handle avatar bio');
-        
+            .populate('followerRequests', 'name handle avatar bio')
+            .lean();
+
         if (!user) return res.status(404).json({ message: 'User not found' });
-        
+
         res.json(user.followerRequests || []);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 });
 
-// @desc    Confirm follow request
+// @desc    Accept a follow request
 // @route   PUT /api/auth/confirm-request/:userId
 // @access  Private
 router.put('/confirm-request/:userId', protect, async (req, res) => {
+    const currentUserId = req.user._id;
+    const senderId      = req.params.userId;
+
     try {
-        const currentUser = await User.findById(req.user._id);
-        const requestSender = await User.findById(req.params.userId);
+        // Only process if the relationship is truly pending
+        const follow = await Follow.findOneAndUpdate(
+            { follower: senderId, following: currentUserId, status: 'pending' },
+            { $set: { status: 'accepted' } },
+            { new: true }
+        );
 
-        if (!currentUser || !requestSender) {
-            return res.status(404).json({ message: 'User not found' });
+        if (!follow) {
+            return res.status(400).json({ message: 'No pending request found from this user' });
         }
 
-        if (!currentUser.followerRequests) currentUser.followerRequests = [];
-        if (!currentUser.followers) currentUser.followers = [];
-        if (!requestSender.sentRequests) requestSender.sentRequests = [];
-        if (!requestSender.following) requestSender.following = [];
+        await Promise.all([
+            // Target user (currentUser) gains a follower
+            User.updateOne(
+                { _id: currentUserId },
+                { $pull: { followerRequests: senderId }, $addToSet: { followers: senderId }, $inc: { followersCount: 1 } }
+            ),
+            // Sender's pending request is cleared, their following grows
+            User.updateOne(
+                { _id: senderId },
+                { $pull: { sentRequests: currentUserId }, $addToSet: { following: currentUserId }, $inc: { followingCount: 1 } }
+            ),
+            // ── MAGIC MUTUAL FOLLOW ──
+            // The user requested that confirming a request ALSO auto-follows the sender back.
+            // Bypass privacy setting: automatically make currentUserId follow senderId.
+            Follow.findOneAndUpdate(
+                { follower: currentUserId, following: senderId },
+                { $set: { status: 'accepted' } },
+                { upsert: true, new: true }
+            ),
+            User.updateOne(
+                { _id: currentUserId },
+                { $addToSet: { following: senderId }, $inc: { followingCount: 1 }, $pull: { sentRequests: senderId } }
+            ),
+            User.updateOne(
+                { _id: senderId },
+                { $addToSet: { followers: currentUserId }, $inc: { followersCount: 1 }, $pull: { followerRequests: currentUserId } }
+            )
+        ]);
 
-        // Check if request exists
-        if (!currentUser.followerRequests.includes(req.params.userId)) {
-             return res.status(400).json({ message: 'No request found from this user' });
-        }
+        // Notify sender
+        const [senderUser] = await Promise.all([
+            User.findById(senderId).select('expoPushToken').lean(),
+            Notification.create({
+                recipient: senderId,
+                sender:    currentUserId,
+                type:  'request_accepted',
+                text:  'accepted your follow request.',
+                isRead: false,
+            }),
+        ]);
 
-        // 1. Move from requests to followers/following (Use filter/spread instead of pull/push for safety)
-        currentUser.followerRequests = currentUser.followerRequests.filter(id => id.toString() !== req.params.userId);
-        if (!currentUser.followers.includes(req.params.userId)) {
-             currentUser.followers.push(req.params.userId);
-        }
-        
-        requestSender.sentRequests = requestSender.sentRequests.filter(id => id.toString() !== req.user._id.toString());
-        if (!requestSender.following.includes(req.user._id)) {
-             requestSender.following.push(req.user._id);
-        }
-
-        // 2. Notify Sender their request was accepted
-        await Notification.create({
-            recipient: requestSender._id,
-            sender: req.user._id,
-            type: 'request_accepted',
-            text: 'accepted your follow request.',
-            isRead: false
-        });
-        
-         if (requestSender.expoPushToken) {
+        if (senderUser?.expoPushToken) {
             sendPushNotification(
-                requestSender.expoPushToken, 
+                senderUser.expoPushToken,
                 `${req.user.name} accepted your follow request.`,
-                { type: 'user', userId: req.user._id }
+                { type: 'user', userId: currentUserId }
             );
         }
 
-        currentUser.markModified('followerRequests');
-        currentUser.markModified('followers');
-        requestSender.markModified('sentRequests');
-        requestSender.markModified('following');
-
-        await Promise.all([currentUser.save(), requestSender.save()]);
-
-        res.json({ message: 'Request confirmed', userId: req.params.userId });
+        res.json({ message: 'Request accepted', userId: senderId });
 
     } catch (error) {
-        console.error("Confirm request error:", error);
+        console.error('Confirm request error:', error);
         res.status(500).json({ message: error.message });
     }
 });
 
-// @desc    Delete/Ignore follow request
+// @desc    Reject / delete a follow request
 // @route   PUT /api/auth/delete-request/:userId
 // @access  Private
 router.put('/delete-request/:userId', protect, async (req, res) => {
+    const currentUserId = req.user._id;
+    const senderId      = req.params.userId;
+
     try {
-        const currentUser = await User.findById(req.user._id);
-        const requestSender = await User.findById(req.params.userId);
+        // Only delete if actually pending
+        const deleted = await Follow.findOneAndDelete({
+            follower: senderId,
+            following: currentUserId,
+            status: 'pending',
+        });
 
-        if (!currentUser) return res.status(404).json({ message: 'User not found' });
-
-        if (!currentUser.followerRequests) currentUser.followerRequests = [];
-        currentUser.followerRequests = currentUser.followerRequests.filter(id => id.toString() !== req.params.userId);
-        
-        if (requestSender) {
-             if (!requestSender.sentRequests) requestSender.sentRequests = [];
-             requestSender.sentRequests = requestSender.sentRequests.filter(id => id.toString() !== req.user._id.toString());
-             requestSender.markModified('sentRequests');
-             await requestSender.save();
+        if (!deleted) {
+            return res.status(400).json({ message: 'No pending request found' });
         }
-        
-        currentUser.markModified('followerRequests');
-        await currentUser.save();
-        res.json({ message: 'Request removed', userId: req.params.userId });
+
+        // Clean up request arrays atomically
+        await Promise.all([
+            User.updateOne({ _id: currentUserId }, { $pull: { followerRequests: senderId     } }),
+            User.updateOne({ _id: senderId      }, { $pull: { sentRequests:     currentUserId } }),
+        ]);
+
+        res.json({ message: 'Request rejected', userId: senderId });
 
     } catch (error) {
-        console.error("Delete request error:", error);
+        console.error('Delete request error:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// @desc    Get follow status between current user and target
+// @route   GET /api/auth/follow-status/:userId
+// @access  Private
+router.get('/follow-status/:userId', protect, async (req, res) => {
+    try {
+        const follow = await Follow.findOne({
+            follower:  req.user._id,
+            following: req.params.userId,
+        }).select('status').lean();
+
+        res.json({ status: follow?.status ?? 'none' });
+    } catch (error) {
         res.status(500).json({ message: error.message });
     }
 });
@@ -661,37 +716,41 @@ router.put('/unblock/:userId', protect, async (req, res) => {
     }
 });
 
-// @desc    Get user's followers
+// @desc    Get user's followers (people who follow userId)
 // @route   GET /api/auth/followers/:userId
 // @access  Public
 router.get('/followers/:userId', async (req, res) => {
     try {
-        const user = await User.findById(req.params.userId)
-            .populate('followers', 'name handle avatar bio isOnline lastSeen');
+        // Query Follow collection: follower → userId
+        const follows = await Follow.find({
+            following: req.params.userId,
+            status: 'accepted',
+        })
+            .populate('follower', 'name handle avatar bio isOnline lastSeen')
+            .lean();
 
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        res.json(user.followers);
+        const followers = follows.map(f => f.follower).filter(Boolean);
+        res.json(followers);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 });
 
-// @desc    Get user's following
+// @desc    Get user's following (people userId follows)
 // @route   GET /api/auth/following/:userId
 // @access  Public
 router.get('/following/:userId', async (req, res) => {
     try {
-        const user = await User.findById(req.params.userId)
-            .populate('following', 'name handle avatar bio isOnline lastSeen');
+        // Query Follow collection: userId → following
+        const follows = await Follow.find({
+            follower: req.params.userId,
+            status: 'accepted',
+        })
+            .populate('following', 'name handle avatar bio isOnline lastSeen')
+            .lean();
 
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        res.json(user.following);
+        const following = follows.map(f => f.following).filter(Boolean);
+        res.json(following);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -719,57 +778,54 @@ router.get('/posts/:userId', async (req, res) => {
 // @access  Public
 router.get('/user/:userId', async (req, res) => {
     try {
-        const user = await User.findById(req.params.userId)
-            .select('-password'); // Exclude password
+        const userId = req.params.userId;
+
+        // Parallel: fetch user + story + accurate follow counts from Follow collection
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const [user, stories, followersCount, followingCount] = await Promise.all([
+            User.findById(userId).select('-password').lean(),
+            Story.find({ user: userId, createdAt: { $gt: twentyFourHoursAgo } }).sort({ createdAt: 1 }).lean(),
+            Follow.countDocuments({ following: userId, status: 'accepted' }),
+            Follow.countDocuments({ follower: userId,  status: 'accepted' }),
+        ]);
 
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        // Fetch active stories from the separate Story collection
-        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-        const stories = await Story.find({
-            user: user._id,
-            createdAt: { $gt: twentyFourHoursAgo }
-        }).sort({ createdAt: 1 });
-
         // Check blocking status relative to requester
         let isBlockedByMe = false;
-        let isBlockingMe = false;
+        let isBlockingMe  = false;
         const authHeader = req.headers.authorization;
-        if (authHeader && authHeader.startsWith('Bearer ')) {
+        if (authHeader?.startsWith('Bearer ')) {
             try {
-                const token = authHeader.split(' ')[1];
-                const decoded = jwt.verify(token, process.env.JWT_SECRET);
-                const requesterId = decoded.id;
-                
-                // Fetch full requester to check their block list
-                const requester = await User.findById(requesterId);
+                const decoded = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET);
+                const requester = await User.findById(decoded.id).select('blockedUsers').lean();
                 if (requester) {
-                    isBlockedByMe = requester.blockedUsers?.includes(user._id);
-                    isBlockingMe = user.blockedUsers?.includes(requester._id);
+                    isBlockedByMe = requester.blockedUsers?.some(id => id.toString() === userId) ?? false;
+                    isBlockingMe  = user.blockedUsers?.some(id => id.toString() === decoded.id) ?? false;
                 }
-            } catch (k) { /* ignore jwt error */ }
+            } catch (_) { /* ignore jwt error */ }
         }
 
         res.json({
-            _id: user._id,
-            name: user.name,
-            handle: user.handle,
-            avatar: user.avatar,
-            coverImage: user.coverImage,
-            bio: user.bio,
-            pronouns: user.pronouns,
-            gender: user.gender,
-            links: user.links,
-            isPrivate: user.isPrivate,
-            stories: stories || [],
-            followersCount: user.followers?.length || 0,
-            followingCount: user.following?.length || 0,
-            following: user.following || [],
-            saved: user.savedPosts || [],
+            _id:            user._id,
+            name:           user.name,
+            handle:         user.handle,
+            avatar:         user.avatar,
+            coverImage:     user.coverImage,
+            bio:            user.bio,
+            pronouns:       user.pronouns,
+            gender:         user.gender,
+            links:          user.links,
+            isPrivate:      user.isPrivate,
+            stories:        stories || [],
+            followersCount,   // accurate: from Follow collection
+            followingCount,   // accurate: from Follow collection
+            following:      user.following || [],
+            saved:          user.savedPosts || [],
             isBlockedByMe,
-            isBlockingMe
+            isBlockingMe,
         });
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -782,19 +838,27 @@ router.get('/user/:userId', async (req, res) => {
 router.get('/users', async (req, res) => {
     try {
         const users = await User.find()
-            .select('-password')
-            .sort({ createdAt: -1 });
+            .select('_id name handle avatar bio')
+            .sort({ createdAt: -1 })
+            .lean();
 
-        console.log(`[DEBUG] Fetched ${users.length} total users for discovery`);
+        // Get all follower counts in one aggregation query
+        const followerCounts = await Follow.aggregate([
+            { $match: { status: 'accepted' } },
+            { $group: { _id: '$following', count: { $sum: 1 } } },
+        ]);
+        const countMap = {};
+        for (const { _id, count } of followerCounts) {
+            countMap[_id.toString()] = count;
+        }
 
         const usersWithStats = users.map(user => ({
-            _id: user._id,
-            name: user.name,
-            handle: user.handle,
-            avatar: user.avatar,
-            bio: user.bio,
-            followersCount: user.followers?.length || 0,
-            followingCount: user.following?.length || 0,
+            _id:           user._id,
+            name:          user.name,
+            handle:        user.handle,
+            avatar:        user.avatar,
+            bio:           user.bio,
+            followersCount: countMap[user._id.toString()] || 0,
         }));
 
         res.json(usersWithStats);

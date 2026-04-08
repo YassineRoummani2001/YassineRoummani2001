@@ -23,6 +23,8 @@ const userSchema = new mongoose.Schema({
     following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     followerRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Pending requests stored on receiver
     sentRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Pending requests stored on sender (for UI "Requested")
+    followersCount: { type: Number, default: 0, min: 0 },
+    followingCount: { type: Number, default: 0, min: 0 },
     isPrivate: { type: Boolean, default: true }, // Default private as requested feature implies this behavior
     stories: [{
         type: { type: String, default: 'image' }, // 'image', 'video', 'text'
@@ -59,13 +61,13 @@ userSchema.methods.matchPassword = async function(enteredPassword) {
     return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Virtual for stats to match frontend expectation easily
+// Virtual for stats (prefer counter fields for efficiency)
 userSchema.virtual('stats').get(function() {
     return {
-        posts: 0, // Placeholder, normally count posts
-        followers: this.followers.length,
-        following: this.following.length,
-        likes: 0 // Placeholder
+        posts: 0,
+        followers: this.followersCount ?? this.followers.length,
+        following: this.followingCount ?? this.following.length,
+        likes: 0
     };
 });
 

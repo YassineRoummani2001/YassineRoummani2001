@@ -338,11 +338,21 @@ export default function UserProfileScreen() {
             const result = await followUser(id);
             if (result.success) {
                 const s = result.data.status;
-                if (s === 'followed') { setIsFollowing(true); setIsRequested(false); }
-                else if (s === 'unfollowed' || s === 'cancelled') { setIsFollowing(false); setIsRequested(false); }
-                else if (s === 'requested') { setIsFollowing(false); setIsRequested(true); }
-                if (result.data.followersCount !== undefined) setFollowersCount(result.data.followersCount);
-                if (result.data.followingCount !== undefined) setFollowingCount(result.data.followingCount);
+                if (s === 'accepted' || s === 'followed') {
+                    setIsFollowing(true);
+                    setIsRequested(false);
+                    setFollowersCount((prev: number) => prev + 1);
+                } else if (s === 'unfollowed') {
+                    setIsFollowing(false);
+                    setIsRequested(false);
+                    setFollowersCount((prev: number) => Math.max(0, prev - 1));
+                } else if (s === 'cancelled') {
+                    setIsFollowing(false);
+                    setIsRequested(false);
+                } else if (s === 'pending' || s === 'requested') {
+                    setIsFollowing(false);
+                    setIsRequested(true);
+                }
             }
         } catch (e) { console.error(e); }
         finally { setFollowLoading(false); }

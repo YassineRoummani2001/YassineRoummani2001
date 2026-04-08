@@ -110,8 +110,6 @@ export default function FollowRequestsScreen() {
                     'Content-Type': 'application/json'
                 }
             });
-            // Automatically follow them back as requested
-            if (followUser) await followUser(id);
             if (refreshUser) await refreshUser();
         } catch (error) {
             console.error("Error confirming request:", error);

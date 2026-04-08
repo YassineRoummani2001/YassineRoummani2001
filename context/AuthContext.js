@@ -221,46 +221,50 @@ export const UserProvider = ({ children }) => {
             });
             if (response.ok) {
                 const data = await response.json();
-                
-                let updatedFollowing = user.following || [];
-                let updatedSentRequests = user.sentRequests || [];
 
                 const isMatch = (item, targetId) => {
                     if (typeof item === 'string') return item === targetId;
                     return item._id === targetId || item.id === targetId;
                 };
 
-                if (data.status === 'followed') {
-                   if (!updatedFollowing.some(f => isMatch(f, userId))) {
-                       updatedFollowing = [...updatedFollowing, userId];
-                   }
-                   updatedSentRequests = updatedSentRequests.filter(r => !isMatch(r, userId));
+                let updatedFollowing    = [...(user.following     || [])];
+                let updatedSentRequests = [...(user.sentRequests  || [])];
+                let updatedFollowers    = [...(user.followers     || [])];
+
+                // ── Handle all status values returned by the new backend ──
+                if (data.status === 'accepted' || data.status === 'followed') {
+                    // Public follow → add to following
+                    if (!updatedFollowing.some(f => isMatch(f, userId))) {
+                        updatedFollowing = [...updatedFollowing, userId];
+                    }
+                    updatedSentRequests = updatedSentRequests.filter(r => !isMatch(r, userId));
+
                 } else if (data.status === 'unfollowed') {
+                    // Unfollow → remove from following only (NOT from followers)
                     updatedFollowing = updatedFollowing.filter(f => !isMatch(f, userId));
                     updatedSentRequests = updatedSentRequests.filter(r => !isMatch(r, userId));
-                } else if (data.status === 'requested') {
+                    // Do NOT touch updatedFollowers — that's who follows US, not who we follow
+
+                } else if (data.status === 'pending' || data.status === 'requested') {
+                    // Private account → request sent
                     if (!updatedSentRequests.some(r => isMatch(r, userId))) {
                         updatedSentRequests = [...updatedSentRequests, userId];
                     }
                     updatedFollowing = updatedFollowing.filter(f => !isMatch(f, userId));
+
                 } else if (data.status === 'cancelled') {
+                    // Cancel request
                     updatedSentRequests = updatedSentRequests.filter(r => !isMatch(r, userId));
-                } else {
-                     if (data.isFollowing) {
-                         if (!updatedFollowing.some(f => isMatch(f, userId))) {
-                             updatedFollowing = [...updatedFollowing, userId];
-                         }
-                     } else {
-                         updatedFollowing = updatedFollowing.filter(f => !isMatch(f, userId));
-                     }
+                    updatedFollowing    = updatedFollowing.filter(f => !isMatch(f, userId));
                 }
 
-                const updatedUser = { 
-                    ...user, 
-                    following: updatedFollowing,
-                    sentRequests: updatedSentRequests
+                const updatedUser = {
+                    ...user,
+                    following:    updatedFollowing,
+                    sentRequests: updatedSentRequests,
+                    followers:    updatedFollowers,
                 };
-                
+
                 setUser(updatedUser);
                 const { token, ...dataToCache } = updatedUser;
                 await AsyncStorage.setItem(USER_KEY, JSON.stringify(dataToCache));

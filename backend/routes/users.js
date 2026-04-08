@@ -58,46 +58,11 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// @desc    Toggle follow/unfollow a user
-// @route   PUT /api/users/:id/follow
-// @access  Private
-router.put('/:id/follow', protect, async (req, res) => {
-    try {
-        const userToFollow = await User.findById(req.params.id);
-        const currentUser = await User.findById(req.user._id);
-
-        if (!userToFollow) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        // Can't follow yourself
-        if (req.params.id === req.user._id.toString()) {
-            return res.status(400).json({ message: 'You cannot follow yourself' });
-        }
-
-        const isFollowing = currentUser.following.includes(req.params.id);
-
-        if (isFollowing) {
-            // Unfollow
-            currentUser.following.pull(req.params.id);
-            userToFollow.followers.pull(req.user._id);
-        } else {
-            // Follow
-            currentUser.following.push(req.params.id);
-            userToFollow.followers.push(req.user._id);
-        }
-
-        await currentUser.save();
-        await userToFollow.save();
-
-        res.json({
-            following: !isFollowing,
-            followersCount: userToFollow.followers.length,
-            followingCount: currentUser.following.length
-        });
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
+// NOTE: Follow / Unfollow logic is handled by the consolidated route:
+//   PUT  /api/auth/follow/:userId        — follow / unfollow / cancel request
+//   PUT  /api/auth/confirm-request/:id   — accept request
+//   PUT  /api/auth/delete-request/:id    — reject request
+//   GET  /api/auth/follow-status/:id     — get current status
+// Do NOT add a follow route here to avoid conflicting logic.
 
 module.exports = router;
