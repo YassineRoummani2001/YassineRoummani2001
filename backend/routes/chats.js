@@ -632,6 +632,13 @@ router.put('/:chatId', protect, async (req, res) => {
             return res.status(403).json({ message: 'Only participants can edit group info' });
         }
 
+        const isUserAdmin = chat.admin?.toString() === req.user._id.toString() || 
+                            chat.admins?.map(a => a.toString()).includes(req.user._id.toString());
+        
+        if (!isUserAdmin) {
+            return res.status(403).json({ message: 'Only an admin can edit group info' });
+        }
+
         if (groupName) chat.groupName = groupName;
         if (groupAvatar) chat.groupAvatar = groupAvatar;
         if (groupCoverImage) chat.groupCoverImage = groupCoverImage;
@@ -762,6 +769,122 @@ router.post('/:chatId/leave', protect, async (req, res) => {
 
         await chat.save();
         res.json({ message: 'Left group' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Remove participant (Admin only)
+router.delete('/:chatId/participants/:userId', protect, async (req, res) => {
+    try {
+        const chat = await Chat.findById(req.params.chatId);
+        if (!chat) return res.status(404).json({ message: 'Chat not found' });
+        if (!chat.isGroup) return res.status(400).json({ message: 'Not a group' });
+
+        // Verify the currentUser is the admin
+        const isUserAdmin = chat.admin?.toString() === req.user._id.toString() || 
+                            chat.admins?.map(a => a.toString()).includes(req.user._id.toString());
+        if (!isUserAdmin) {
+            return res.status(403).json({ message: 'Only the admin can remove participants' });
+        }
+
+        const userToRemove = req.params.userId;
+
+        // Ensure user is not removing themselves (they should use /leave)
+        if (userToRemove === req.user._id.toString()) {
+            return res.status(400).json({ message: 'Use the leave endpoint to remove yourself' });
+        }
+
+        // Remove from array
+        chat.participants = chat.participants.filter(p => p.toString() !== userToRemove);
+        await chat.save();
+
+        // Get name of removed user
+        const User = require('../models/User');
+        const removedUser = await User.findById(userToRemove, 'name');
+        
+        if (removedUser) {
+            await Message.create({
+                chatId: chat._id,
+                sender: req.user._id,
+                content: `removed ${removedUser.name} from the group`,
+                type: 'system'
+            });
+
+            await Chat.findByIdAndUpdate(chat._id, {
+                lastMessage: `Action: Member removed`,
+                lastMessageSender: req.user._id,
+                updatedAt: Date.now()
+            });
+        }
+
+        const fullChat = await Chat.findById(chat._id).populate('participants', 'name handle avatar username bio');
+        res.json(fullChat);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Promote participant to Admin
+router.post('/:chatId/admins/:userId', protect, async (req, res) => {
+    try {
+        const chat = await Chat.findById(req.params.chatId);
+        if (!chat) return res.status(404).json({ message: 'Chat not found' });
+        if (!chat.isGroup) return res.status(400).json({ message: 'Not a group' });
+
+        // Verify the currentUser is an admin
+        const isUserAdmin = chat.admin?.toString() === req.user._id.toString() || 
+                            chat.admins?.map(a => a.toString()).includes(req.user._id.toString());
+        if (!isUserAdmin) {
+            return res.status(403).json({ message: 'Only an admin can promote other participants' });
+        }
+
+        const userToPromote = req.params.userId;
+
+        // Ensure user is in the group
+        if (!chat.participants.map(p => p.toString()).includes(userToPromote)) {
+            return res.status(400).json({ message: 'User is not a participant in this group' });
+        }
+
+        // Initialize admins array if not present
+        if (!chat.admins) chat.admins = [];
+
+        // Check if already admin
+        if (chat.admin?.toString() === userToPromote || chat.admins.map(a => a.toString()).includes(userToPromote)) {
+            return res.status(400).json({ message: 'User is already an admin' });
+        }
+
+        chat.admins.push(userToPromote);
+        await chat.save();
+
+        // Also update Group collection
+        const Group = require('../models/Group');
+        await Group.findOneAndUpdate(
+            { chatId: chat._id },
+            { $addToSet: { admins: userToPromote } }
+        );
+
+        // Get name of promoted user
+        const User = require('../models/User');
+        const promotedUser = await User.findById(userToPromote, 'name');
+        
+        if (promotedUser) {
+            await Message.create({
+                chatId: chat._id,
+                sender: req.user._id,
+                content: `made ${promotedUser.name} an admin`,
+                type: 'system'
+            });
+
+            await Chat.findByIdAndUpdate(chat._id, {
+                lastMessage: `Action: New admin added`,
+                lastMessageSender: req.user._id,
+                updatedAt: Date.now()
+            });
+        }
+
+        const fullChat = await Chat.findById(chat._id).populate('participants', 'name handle avatar username bio');
+        res.json(fullChat);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

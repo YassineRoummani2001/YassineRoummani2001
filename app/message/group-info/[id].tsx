@@ -82,6 +82,10 @@ export default function GroupInfoScreen() {
 
     const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false);
     const [pendingImage, setPendingImage] = useState<{ uri: string, type: 'avatar' | 'cover' } | null>(null);
+    const [userToRemove, setUserToRemove] = useState<any>(null);
+    const [isRemoveModalVisible, setIsRemoveModalVisible] = useState(false);
+    const [userToPromote, setUserToPromote] = useState<any>(null);
+    const [isPromoteModalVisible, setIsPromoteModalVisible] = useState(false);
 
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -94,8 +98,8 @@ export default function GroupInfoScreen() {
     }, [groupData]);
 
     useEffect(() => {
-        if (id) fetchGroupData();
-    }, [id]);
+        if (id && currentUser?.token) fetchGroupData();
+    }, [id, currentUser]);
 
     const fetchGroupData = async () => {
         setLoading(true);
@@ -112,8 +116,16 @@ export default function GroupInfoScreen() {
     };
 
     const isAdmin = (participantId: string) => {
+        // Support new array of admins
+        if (groupData?.admins && groupData.admins.length > 0) {
+            const inAdminsArray = groupData.admins.some((admin: any) => 
+                String(admin._id || admin) === String(participantId)
+            );
+            if (inAdminsArray) return true;
+        }
+
         if (!groupData?.admin) return false;
-        // The admin can be an ID string or a populated object.
+        // Support original single admin field
         const adminId = typeof groupData.admin === 'object' ? groupData.admin._id : groupData.admin;
         return String(participantId) === String(adminId);
     };
@@ -301,6 +313,59 @@ export default function GroupInfoScreen() {
     const handleLeaveGroup = () => setIsLeaveModalVisible(true);
     const handleClearChat = () => setIsClearModalVisible(true);
 
+    const checkRemoveUser = (user: any) => {
+        setUserToRemove(user);
+        setIsRemoveModalVisible(true);
+    };
+
+    const confirmRemoveUser = async () => {
+        if (!userToRemove) return;
+        try {
+            const res = await ApiClient.delete<any>(`/api/chats/${id}/participants/${userToRemove._id}`, 
+                { 'Authorization': `Bearer ${currentUser.token}` }
+            );
+            if (res.success) {
+                setGroupData(res.data);
+                Toast.show({ type: 'success', text1: 'User removed' });
+            } else {
+                Alert.alert("Error", res.message || "Failed to remove user");
+            }
+        } catch (e) {
+            console.error(e);
+            Alert.alert("Error", "An error occurred");
+        } finally {
+            setIsRemoveModalVisible(false);
+            setUserToRemove(null);
+        }
+    };
+
+    const checkPromoteUser = (user: any) => {
+        setUserToPromote(user);
+        setIsPromoteModalVisible(true);
+    };
+
+    const confirmPromoteUser = async () => {
+        if (!userToPromote) return;
+        try {
+            const res = await ApiClient.post<any>(`/api/chats/${id}/admins/${userToPromote._id}`, 
+                {},
+                { 'Authorization': `Bearer ${currentUser.token}` }
+            );
+            if (res.success) {
+                setGroupData(res.data);
+                Toast.show({ type: 'success', text1: 'User promoted to Admin' });
+            } else {
+                Alert.alert("Error", res.message || "Failed to promote user");
+            }
+        } catch (e) {
+            console.error(e);
+            Alert.alert("Error", "An error occurred");
+        } finally {
+            setIsPromoteModalVisible(false);
+            setUserToPromote(null);
+        }
+    };
+
     const handleMuteToggle = async () => {
         const newMutedState = !isMuted;
         setIsMuted(newMutedState);
@@ -468,15 +533,18 @@ export default function GroupInfoScreen() {
                 <View style={styles.section}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                         <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Members</Text>
-                        <TouchableOpacity onPress={() => setIsAddModalVisible(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <Ionicons name="person-add" size={16} color={colors.primary} />
-                            <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>Add</Text>
-                        </TouchableOpacity>
+                        {isAdmin(currentUser._id) && (
+                            <TouchableOpacity onPress={() => setIsAddModalVisible(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                <Ionicons name="person-add" size={16} color={colors.primary} />
+                                <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>Add</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                     <View style={[styles.listContainer, { backgroundColor: isDark ? '#1a1a1a' : '#f9f9f9' }]}>
                         {groupData.participants?.map((participant: any, index: number) => {
                             const isMe = participant._id === currentUser._id;
                             const isGroupAdmin = isAdmin(participant._id);
+                            const isCurrentUserAdmin = isAdmin(currentUser._id);
 
                             return (
                                 <TouchableOpacity
@@ -513,9 +581,25 @@ export default function GroupInfoScreen() {
                                             @{ (participant.username || participant.handle || '').replace(/^@+/, '') }
                                         </Text>
                                     </View>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                                         {isGroupAdmin && !isMe && (
                                             <Ionicons name="shield-checkmark" size={18} color={colors.primary} style={{ opacity: 0.6 }} />
+                                        )}
+                                        {isCurrentUserAdmin && !isMe && !isGroupAdmin && (
+                                            <>
+                                                <TouchableOpacity 
+                                                    onPress={(e) => { e.stopPropagation(); checkPromoteUser(participant); }}
+                                                    style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: colors.primary + '20', borderRadius: 8 }}
+                                                >
+                                                    <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>Make Admin</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity 
+                                                    onPress={(e) => { e.stopPropagation(); checkRemoveUser(participant); }}
+                                                    style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#EF444420', borderRadius: 8 }}
+                                                >
+                                                    <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '600' }}>Remove</Text>
+                                                </TouchableOpacity>
+                                            </>
                                         )}
                                         <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                                     </View>
@@ -640,6 +724,24 @@ export default function GroupInfoScreen() {
                 confirmText="Leave"
                 onConfirm={onLeaveGroupConfirm}
                 onCancel={() => setIsLeaveModalVisible(false)}
+            />
+
+            <ConfirmModal
+                visible={isRemoveModalVisible}
+                title="Remove User"
+                message={`Are you sure you want to remove ${userToRemove?.name}?`}
+                confirmText="Remove"
+                onConfirm={confirmRemoveUser}
+                onCancel={() => setIsRemoveModalVisible(false)}
+            />
+
+            <ConfirmModal
+                visible={isPromoteModalVisible}
+                title="Make Admin"
+                message={`Are you sure you want to make ${userToPromote?.name} an admin? They will be able to add/remove users and edit group info.`}
+                confirmText="Promote"
+                onConfirm={confirmPromoteUser}
+                onCancel={() => setIsPromoteModalVisible(false)}
             />
 
             <ConfirmModal

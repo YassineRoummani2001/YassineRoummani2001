@@ -416,10 +416,10 @@ router.put('/follow/:userId', protect, async (req, res) => {
         }
 
         // ── NEW FOLLOW REQUEST ────────────────────────────────────────────────
-        // If the target is private, typically a request is 'pending'.
-        // BUT if the target is ALREADY following us (this is a 'Follow Back'), bypass privacy and auto-accept.
+        // The user wants ALL initial follows to act like friend requests, meaning they ALWAYS require confirmation
+        // UNLESS the target is already following us (this is a 'Follow Back'), then we can bypass.
         const isFollowBack = await Follow.exists({ follower: followingId, following: followerId, status: 'accepted' });
-        const newStatus = (targetUser.isPrivate && !isFollowBack) ? 'pending' : 'accepted';
+        const newStatus = isFollowBack ? 'accepted' : 'pending';
 
         try {
             await Follow.create({ follower: followerId, following: followingId, status: newStatus });
@@ -535,8 +535,7 @@ router.put('/confirm-request/:userId', protect, async (req, res) => {
                 { $pull: { sentRequests: currentUserId }, $addToSet: { following: currentUserId }, $inc: { followingCount: 1 } }
             ),
             // ── MAGIC MUTUAL FOLLOW ──
-            // The user requested that confirming a request ALSO auto-follows the sender back.
-            // Bypass privacy setting: automatically make currentUserId follow senderId.
+            // If I confirm someone's request, automatically make me a follower of them too.
             Follow.findOneAndUpdate(
                 { follower: currentUserId, following: senderId },
                 { $set: { status: 'accepted' } },
