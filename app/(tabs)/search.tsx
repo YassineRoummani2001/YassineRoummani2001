@@ -1,6 +1,7 @@
 import { SkeletonGridItem, SkeletonRow } from '@/components/Skeletons';
 import { API_BASE_URL } from '@/constants/Config';
 import { useThemeContext } from '@/context/ThemeContext';
+import { useUser } from '@/context/AuthContext';
 import { useTheme } from '@/hooks/useTheme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -37,7 +38,7 @@ export default function SearchScreen() {
     const { colors, isDark } = useThemeContext();
     const insets = useSafeAreaInsets();
     const router = useRouter();
-    const { user } = (useTheme() as any) || {};
+    const { user } = (useUser() || {}) as any;
     const width = Dimensions.get('window').width;
     const isDesktop = Platform.OS === 'web' && width > 768;
     const styles = useMemo(() => createStyles(colors, insets, isDesktop, isDark), [colors, insets, isDesktop, isDark]);
@@ -51,7 +52,9 @@ export default function SearchScreen() {
 
     const fetchSuggestedUsers = async () => {
         try {
-            const res = await fetch(`${API_BASE_URL}/api/users/all`);
+            const res = await fetch(`${API_BASE_URL}/api/users/all`, {
+                headers: { 'Authorization': `Bearer ${user?.token}` }
+            });
             if (res.ok) {
                 const data = await res.json();
                 // Filter out the current user if possible
@@ -64,7 +67,9 @@ export default function SearchScreen() {
 
     const fetchTrendingTopics = async () => {
         try {
-            const res = await fetch(`${API_BASE_URL}/api/posts/all-hashtags`);
+            const res = await fetch(`${API_BASE_URL}/api/posts/all-hashtags`, {
+                headers: { 'Authorization': `Bearer ${user?.token}` }
+            });
             if (res.ok) {
                 const data = await res.json();
                 if (data && data.length > 0) {
@@ -130,7 +135,9 @@ export default function SearchScreen() {
     const performSearch = async (query: string) => {
         setIsSearching(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/api/auth/search?q=${encodeURIComponent(query)}`);
+            const response = await fetch(`${API_BASE_URL}/api/auth/search?q=${encodeURIComponent(query)}`, {
+                headers: { 'Authorization': `Bearer ${user?.token}` }
+            });
             if (response.ok) {
                 const data = await response.json();
                 setResults(data);

@@ -72,7 +72,11 @@ export default function MarketplaceScreen() {
             if (location) url += `&location=${location}`;
             if (searchQuery) url += `&search=${searchQuery}`;
 
-            const res = await fetch(url);
+            const res = await fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${user?.token}`
+                }
+            });
             if (res.ok) {
                 const data = await res.json();
                 setItems(data);

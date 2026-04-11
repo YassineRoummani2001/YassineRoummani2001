@@ -73,7 +73,7 @@ router.get('/', protect, async (req, res) => {
 
 // @desc    Create a new story
 // @route   POST /api/stories
-router.post('/', async (req, res) => {
+router.post('/', protect, async (req, res) => {
     try {
         const { userId, type, uri, content, color } = req.body;
         

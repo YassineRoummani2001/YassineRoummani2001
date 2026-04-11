@@ -7,7 +7,7 @@ const { protect } = require('../middleware/auth');
 
 // @desc    Get all marketplace items (with filters)
 // @route   GET /api/marketplace
-router.get('/', async (req, res) => {
+router.get('/', protect, async (req, res) => {
     try {
         const { category, status, search, userId, location } = req.query;
         // console.log('🔍 Marketplace GET query:', req.query);
@@ -149,7 +149,7 @@ router.get('/stats', protect, async (req, res) => {
 
 // @desc    Get single marketplace item
 // @route   GET /api/marketplace/:id
-router.get('/:id', async (req, res) => {
+router.get('/:id', protect, async (req, res) => {
     try {
         const item = await MarketItem.findById(req.params.id)
             .populate('user', 'name avatar handle phone email');

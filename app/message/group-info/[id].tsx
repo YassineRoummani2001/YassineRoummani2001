@@ -551,57 +551,68 @@ export default function GroupInfoScreen() {
                                     key={participant._id}
                                     style={[
                                         styles.participantItem,
-                                        index !== groupData.participants.length - 1 && { borderBottomWidth: 1, borderBottomColor: isDark ? '#333' : '#eee' }
+                                        index !== groupData.participants.length - 1 && { borderBottomWidth: 1, borderBottomColor: isDark ? '#222' : '#f0f0f0' }
                                     ]}
                                     onPress={() => router.push(`/user/${participant._id}`)}
+                                    activeOpacity={0.7}
                                 >
-                                    <View>
+                                    <View style={styles.avatarWrapper}>
                                         <Image
                                             source={{ uri: getCorrectUrl(participant.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(participant.name || 'User')}&background=random` }}
                                             style={styles.participantAvatar}
                                         />
                                         {isGroupAdmin && (
-                                            <View style={styles.crownIcon}>
-                                                <Ionicons name="ribbon" size={12} color="#FFD700" />
-                                            </View>
+                                            <LinearGradient 
+                                                colors={['#FFD700', '#FFA500']} 
+                                                style={styles.crownContainer}
+                                            >
+                                                <Ionicons name="ribbon" size={10} color="#000" />
+                                            </LinearGradient>
                                         )}
                                     </View>
+
                                     <View style={styles.participantText}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                            <Text style={[styles.participantName, { color: colors.text }]}>
-                                                {participant.name} {isMe && <Text style={{ fontSize: 13, fontWeight: '400', color: colors.textSecondary }}>(You)</Text>}
+                                        <View style={styles.nameBadgeRow}>
+                                            <Text style={[styles.participantName, { color: colors.text }]} numberOfLines={1}>
+                                                {participant.name}
                                             </Text>
+                                            {isMe && <View style={[styles.youBadge, { backgroundColor: isDark ? '#333' : '#eee' }]}><Text style={[styles.youText, { color: colors.textSecondary }]}>You</Text></View>}
                                             {isGroupAdmin && (
-                                                <View style={styles.adminBadge}>
+                                                <LinearGradient 
+                                                    colors={['#8b5cf6', '#7c3aed']} 
+                                                    start={{x:0, y:0}} end={{x:1, y:0}}
+                                                    style={styles.adminBadge}
+                                                >
                                                     <Text style={styles.adminText}>Admin</Text>
-                                                </View>
+                                                </LinearGradient>
                                             )}
                                         </View>
-                                        <Text style={[styles.participantHandle, { color: colors.textSecondary }]}>
+                                        <Text style={[styles.participantHandle, { color: colors.textSecondary }]} numberOfLines={1}>
                                             @{ (participant.username || participant.handle || '').replace(/^@+/, '') }
                                         </Text>
                                     </View>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+
+                                    <View style={styles.participantActions}>
                                         {isGroupAdmin && !isMe && (
-                                            <Ionicons name="shield-checkmark" size={18} color={colors.primary} style={{ opacity: 0.6 }} />
+                                            <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} style={{ opacity: 0.5, marginRight: 4 }} />
                                         )}
                                         {isCurrentUserAdmin && !isMe && !isGroupAdmin && (
-                                            <>
+                                            <View style={styles.adminControls}>
                                                 <TouchableOpacity 
                                                     onPress={(e) => { e.stopPropagation(); checkPromoteUser(participant); }}
-                                                    style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: colors.primary + '20', borderRadius: 8 }}
+                                                    style={[styles.miniActionBtn, { backgroundColor: colors.primary + '15' }]}
                                                 >
-                                                    <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>Make Admin</Text>
+                                                    <Text style={[styles.miniActionText, { color: colors.primary }]}>Admin</Text>
                                                 </TouchableOpacity>
                                                 <TouchableOpacity 
                                                     onPress={(e) => { e.stopPropagation(); checkRemoveUser(participant); }}
-                                                    style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#EF444420', borderRadius: 8 }}
+                                                    style={[styles.miniActionBtn, { backgroundColor: '#FF4B4B15' }]}
                                                 >
-                                                    <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '600' }}>Remove</Text>
+                                                    <Text style={[styles.miniActionText, { color: '#FF4B4B' }]}>Remove</Text>
                                                 </TouchableOpacity>
-                                            </>
+                                            </View>
                                         )}
-                                        <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                                        <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} style={{ opacity: 0.5 }} />
                                     </View>
                                 </TouchableOpacity>
                             );
@@ -879,50 +890,94 @@ const styles = StyleSheet.create({
     participantItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 12,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+    },
+    avatarWrapper: {
+        position: 'relative',
     },
     participantAvatar: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
     },
     participantText: {
         flex: 1,
-        marginLeft: 12,
+        marginLeft: 14,
+        justifyContent: 'center',
+    },
+    nameBadgeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 2,
     },
     participantName: {
         fontSize: 16,
-        fontWeight: '700',
+        fontWeight: '800',
+        maxWidth: 140,
     },
     participantHandle: {
         fontSize: 13,
+        opacity: 0.6,
+    },
+    youBadge: {
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+        borderRadius: 4,
+    },
+    youText: {
+        fontSize: 10,
+        fontWeight: '700',
+        textTransform: 'uppercase',
     },
     adminBadge: {
-        backgroundColor: 'rgba(139, 92, 246, 0.1)',
-        paddingHorizontal: 8,
-        paddingVertical: 2,
+        paddingHorizontal: 7,
+        paddingVertical: 1,
         borderRadius: 6,
-        borderWidth: 1,
-        borderColor: 'rgba(139, 92, 246, 0.2)',
     },
     adminText: {
-        color: '#8b5cf6',
+        color: '#fff',
         fontSize: 9,
         fontWeight: '900',
         textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
-    crownIcon: {
+    crownContainer: {
         position: 'absolute',
         bottom: -2,
         right: -2,
-        backgroundColor: '#000',
-        borderRadius: 10,
         width: 20,
         height: 20,
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 2,
-        borderColor: '#FFD700',
+        borderColor: '#000',
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.3,
+        shadowRadius: 1,
+    },
+    participantActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    adminControls: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    miniActionBtn: {
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+    },
+    miniActionText: {
+        fontSize: 11,
+        fontWeight: '800',
     },
     actionRow: {
         flexDirection: 'row',

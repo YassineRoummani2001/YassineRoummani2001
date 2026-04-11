@@ -5,8 +5,8 @@ const { protect } = require('../middleware/auth');
 
 // @desc    Get all/suggested users
 // @route   GET /api/users/all
-// @access  Public
-router.get('/all', async (req, res) => {
+// @access  Private
+router.get('/all', protect, async (req, res) => {
     try {
         const users = await User.find({})
             .select('-password')
@@ -20,8 +20,8 @@ router.get('/all', async (req, res) => {
 
 // @desc    Search users
 // @route   GET /api/users/search/:query
-// @access  Public
-router.get('/search/:query', async (req, res) => {
+// @access  Private
+router.get('/search/:query', protect, async (req, res) => {
     try {
         const users = await User.find({
             $or: [
@@ -40,8 +40,8 @@ router.get('/search/:query', async (req, res) => {
 
 // @desc    Get user profile by ID
 // @route   GET /api/users/:id
-// @access  Public
-router.get('/:id', async (req, res) => {
+// @access  Private
+router.get('/:id', protect, async (req, res) => {
     try {
         const user = await User.findById(req.params.id)
             .select('-password')

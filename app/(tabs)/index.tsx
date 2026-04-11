@@ -3,6 +3,7 @@ import { API_BASE_URL } from '@/constants/Config';
 import { useMessages } from '@/context/MessagesContext';
 import { useNotifications } from '@/context/NotificationContext';
 import { useThemeContext } from '@/context/ThemeContext';
+import { useUser } from '@/context/AuthContext';
 import { getCorrectUrl } from '@/utils/api';
 import { lazyLoad } from '@/utils/lazyLoad';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +33,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { unreadCount } = useNotifications();
   const { unreadCount: unreadMessagesCount } = useMessages();
+  const { user } = (useUser() || {}) as any;
   const isFocused = useIsFocused();
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width > 768;
@@ -60,7 +62,11 @@ export default function HomeScreen() {
       else if (pageNum === 1) setLoading(true);
       else setIsFetchingMore(true);
 
-      const res = await fetch(`${API_BASE_URL}/api/posts?page=${pageNum}&limit=10`);
+      const res = await fetch(`${API_BASE_URL}/api/posts?page=${pageNum}&limit=10`, {
+        headers: {
+          'Authorization': `Bearer ${user?.token}`
+        }
+      });
 
       if (res.ok) {
         const data = await res.json();

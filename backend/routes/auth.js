@@ -334,8 +334,8 @@ router.post('/stories', protect, async (req, res) => {
 
 // @desc    Get user stories by user ID (for debugging)
 // @route   GET /api/auth/user/:id/stories
-// @access  Public
-router.get('/user/:id/stories', async (req, res) => {
+// @access  Private
+router.get('/user/:id/stories', protect, async (req, res) => {
     try {
         const user = await User.findById(req.params.id).select('name handle avatar');
         if (!user) {
@@ -717,8 +717,8 @@ router.put('/unblock/:userId', protect, async (req, res) => {
 
 // @desc    Get user's followers (people who follow userId)
 // @route   GET /api/auth/followers/:userId
-// @access  Public
-router.get('/followers/:userId', async (req, res) => {
+// @access  Private
+router.get('/followers/:userId', protect, async (req, res) => {
     try {
         // Query Follow collection: follower → userId
         const follows = await Follow.find({
@@ -737,8 +737,8 @@ router.get('/followers/:userId', async (req, res) => {
 
 // @desc    Get user's following (people userId follows)
 // @route   GET /api/auth/following/:userId
-// @access  Public
-router.get('/following/:userId', async (req, res) => {
+// @access  Private
+router.get('/following/:userId', protect, async (req, res) => {
     try {
         // Query Follow collection: userId → following
         const follows = await Follow.find({
@@ -757,8 +757,8 @@ router.get('/following/:userId', async (req, res) => {
 
 // @desc    Get user's posts
 // @route   GET /api/auth/posts/:userId
-// @access  Public
-router.get('/posts/:userId', async (req, res) => {
+// @access  Private
+router.get('/posts/:userId', protect, async (req, res) => {
     try {
         const Post = require('../models/Post');
         
@@ -833,8 +833,8 @@ router.get('/user/:userId', async (req, res) => {
 
 // @desc    Get all users for discovery
 // @route   GET /api/auth/users
-// @access  Public
-router.get('/users', async (req, res) => {
+// @access  Private
+router.get('/users', protect, async (req, res) => {
     try {
         const users = await User.find()
             .select('_id name handle avatar bio')
@@ -868,8 +868,8 @@ router.get('/users', async (req, res) => {
 
 // @desc    Global Search (Users or Hashtags)
 // @route   GET /api/auth/search
-// @access  Public
-router.get('/search', async (req, res) => {
+// @access  Private
+router.get('/search', protect, async (req, res) => {
     const { q } = req.query;
     if (!q) return res.json({ users: [], posts: [] });
 
@@ -1172,38 +1172,6 @@ router.delete('/profile', protect, async (req, res) => {
     }
 });
 
-// @desc    Search users and posts
-// @route   GET /api/auth/search
-// @access  Public
-router.get('/search', async (req, res) => {
-    try {
-        const { q } = req.query;
-        if (!q) return res.json({ users: [], posts: [] });
-
-        const Post = require('../models/Post');
-        const query = q.startsWith('#') ? q : q; // Keep hashtag if present
-
-        // Parallel Search
-        const [users, posts] = await Promise.all([
-            User.find({
-                $or: [
-                    { name: { $regex: query, $options: 'i' } },
-                    { handle: { $regex: query, $options: 'i' } }
-                ]
-            }).select('name handle avatar followers').limit(10),
-            
-            Post.find({
-                $or: [
-                    { caption: { $regex: query, $options: 'i' } },
-                    { tags: { $regex: query, $options: 'i' } }
-                ]
-            }).populate('user', 'name avatar handle').sort({ createdAt: -1 }).limit(20)
-        ]);
-
-        res.json({ users, posts });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-});
+// Final exported router
 
 module.exports = router;

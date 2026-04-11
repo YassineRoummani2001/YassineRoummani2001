@@ -59,7 +59,9 @@ export default function UsersListScreen() {
                 ? `/api/auth/followers/${targetUserId}`
                 : `/api/auth/following/${targetUserId}`;
 
-            const response = await fetch(`${API_BASE_URL}${endpoint}`);
+            const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+                headers: { 'Authorization': `Bearer ${currentUser?.token}` }
+            });
 
             if (response.ok) {
                 const data = await response.json();

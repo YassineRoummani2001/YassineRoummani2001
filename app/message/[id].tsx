@@ -73,11 +73,11 @@ const formatDividerDate = (dateStr: string) => {
 
 const getSenderColor = (senderId: string) => {
     const colors = [
-        '#FF5252', '#FF4081', '#E040FB', '#7C4DFF',
-        '#536DFE', '#448AFF', '#40C4FF', '#18FFFF',
-        '#64FFDA', '#69F0AE', '#B2FF59', '#EEFF41',
-        '#FFD740', '#FFAB40', '#FF6E40', '#9B59B6',
-        '#3498DB', '#E67E22', '#2ECC71', '#1ABC9C'
+        '#FF3B30', '#FF9500', '#FFCC00', '#4CD964',
+        '#5AC8FA', '#007AFF', '#5856D6', '#AF52DE',
+        '#FF2D55', '#A2845E', '#10B981', '#3B82F6',
+        '#6366F1', '#8B5CF6', '#EC4899', '#F59E0B',
+        '#14B8A6', '#06B6D4', '#F43F5E', '#84CC16'
     ];
     let hash = 0;
     const str = senderId || 'default';
@@ -177,7 +177,8 @@ const VoiceMessage = ({ uri, itemsDuration, isMe, colors, customColor }: { uri: 
     };
 
     const activeColor = isMe ? '#FFF' : (customColor || colors.primary);
-    const inactiveColor = isMe ? 'rgba(255,255,255,0.4)' : (colors.background === '#000' ? '#444' : '#CCC');
+    const inactiveColor = isMe ? 'rgba(255,255,255,0.4)' : (isDark ? '#444' : '#CCC');
+    const bubbleBg = isMe ? colors.primary : (isDark ? '#1C1C1E' : '#E9E9EB');
 
     return (
         <View style={{
@@ -185,14 +186,14 @@ const VoiceMessage = ({ uri, itemsDuration, isMe, colors, customColor }: { uri: 
             padding: 10,
             paddingRight: 16,
             minWidth: 200,
-            backgroundColor: isMe ? colors.primary : (customColor || (colors.background === '#000' ? '#262626' : '#F2F2F2')),
+            backgroundColor: bubbleBg,
             borderBottomRightRadius: isMe ? 4 : 18,
             borderBottomLeftRadius: isMe ? 18 : 4,
             flexDirection: 'row', alignItems: 'center', gap: 12
         }}>
             <TouchableOpacity onPress={loadAndPlay} style={{
                 width: 32, height: 32, borderRadius: 16,
-                backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : colors.primary,
+                backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : (customColor || colors.primary),
                 alignItems: 'center', justifyContent: 'center'
             }}>
                 {status.playing ?
@@ -210,7 +211,7 @@ const VoiceMessage = ({ uri, itemsDuration, isMe, colors, customColor }: { uri: 
                             <Animated.View
                                 key={i}
                                 style={{
-                                    width: 2.5,
+                                    width: 2.3,
                                     height: height,
                                     borderRadius: 1.5,
                                     backgroundColor: progress.interpolate({
@@ -227,16 +228,22 @@ const VoiceMessage = ({ uri, itemsDuration, isMe, colors, customColor }: { uri: 
                 {/* Duration */}
                 <Text style={{
                     fontSize: 11,
-                    color: isMe ? '#FFF' : colors.textSecondary,
-                    fontWeight: '600',
+                    color: isMe ? '#FFF' : (isDark ? '#8E8E93' : '#8E8E93'),
+                    fontWeight: '700',
                     width: 35,
                     textAlign: 'right'
                 }}>
-                    {formatDuration((status.currentTime > 0 ? status.currentTime : (status.duration > 0 ? status.duration : (itemsDuration || 0))) * 1000)}
+                    {formatTimeLabel((status.currentTime > 0 ? status.currentTime : (status.duration > 0 ? status.duration : (itemsDuration || 0))))}
                 </Text>
             </View>
         </View>
     );
+};
+
+const formatTimeLabel = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -857,10 +864,12 @@ export default function MessageScreen() {
         const senderAvatar = item.sender?.avatar;
         const isGroupChat = isGroup === 'true';
 
-        // Unique color for group members
+        // Unique color for group members name/accents
         const participantColor = (!isMe && isGroupChat) ? getSenderColor(senderId) : undefined;
-        const bubbleBg = isMe ? colors.primary : (participantColor || (isDark ? '#262626' : '#F2F2F2'));
-        const textColor = (isMe || participantColor) ? '#FFF' : colors.text;
+        
+        // Bubbles for received messages are neutral, but accented by participant color
+        const bubbleBg = isMe ? colors.primary : (isDark ? '#1C1C1E' : '#E9E9EB');
+        const textColor = isMe ? '#FFF' : colors.text;
 
         const reactions = item.reactions || {};
         const reactionKeys = Object.keys(reactions);
@@ -876,28 +885,30 @@ export default function MessageScreen() {
 
             return (
                 <View style={{
-                    backgroundColor: isMe ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)',
+                    backgroundColor: isMe ? 'rgba(0,0,0,0.1)' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)'),
                     borderLeftWidth: 3,
-                    borderLeftColor: isMe ? 'rgba(255,255,255,0.5)' : (participantColor || colors.primary),
-                    padding: 6,
+                    borderLeftColor: isMe ? 'rgba(255,255,255,0.6)' : (participantColor || colors.primary),
+                    padding: 8,
                     margin: 4,
                     marginBottom: 2,
-                    borderRadius: 4,
+                    borderRadius: 6,
                     flexDirection: 'row',
-                    gap: 8,
+                    gap: 10,
                     alignItems: 'center',
                     minWidth: 160
                 }}>
                     <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: isMe ? 'white' : (participantColor || colors.primary), marginBottom: 2 }}>{rSender}</Text>
-                        <Text numberOfLines={1} style={{ fontSize: 11, color: isMe ? 'rgba(255,255,255,0.8)' : colors.textSecondary }}>{rContent}</Text>
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: isMe ? 'white' : (participantColor || colors.primary), marginBottom: 2 }}>{rSender}</Text>
+                        <Text numberOfLines={1} style={{ fontSize: 12, color: isMe ? 'rgba(255,255,255,0.85)' : colors.textSecondary }}>{rContent}</Text>
                     </View>
                     {rImageUrl && (
-                        <ExpoImage
-                            source={{ uri: rImageUrl }}
-                            style={{ width: 34, height: 34, borderRadius: 4 }}
-                            contentFit="cover"
-                        />
+                        <View style={{ borderRadius: 4, overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.1)' }}>
+                            <ExpoImage
+                                source={{ uri: rImageUrl }}
+                                style={{ width: 38, height: 38 }}
+                                contentFit="cover"
+                            />
+                        </View>
                     )}
                 </View>
             );
@@ -1133,24 +1144,20 @@ export default function MessageScreen() {
                     ) : (
                         // Text Bubble
                         <View style={{
-                            borderRadius: 20,
+                            borderRadius: 18,
                             overflow: 'hidden',
-                            borderBottomRightRadius: isMe ? 4 : 20,
-                            borderBottomLeftRadius: isMe ? 20 : 4,
+                            borderBottomRightRadius: isMe ? 4 : 18,
+                            borderBottomLeftRadius: isMe ? 18 : 4,
                             backgroundColor: bubbleBg,
-                            minWidth: 100,
-                            shadowColor: "#000",
-                            shadowOffset: { width: 0, height: 1 },
-                            shadowOpacity: 0.1,
-                            shadowRadius: 1,
-                            elevation: 1,
+                            minWidth: 80,
+                            paddingBottom: 2,
                         }}>
                             <ReplyBlock />
                             <NoteReplyBlock />
                             <StoryReplyBlock />
 
-                            <View style={{ padding: 12, paddingTop: (item.replyTo || item.noteRepliedTo) ? 4 : 12 }}>
-                                <Text style={{ fontSize: 16, color: textColor }}>{item.content}</Text>
+                            <View style={{ paddingVertical: 8, paddingHorizontal: 12 }}>
+                                <Text style={{ fontSize: 16, color: textColor, lineHeight: 22 }}>{item.content}</Text>
                             </View>
                         </View>
                     )}

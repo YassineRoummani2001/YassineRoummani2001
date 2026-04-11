@@ -8,8 +8,8 @@ const sendPushNotification = require('../utils/sendPushNotification');
 
 // @desc    Get all posts
 // @route   GET /api/posts
-// @access  Public (or Private)
-router.get('/', async (req, res) => {
+// @access  Private
+router.get('/', protect, async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
@@ -38,8 +38,8 @@ router.get('/', async (req, res) => {
 
 // @desc    Get all reels
 // @route   GET /api/posts/reels
-// @access  Public
-router.get('/reels', async (req, res) => {
+// @access  Private
+router.get('/reels', protect, async (req, res) => {
     try {
         const reelsRaw = await Post.find({ type: { $in: ['reel', 'video'] } })
             .populate('user', 'name handle avatar')
@@ -61,8 +61,8 @@ router.get('/reels', async (req, res) => {
 
 // @desc    Get all unique hashtags
 // @route   GET /api/posts/all-hashtags
-// @access  Public
-router.get('/all-hashtags', async (req, res) => {
+// @access  Private
+router.get('/all-hashtags', protect, async (req, res) => {
     try {
         const posts = await Post.find({ caption: { $regex: /#/ } });
         const hashtagCounts = {};
@@ -89,8 +89,8 @@ router.get('/all-hashtags', async (req, res) => {
 
 // @desc    Get single post by ID
 // @route   GET /api/posts/:id
-// @access  Public
-router.get('/:id', async (req, res) => {
+// @access  Private
+router.get('/:id', protect, async (req, res) => {
     try {
         const post = await Post.findById(req.params.id)
             .populate('user', 'name handle avatar')

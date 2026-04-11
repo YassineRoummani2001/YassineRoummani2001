@@ -300,7 +300,9 @@ export default function UserProfileScreen() {
     const fetchUserData = async () => {
         setUserLoading(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/api/auth/user/${id}`);
+            const res = await fetch(`${API_BASE_URL}/api/auth/user/${id}`, {
+                headers: { 'Authorization': `Bearer ${currentUser?.token}` }
+            });
             if (res.ok) {
                 const data = await res.json();
                 setUserData(data);
@@ -315,7 +317,9 @@ export default function UserProfileScreen() {
     const fetchUserPosts = async () => {
         setPostsLoading(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/api/auth/posts/${id}`);
+            const res = await fetch(`${API_BASE_URL}/api/auth/posts/${id}`, {
+                headers: { 'Authorization': `Bearer ${currentUser?.token}` }
+            });
             if (res.ok) setUserPosts(await res.json());
         } catch (e) { console.error(e); }
         finally { setPostsLoading(false); }
@@ -385,8 +389,13 @@ export default function UserProfileScreen() {
     }, [userData, isFollowing, isOwnProfile, isBlockedByMe, isBlockingMe]);
 
     // ─── Content renderer ────────────────────────────────────────────────────
-    const reels = useMemo(
-        () => userPosts.filter((p) => p.type === 'reel' || p.type === 'video' || p.uri?.endsWith('.mp4')),
+    const reelsOnly = useMemo(
+        () => userPosts.filter((p) => p.type === 'reel'),
+        [userPosts]
+    );
+
+    const videos = useMemo(
+        () => userPosts.filter((p) => p.type === 'video' || p.uri?.endsWith('.mp4') || p.videoUri),
         [userPosts]
     );
 
@@ -496,7 +505,7 @@ export default function UserProfileScreen() {
 
         // — Reels tab
         if (activeTab === 1) {
-            if (reels.length === 0) {
+            if (reelsOnly.length === 0) {
                 return (
                     <View style={styles.emptyState}>
                         <View style={styles.emptyIconWrap}>
@@ -509,7 +518,7 @@ export default function UserProfileScreen() {
             }
             return (
                 <View style={styles.reelsGrid}>
-                    {reels.map((post, i) => (
+                    {reelsOnly.map((post, i) => (
                         <HoverableGridCard
                             key={post._id || i}
                             post={post}
@@ -532,15 +541,41 @@ export default function UserProfileScreen() {
         }
 
         // — Videos tab
-        return (
-            <View style={styles.emptyState}>
-                <View style={styles.emptyIconWrap}>
-                    <Ionicons name="videocam-outline" size={40} color={colors.textSecondary} />
+        if (activeTab === 2) {
+            if (videos.length === 0) {
+                return (
+                    <View style={styles.emptyState}>
+                        <View style={styles.emptyIconWrap}>
+                            <Ionicons name="play-outline" size={40} color={colors.textSecondary} />
+                        </View>
+                        <Text style={styles.emptyTitle}>No Videos Yet</Text>
+                        <Text style={styles.emptySub}>When they share videos, they'll show up here.</Text>
+                    </View>
+                );
+            }
+            return (
+                <View style={styles.grid}>
+                    {videos.map((post, i) => (
+                        <HoverableGridCard
+                            key={post._id || i}
+                            post={post}
+                            isVideo={true}
+                            isReel={false}
+                            style={styles.gridItem}
+                            imageStyle={styles.gridImage}
+                            isDark={isDark}
+                            colors={colors}
+                            onPress={() =>
+                                router.push({
+                                    pathname: '/media-view',
+                                    params: { type: 'video', postId: post._id },
+                                })
+                            }
+                        />
+                    ))}
                 </View>
-                <Text style={styles.emptyTitle}>No Videos Yet</Text>
-                <Text style={styles.emptySub}>Videos will appear here.</Text>
-            </View>
-        );
+            );
+        }
     };
 
     // ─── Buttons ─────────────────────────────────────────────────────────────
