@@ -48,6 +48,8 @@ export default function HomeScreen() {
 
   // Guard ref for race conditions
   const isFetchingRef = useRef(false);
+  const flatListRef = useRef<any>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   const fetchPosts = async (pageNum: number, shouldRefresh = false) => {
     if (isFetchingRef.current) return;
@@ -353,7 +355,30 @@ export default function HomeScreen() {
         maxToRenderPerBatch={4}
         windowSize={5}
         removeClippedSubviews={Platform.OS === 'android'}
+        ref={flatListRef}
+        onScroll={(e) => {
+          const y = e.nativeEvent.contentOffset.y;
+          setShowScrollTop(y > 400);
+        }}
+        scrollEventThrottle={16}
       />
+
+      {/* Floating scroll-to-top + refresh button */}
+      {showScrollTop && (
+        <TouchableOpacity
+          style={[
+            styles.scrollTopBtn,
+            { backgroundColor: colors.primary, bottom: isDesktop ? 32 : 90 }
+          ]}
+          onPress={() => {
+            flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+            setTimeout(onRefresh, 400);
+          }}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="arrow-up" size={20} color="white" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -420,5 +445,18 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 100,
   },
-
+  scrollTopBtn: {
+    position: 'absolute',
+    right: 20,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
 });

@@ -9,32 +9,7 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getCorrectUrl } from '@/utils/api';
 
-// Web standard custom scrollbar styles
-if (Platform.OS === 'web' && typeof document !== 'undefined') {
-    const style = document.createElement('style');
-    style.id = 'comments-modal-web-scrollbar';
-    style.textContent = `
-        .comments-list-scrollbar::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        .comments-list-scrollbar::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        .comments-list-scrollbar::-webkit-scrollbar-thumb {
-            background-color: rgba(155, 155, 155, 0.35);
-            border-radius: 20px;
-            border: 2px solid transparent;
-            background-clip: content-box;
-        }
-        .comments-list-scrollbar::-webkit-scrollbar-thumb:hover {
-            background-color: rgba(155, 155, 155, 0.6);
-        }
-    `;
-    if (!document.getElementById(style.id)) {
-        document.head.appendChild(style);
-    }
-}
+// Dynamic style injection will be handled inside the component to access theme colors
 
 interface Comment {
     _id: string;
@@ -88,6 +63,33 @@ export default function CommentsModal({ visible, onClose, postId, initialComment
     const [followingUsers, setFollowingUsers] = useState<any[]>([]);
 
     const quickEmojis = ['🔥', '❤️', '🙌', '💀', '💯', '🤩', '🫡', '🥺', '😂', '🤞'];
+
+    useEffect(() => {
+        if (Platform.OS === 'web' && typeof document !== 'undefined') {
+            const styleId = 'comments-modal-web-scrollbar';
+            let style = document.getElementById(styleId) as HTMLStyleElement;
+            if (!style) {
+                style = document.createElement('style');
+                style.id = styleId;
+                document.head.appendChild(style);
+            }
+            style.textContent = `
+                .comments-list-scrollbar::-webkit-scrollbar {
+                    width: 6px;
+                }
+                .comments-list-scrollbar::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .comments-list-scrollbar::-webkit-scrollbar-thumb {
+                    background-color: ${colors.primary}66;
+                    border-radius: 10px;
+                }
+                .comments-list-scrollbar::-webkit-scrollbar-thumb:hover {
+                    background-color: ${colors.primary};
+                }
+            `;
+        }
+    }, [colors.primary]);
 
     useEffect(() => {
         if (visible && postId) {
@@ -323,7 +325,10 @@ export default function CommentsModal({ visible, onClose, postId, initialComment
                                 showsVerticalScrollIndicator={true}
                                 persistentScrollbar={true}
                                 keyboardDismissMode="on-drag"
-                                style={styles.flatList}
+                                style={[
+                                    styles.flatList,
+                                    Platform.OS === 'web' && { scrollbarColor: `${colors.primary}66 transparent` } as any
+                                ]}
                                 // @ts-ignore
                                 dataSet={{ class: 'comments-list-scrollbar' }}
                                 contentContainerStyle={styles.listContent}
@@ -514,8 +519,7 @@ const styles = StyleSheet.create({
         // Web-specific scrollbar styling
         ...(Platform.OS === 'web' ? {
             overflowY: 'auto' as any,
-            scrollbarWidth: 'auto' as any,
-            scrollbarColor: 'rgba(150, 150, 150, 0.6) transparent',
+            scrollbarWidth: 'thin' as any,
         } : {})
     },
     listContent: {

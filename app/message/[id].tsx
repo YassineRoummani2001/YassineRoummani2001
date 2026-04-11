@@ -71,6 +71,22 @@ const formatDividerDate = (dateStr: string) => {
     return `${day} ${time}`;
 };
 
+const getSenderColor = (senderId: string) => {
+    const colors = [
+        '#FF5252', '#FF4081', '#E040FB', '#7C4DFF',
+        '#536DFE', '#448AFF', '#40C4FF', '#18FFFF',
+        '#64FFDA', '#69F0AE', '#B2FF59', '#EEFF41',
+        '#FFD740', '#FFAB40', '#FF6E40', '#9B59B6',
+        '#3498DB', '#E67E22', '#2ECC71', '#1ABC9C'
+    ];
+    let hash = 0;
+    const str = senderId || 'default';
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+};
+
 const AvatarImage = ({ uri, name, size = 32, hasStory, storyViewed }: { uri?: string, name?: string, size?: number, hasStory?: boolean, storyViewed?: boolean }) => {
     const validUri = getCorrectUrl(uri);
     const { colors } = useThemeContext();
@@ -121,7 +137,7 @@ const AvatarImage = ({ uri, name, size = 32, hasStory, storyViewed }: { uri?: st
 
 const WAVEFORM_BARS = [4, 6, 8, 14, 12, 8, 10, 16, 20, 14, 10, 8, 12, 18, 16, 10, 8, 6, 4, 10, 12, 16, 20, 18, 12, 10, 8, 6, 4];
 
-const VoiceMessage = ({ uri, itemsDuration, isMe, colors }: { uri: string, itemsDuration?: number, isMe: boolean, colors: any }) => {
+const VoiceMessage = ({ uri, itemsDuration, isMe, colors, customColor }: { uri: string, itemsDuration?: number, isMe: boolean, colors: any, customColor?: string }) => {
     // Attempt to use the hook, but wrap in a try-catch pattern if it causes constructor errors
     // Since useAudioPlayer is a hook, we can't try-catch it directly.
     // However, the error usually happens during the constructor call inside the hook.
@@ -160,7 +176,7 @@ const VoiceMessage = ({ uri, itemsDuration, isMe, colors }: { uri: string, items
         return `${m}:${s < 10 ? '0' : ''}${s}`;
     };
 
-    const activeColor = isMe ? '#FFF' : colors.primary;
+    const activeColor = isMe ? '#FFF' : (customColor || colors.primary);
     const inactiveColor = isMe ? 'rgba(255,255,255,0.4)' : (colors.background === '#000' ? '#444' : '#CCC');
 
     return (
@@ -169,7 +185,7 @@ const VoiceMessage = ({ uri, itemsDuration, isMe, colors }: { uri: string, items
             padding: 10,
             paddingRight: 16,
             minWidth: 200,
-            backgroundColor: isMe ? colors.primary : (colors.background === '#000' ? '#262626' : '#F2F2F2'),
+            backgroundColor: isMe ? colors.primary : (customColor || (colors.background === '#000' ? '#262626' : '#F2F2F2')),
             borderBottomRightRadius: isMe ? 4 : 18,
             borderBottomLeftRadius: isMe ? 18 : 4,
             flexDirection: 'row', alignItems: 'center', gap: 12
@@ -836,6 +852,16 @@ export default function MessageScreen() {
         }
 
         const isMe = item.sender?._id === user._id || item.sender === user._id;
+        const senderId = typeof item.sender === 'object' ? item.sender?._id : (item.sender || 'unknown');
+        const senderName = item.sender?.name || 'User';
+        const senderAvatar = item.sender?.avatar;
+        const isGroupChat = isGroup === 'true';
+
+        // Unique color for group members
+        const participantColor = (!isMe && isGroupChat) ? getSenderColor(senderId) : undefined;
+        const bubbleBg = isMe ? colors.primary : (participantColor || (isDark ? '#262626' : '#F2F2F2'));
+        const textColor = (isMe || participantColor) ? '#FFF' : colors.text;
+
         const reactions = item.reactions || {};
         const reactionKeys = Object.keys(reactions);
         const hasReactions = reactionKeys.length > 0;
@@ -852,7 +878,7 @@ export default function MessageScreen() {
                 <View style={{
                     backgroundColor: isMe ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)',
                     borderLeftWidth: 3,
-                    borderLeftColor: isMe ? 'rgba(255,255,255,0.5)' : colors.primary,
+                    borderLeftColor: isMe ? 'rgba(255,255,255,0.5)' : (participantColor || colors.primary),
                     padding: 6,
                     margin: 4,
                     marginBottom: 2,
@@ -863,7 +889,7 @@ export default function MessageScreen() {
                     minWidth: 160
                 }}>
                     <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: isMe ? 'white' : colors.primary, marginBottom: 2 }}>{rSender}</Text>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: isMe ? 'white' : (participantColor || colors.primary), marginBottom: 2 }}>{rSender}</Text>
                         <Text numberOfLines={1} style={{ fontSize: 11, color: isMe ? 'rgba(255,255,255,0.8)' : colors.textSecondary }}>{rContent}</Text>
                     </View>
                     {rImageUrl && (
@@ -887,7 +913,7 @@ export default function MessageScreen() {
                 <View style={{
                     backgroundColor: isMe ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)',
                     borderLeftWidth: 3,
-                    borderLeftColor: isMe ? '#FFF' : colors.primary,
+                    borderLeftColor: isMe ? '#FFF' : (participantColor || colors.primary),
                     padding: 8,
                     margin: 4,
                     marginBottom: 6,
@@ -898,7 +924,7 @@ export default function MessageScreen() {
                     minWidth: 160, // Fixed min width to avoid wrapping 'Replying to note'
                 }}>
                     <View style={{ flex: 1 }}>
-                        <Text numberOfLines={1} style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', color: isMe ? 'rgba(255,255,255,0.7)' : colors.primary, marginBottom: 4, letterSpacing: 0.5 }}>
+                        <Text numberOfLines={1} style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', color: isMe ? 'rgba(255,255,255,0.7)' : (participantColor || colors.primary), marginBottom: 4, letterSpacing: 0.5 }}>
                             Replying to note
                         </Text>
                         <Text numberOfLines={1} style={{ fontSize: 13, color: isMe ? '#FFF' : colors.text, fontWeight: '600' }}>
@@ -983,163 +1009,187 @@ export default function MessageScreen() {
         };
 
         const content = (
-            <TouchableOpacity
-                activeOpacity={0.8}
-                onLongPress={() => setSelectedMessage(item)}
-                style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '75%', marginVertical: 6 }}
-            >
-                {(item.marketitemId || item.postId) ? (() => {
-                    // Shared Item (Post/Market)
-                    const isMarket = !!item.marketitemId;
-                    const sharedItem = item.marketitemId || item.postId;
+            <View style={{ 
+                flexDirection: 'row', 
+                alignSelf: isMe ? 'flex-end' : 'flex-start', 
+                maxWidth: '85%', 
+                marginVertical: 4,
+                gap: 8,
+                alignItems: 'flex-end' 
+            }}>
+                {!isMe && isGroupChat && (
+                    <TouchableOpacity onPress={() => router.push(`/user/${senderId}`)}>
+                        <AvatarImage uri={senderAvatar} name={senderName} size={30} />
+                    </TouchableOpacity>
+                )}
+                
+                <TouchableOpacity
+                    activeOpacity={0.8}
+                    onLongPress={() => setSelectedMessage(item)}
+                    style={{ flexShrink: 1 }}
+                >
+                    {!isMe && isGroupChat && (
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: participantColor || colors.textSecondary, marginLeft: 4, marginBottom: 2 }}>
+                            {senderName}
+                        </Text>
+                    )}
 
-                    const rawImageUrl = isMarket
-                        ? (sharedItem.images?.[0] || sharedItem.image)
-                        : (sharedItem.uri || sharedItem.videoUri);
+                    {(item.marketitemId || item.postId) ? (() => {
+                        // Shared Item (Post/Market)
+                        const isMarket = !!item.marketitemId;
+                        const sharedItem = item.marketitemId || item.postId;
 
-                    const imageUrl = getCorrectUrl(rawImageUrl);
-                    const title = isMarket ? sharedItem.title : (sharedItem.caption || 'Shared Post');
-                    const owner = sharedItem.user;
+                        const rawImageUrl = isMarket
+                            ? (sharedItem.images?.[0] || sharedItem.image)
+                            : (sharedItem.uri || sharedItem.videoUri);
 
-                    return (
+                        const imageUrl = getCorrectUrl(rawImageUrl);
+                        const title = isMarket ? sharedItem.title : (sharedItem.caption || 'Shared Post');
+                        const owner = sharedItem.user;
+
+                        return (
+                            <View>
+                                <ReplyBlock />
+                                <NoteReplyBlock />
+                                <StoryReplyBlock />
+                                <TouchableOpacity
+                                    activeOpacity={0.9}
+                                    onLongPress={() => setSelectedMessage(item)}
+                                    onPress={() => {
+                                        if (isMarket) router.push(`/marketplace/${sharedItem._id}`);
+                                        else {
+                                            router.push({
+                                                pathname: '/media-view',
+                                                params: {
+                                                    uri: sharedItem.videoUri || sharedItem.uri || sharedItem.image,
+                                                    type: sharedItem.videoUri ? 'video' : 'image',
+                                                    postId: sharedItem._id
+                                                }
+                                            });
+                                        }
+                                    }}
+                                    style={{
+                                        backgroundColor: isDark ? '#262626' : '#F2F2F2',
+                                        borderRadius: 16,
+                                        overflow: 'hidden',
+                                        borderWidth: 1,
+                                        borderColor: isDark ? '#333' : '#EEE',
+                                        marginBottom: 4,
+                                        width: 220
+                                    }}
+                                >
+                                    {owner && (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', padding: 8, gap: 8 }}>
+                                            <AvatarImage uri={owner.avatar} name={owner.name} size={24} />
+                                            <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '600', color: colors.text, flex: 1 }}>{owner.name || owner.username}</Text>
+                                        </View>
+                                    )}
+                                    {imageUrl ? (
+                                        <View style={{ width: '100%', height: 220, backgroundColor: isDark ? '#333' : '#E0E0E0' }}>
+                                            <ExpoImage
+                                                source={{ uri: imageUrl }}
+                                                style={{ width: '100%', height: '100%' }}
+                                                contentFit="cover"
+                                            />
+                                        </View>
+                                    ) : (
+                                        <View style={{ width: '100%', height: 220, backgroundColor: isDark ? '#333' : '#E0E0E0', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Ionicons name="image-outline" size={40} color={colors.textSecondary} />
+                                        </View>
+                                    )}
+                                    <View style={{ padding: 12 }}>
+                                        <Text numberOfLines={2} style={{ fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 8 }}>{title}</Text>
+                                        <View style={{ backgroundColor: isDark ? '#000' : '#FFF', paddingVertical: 6, borderRadius: 8, alignItems: 'center' }}>
+                                            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary }}>View Details</Text>
+                                        </View>
+                                    </View>
+                                </TouchableOpacity>
+                            </View>
+                        );
+                    })() : item.type === 'audio' ? (
                         <View>
                             <ReplyBlock />
                             <NoteReplyBlock />
                             <StoryReplyBlock />
-                            <TouchableOpacity
-                                activeOpacity={0.9}
-                                onLongPress={() => setSelectedMessage(item)}
-                                onPress={() => {
-                                    if (isMarket) router.push(`/marketplace/${sharedItem._id}`);
-                                    else {
-                                        router.push({
-                                            pathname: '/media-view',
-                                            params: {
-                                                uri: sharedItem.videoUri || sharedItem.uri || sharedItem.image,
-                                                type: sharedItem.videoUri ? 'video' : 'image',
-                                                postId: sharedItem._id
-                                            }
-                                        });
-                                    }
-                                }}
-                                style={{
-                                    backgroundColor: isDark ? '#262626' : '#F2F2F2',
-                                    borderRadius: 16,
-                                    overflow: 'hidden',
-                                    borderWidth: 1,
-                                    borderColor: isDark ? '#333' : '#EEE',
-                                    marginBottom: 4,
-                                    width: 220
-                                }}
-                            >
-                                {owner && (
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', padding: 8, gap: 8 }}>
-                                        <AvatarImage uri={owner.avatar} name={owner.name} size={24} />
-                                        <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '600', color: colors.text, flex: 1 }}>{owner.name || owner.username}</Text>
-                                    </View>
-                                )}
-                                {imageUrl ? (
-                                    <View style={{ width: '100%', height: 220, backgroundColor: isDark ? '#333' : '#E0E0E0' }}>
-                                        <ExpoImage
-                                            source={{ uri: imageUrl }}
-                                            style={{ width: '100%', height: '100%' }}
-                                            contentFit="cover"
-                                            onLoad={() => console.log('Image loaded successfully')}
-                                            onError={() => console.log('Image failed to load URL:', imageUrl)}
-                                        />
-                                    </View>
-                                ) : (
-                                    <View style={{ width: '100%', height: 220, backgroundColor: isDark ? '#333' : '#E0E0E0', alignItems: 'center', justifyContent: 'center' }}>
-                                        <Ionicons name="image-outline" size={40} color={colors.textSecondary} />
-                                    </View>
-                                )}
-                                <View style={{ padding: 12 }}>
-                                    <Text numberOfLines={2} style={{ fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 8 }}>{title}</Text>
-                                    <View style={{ backgroundColor: isDark ? '#000' : '#FFF', paddingVertical: 6, borderRadius: 8, alignItems: 'center' }}>
-                                        <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary }}>View Details</Text>
-                                    </View>
-                                </View>
-                            </TouchableOpacity>
+                            <VoiceMessage uri={item.content} itemsDuration={item.duration} isMe={isMe} colors={colors} customColor={participantColor} />
                         </View>
-                    );
-                })() : item.type === 'audio' ? (
-                    <View>
-                        <ReplyBlock />
-                        <NoteReplyBlock />
-                        <StoryReplyBlock />
-                        <VoiceMessage uri={item.content} itemsDuration={item.duration} isMe={isMe} colors={colors} />
-                    </View>
-                ) : item.type === 'image' ? (
-                    <View>
-                        <ReplyBlock />
-                        <NoteReplyBlock />
-                        <StoryReplyBlock />
-                        <View style={{ borderRadius: 18, overflow: 'hidden', backgroundColor: isDark ? '#262626' : '#F2F2F2' }}>
-                            {(() => {
-                                const validUri = getCorrectUrl(item.content);
-                                if (validUri) return <ExpoImage source={{ uri: validUri }} style={{ width: 220, height: 280, borderRadius: 18 }} contentFit="cover" />;
-                                return (
-                                    <View style={{ width: 220, height: 280, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? '#333' : '#DDD' }}>
-                                        <Ionicons name="image-outline" size={40} color={colors.textSecondary} />
-                                    </View>
-                                );
-                            })()}
+                    ) : item.type === 'image' ? (
+                        <View>
+                            <ReplyBlock />
+                            <NoteReplyBlock />
+                            <StoryReplyBlock />
+                            <View style={{ borderRadius: 18, overflow: 'hidden', backgroundColor: isDark ? '#262626' : '#F2F2F2' }}>
+                                {(() => {
+                                    const validUri = getCorrectUrl(item.content);
+                                    if (validUri) return <ExpoImage source={{ uri: validUri }} style={{ width: 220, height: 280, borderRadius: 18 }} contentFit="cover" />;
+                                    return (
+                                        <View style={{ width: 220, height: 280, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? '#333' : '#DDD' }}>
+                                            <Ionicons name="image-outline" size={40} color={colors.textSecondary} />
+                                        </View>
+                                    );
+                                })()}
+                            </View>
                         </View>
-                    </View>
-                ) : (
-                    // Text Bubble
-                    <View style={{
-                        borderRadius: 20,
-                        overflow: 'hidden',
-                        borderBottomRightRadius: isMe ? 4 : 20,
-                        borderBottomLeftRadius: isMe ? 20 : 4,
-                        backgroundColor: isMe ? colors.primary : (isDark ? '#262626' : '#F2F2F2'),
-                        minWidth: 140
-                    }}>
-                        <ReplyBlock />
-                        <NoteReplyBlock />
-                        <StoryReplyBlock />
+                    ) : (
+                        // Text Bubble
+                        <View style={{
+                            borderRadius: 20,
+                            overflow: 'hidden',
+                            borderBottomRightRadius: isMe ? 4 : 20,
+                            borderBottomLeftRadius: isMe ? 20 : 4,
+                            backgroundColor: bubbleBg,
+                            minWidth: 100,
+                            shadowColor: "#000",
+                            shadowOffset: { width: 0, height: 1 },
+                            shadowOpacity: 0.1,
+                            shadowRadius: 1,
+                            elevation: 1,
+                        }}>
+                            <ReplyBlock />
+                            <NoteReplyBlock />
+                            <StoryReplyBlock />
 
-                        <View style={{ padding: 12, paddingTop: (item.replyTo || item.noteRepliedTo) ? 4 : 12 }}>
-                            <Text style={{ fontSize: 16, color: isMe ? '#FFF' : colors.text }}>{item.content}</Text>
+                            <View style={{ padding: 12, paddingTop: (item.replyTo || item.noteRepliedTo) ? 4 : 12 }}>
+                                <Text style={{ fontSize: 16, color: textColor }}>{item.content}</Text>
+                            </View>
                         </View>
-                    </View>
-                )}
+                    )}
 
-                {/* Reactions Overlay */}
-                {hasReactions && (
-                    <View style={{
-                        position: 'absolute',
-                        bottom: 12, // Overlap slightly
-                        [isMe ? 'left' : 'right']: -4, // Hang off the side
-                        backgroundColor: isDark ? '#333' : '#FFF',
-                        borderRadius: 12,
-                        paddingVertical: 2,
-                        paddingHorizontal: 6,
-                        flexDirection: 'row',
-                        gap: 2,
-                        shadowColor: "#000",
-                        shadowOffset: { width: 0, height: 1 },
-                        shadowOpacity: 0.2,
-                        shadowRadius: 1,
-                        elevation: 3,
-                        borderColor: isDark ? '#444' : '#EEE',
-                        borderWidth: 1,
-                        zIndex: 10
-                    }}>
-                        {reactionKeys.slice(0, 3).map((emoji) => (
-                            <Text key={emoji} style={{ fontSize: 11, color: colors.text }}>
-                                {emoji} {reactions[emoji].length > 1 ? reactions[emoji].length : ''}
-                            </Text>
-                        ))}
-                        {reactionKeys.length > 3 && <Text style={{ fontSize: 10, color: colors.textSecondary }}>+</Text>}
-                    </View>
-                )}
+                    {/* Reactions Overlay */}
+                    {hasReactions && (
+                        <View style={{
+                            position: 'absolute',
+                            bottom: 12, // Overlap slightly
+                            [isMe ? 'left' : 'right']: -4, // Hang off the side
+                            backgroundColor: isDark ? '#333' : '#FFF',
+                            borderRadius: 12,
+                            paddingVertical: 2,
+                            paddingHorizontal: 6,
+                            flexDirection: 'row',
+                            gap: 2,
+                            shadowColor: "#000",
+                            shadowOffset: { width: 0, height: 1 },
+                            shadowOpacity: 0.2,
+                            shadowRadius: 1,
+                            elevation: 3,
+                            borderColor: isDark ? '#444' : '#EEE',
+                            borderWidth: 1,
+                            zIndex: 10
+                        }}>
+                            {reactionKeys.slice(0, 3).map((emoji) => (
+                                <Text key={emoji} style={{ fontSize: 11, color: colors.text }}>
+                                    {emoji} {reactions[emoji].length > 1 ? reactions[emoji].length : ''}
+                                </Text>
+                            ))}
+                            {reactionKeys.length > 3 && <Text style={{ fontSize: 10, color: colors.textSecondary }}>+</Text>}
+                        </View>
+                    )}
 
-                <Text style={{ fontSize: 10, marginTop: 6, marginHorizontal: 4, color: colors.textSecondary, alignSelf: 'flex-end' }}>
-                    {formatTime(item.createdAt)}
-                </Text>
-            </TouchableOpacity>
+                    <Text style={{ fontSize: 9, marginTop: 4, marginHorizontal: 4, color: colors.textSecondary, alignSelf: isMe ? 'flex-end' : 'flex-start', opacity: 0.7 }}>
+                        {formatTime(item.createdAt)}
+                    </Text>
+                </TouchableOpacity>
+            </View>
         );
 
         return (

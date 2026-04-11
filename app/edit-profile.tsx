@@ -421,13 +421,25 @@ export default function EditProfileScreen() {
                         <View style={[styles.inputGroup, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF', borderColor: colors.border }]}>
                             <View style={[styles.inputContainer, { borderBottomColor: colors.border }]}>
                                 <Text style={[styles.label, { color: colors.textSecondary }]}>Pronouns</Text>
-                                <TextInput
-                                    style={[styles.input, { color: colors.text }]}
-                                    value={pronouns}
-                                    onChangeText={setPronouns}
-                                    placeholder="he/him, she/her"
-                                    placeholderTextColor={colors.textSecondary}
-                                />
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.genderRow} contentContainerStyle={{ gap: 8 }}>
+                                    {['he/him', 'she/her', 'they/them', 'None'].map((option) => (
+                                        <TouchableOpacity
+                                            key={option}
+                                            style={[
+                                                styles.genderChip,
+                                                pronouns === (option === 'None' ? '' : option) ? { backgroundColor: colors.primary } : { backgroundColor: isDark ? '#2C2C2E' : '#F2F2F2' }
+                                            ]}
+                                            onPress={() => setPronouns(option === 'None' ? '' : option)}
+                                        >
+                                            <Text style={[
+                                                styles.genderText,
+                                                pronouns === (option === 'None' ? '' : option) ? { color: 'white' } : { color: colors.text }
+                                            ]}>
+                                                {option}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
                             </View>
 
                             <View style={[styles.inputContainer, { borderBottomColor: colors.border }]}>
@@ -480,7 +492,7 @@ export default function EditProfileScreen() {
                                         <ChevronDown size={14} color={colors.textSecondary} />
                                     </TouchableOpacity>
                                     <TextInput
-                                        style={[styles.input, { flex: 1, paddingVertical: 0, height: '100%' }]}
+                                        style={[styles.input, { color: colors.text, flex: 1, paddingVertical: 0, height: '100%' }]}
                                         value={phone}
                                         onChangeText={setPhone}
                                         placeholder="Mobile Number"

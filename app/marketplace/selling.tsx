@@ -67,36 +67,11 @@ export default function SellingDashboard() {
                 }
             });
             
-            // Comprehensive local calculations for "real" database data
-            const activeCount = userItems.filter(i => i.status === 'available').length;
-            const soldCount = userItems.filter(i => i.status === 'sold').length;
-            const totalClicks = userItems.reduce((acc, item) => acc + (item.views || 0), 0);
-            const totalSaves = userItems.reduce((acc, item) => acc + (item.savedBy?.length || 0), 0);
-            const inventoryValue = userItems
-                .filter(i => i.status === 'available')
-                .reduce((acc, item) => acc + (item.price || 0), 0);
-
             if (res.ok) {
                 const data = await res.json();
-                setStats({
-                    ...data,
-                    activeListings: activeCount,
-                    soldCount: soldCount,
-                    totalViews: totalClicks > 0 ? totalClicks : (data.totalViews || 0),
-                    totalSaves: totalSaves,
-                    inventoryValue: inventoryValue,
-                    sellerRating: data.sellerRating || 5.0,
-                });
+                setStats(data);
             } else {
-                // Fallback to local calculations if stats endpoint fails
-                setStats((prev: any) => ({
-                    ...prev,
-                    activeListings: activeCount,
-                    soldCount: soldCount,
-                    totalViews: totalClicks,
-                    totalSaves: totalSaves,
-                    inventoryValue: inventoryValue,
-                }));
+                // Keep default if failed
             }
         } catch (error) {
             console.error('Error fetching stats:', error);
@@ -562,8 +537,14 @@ export default function SellingDashboard() {
 
         const pieData = [
             { value: stats.soldCount || 0, color: '#6366F1', text: 'Sold' },
-            { value: stats.activeListings || 1, color: '#00F0FF', text: 'Active' },
-            { value: Math.round(totalItems * 0.15), color: '#8B5CF6', text: 'Saves' },
+            { value: stats.activeListings || 0, color: '#00F0FF', text: 'Active' },
+            { value: stats.totalSaves || 0, color: '#8B5CF6', text: 'Saves' },
+        ];
+
+        // Ensure chart shows something even if all zero
+        const hasData = pieData.some(d => d.value > 0);
+        const displayPieData = hasData ? pieData : [
+            { value: 1, color: isDark ? '#333' : '#EEE', text: 'No Data' }
         ];
 
         return (
@@ -640,49 +621,101 @@ export default function SellingDashboard() {
                 {/* Visual Analytics Row 2 - Deep Insights */}
                 <View style={[styles.chartsRow, { flexDirection: isDesktop ? 'row' : 'column', marginTop: 16, justifyContent: 'space-between' }]}>
                    <ChartCard title="Success Rate" subtitle="Sales conversion" icon={CheckCircle2}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 32, marginTop: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 24, marginTop: 16 }}>
                             <PieChart
                                 donut
-                                data={pieData}
+                                data={displayPieData}
                                 radius={55}
                                 innerRadius={42}
                                 innerCircleColor={isDark ? '#1C1C1E' : '#FFFFFF'}
                                 centerLabelComponent={() => (
                                     <View style={{ justifyContent: 'center', alignItems: 'center' }}>
-                                        <Text style={{ fontSize: 18, color: colors.text, fontWeight: '900' }}>{soldPercentage}%</Text>
-                                        <Text style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 'bold' }}>Sold</Text>
+                                        <Text style={{ fontSize: 18, color: hasData ? colors.text : colors.textSecondary, fontWeight: '900' }}>{hasData ? `${soldPercentage}%` : '—'}</Text>
+                                        <Text style={{ fontSize: 8, color: colors.textSecondary, fontWeight: '700', textTransform: 'uppercase' }}>{hasData ? 'Sold' : 'Empty'}</Text>
                                     </View>
                                 )}
                             />
-                            <View style={{ gap: 8 }}>
+                            <View style={{ flex: 1, gap: 12 }}>
                                 {pieData.map((d, i) => (
-                                    <View key={i} style={styles.legendItem}>
-                                        <View style={[styles.legendDot, { backgroundColor: d.color }]} />
-                                        <Text style={styles.legendText}>{d.text}</Text>
-                                        <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text }}>{d.value}</Text>
+                                    <View key={i} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <View style={[styles.legendDot, { backgroundColor: d.color, width: 10, height: 10, borderRadius: 5 }]} />
+                                            <Text style={[styles.legendText, { fontSize: 13, fontWeight: '600', color: colors.textSecondary }]}>{d.text}</Text>
+                                        </View>
+                                        <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>{d.value}</Text>
                                     </View>
                                 ))}
                             </View>
                         </View>
                    </ChartCard>
 
-                   {/* Secondary Info Card - Glass Variant */}
+                   {/* Interactive Account Status - Premium Card */}
                    <LinearGradient
-                        colors={isDark ? ['#1C1C1E', '#1C1C1E'] : ['#6366f110', '#6366f105']}
+                        colors={isDark ? ['#1C1C1E', '#262626'] : ['#F8FAFC', '#F1F5F9']}
                         style={[styles.chartContainer, { width: isDesktop ? '49%' : '100%', borderColor: colors.border, padding: 24 }]}
                    >
-                        <Text style={{ fontSize: 14, fontWeight: '800', color: colors.primary, textTransform: 'uppercase', letterSpacing: 1 }}>Account Status</Text>
-                        <View style={{ marginTop: 16, gap: 12 }}>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <Text style={{ color: colors.text, fontSize: 13, fontWeight: '600' }}>Profile Strength</Text>
-                                <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Excellent</Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: isDark ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.1)', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Zap size={20} color={colors.primary} />
+                                </View>
+                                <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text, textTransform: 'uppercase', letterSpacing: 1 }}>Account Status</Text>
                             </View>
-                            <View style={{ height: 6, backgroundColor: isDark ? '#2C2C2E' : '#F3F4F6', borderRadius: 3, overflow: 'hidden' }}>
-                                <View style={{ width: '85%', height: '100%', backgroundColor: colors.primary, borderRadius: 3 }} />
+                            <View style={{ backgroundColor: stats.profileStrength >= 90 ? '#10B98120' : '#6366F120', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
+                                <Text style={{ color: stats.profileStrength >= 90 ? '#10B981' : colors.primary, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' }}>
+                                    {stats.profileStrength >= 90 ? 'Verified' : 'Active'}
+                                </Text>
                             </View>
-                            <Text style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 18, marginTop: 4 }}>
-                                You are performing better than 85% of sellers in your category. Keep it up!
+                        </View>
+
+                        <View style={{ gap: 14 }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                                <View>
+                                    <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600' }}>Profile Strength</Text>
+                                    <Text style={{ color: colors.text, fontSize: 24, fontWeight: '900', marginTop: 2 }}>
+                                        {stats.profileStrength >= 90 ? 'Elite' : stats.profileStrength >= 70 ? 'Strong' : 'Rising'}
+                                    </Text>
+                                </View>
+                                <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '800' }}>{stats.profileStrength || 0}%</Text>
+                            </View>
+
+                            <View style={{ height: 10, backgroundColor: isDark ? '#333' : '#E2E8F0', borderRadius: 5, overflow: 'hidden' }}>
+                                <LinearGradient
+                                    colors={[colors.primary, '#8B5CF6']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={{ width: `${stats.profileStrength || 60}%`, height: '100%', borderRadius: 5 }}
+                                />
+                            </View>
+
+                            <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 20 }}>
+                                {stats.profileStrength >= 80 
+                                    ? `Outstanding! You're in the top ${100 - stats.profileStrength}% of sellers. Your visibility is boosted.`
+                                    : `Complete your missing profile details to reach up to 40% more potential buyers in your area.`}
                             </Text>
+
+                            <TouchableOpacity 
+                                style={{ 
+                                    marginTop: 10, 
+                                    backgroundColor: colors.primary, 
+                                    borderRadius: 14, 
+                                    paddingVertical: 14,
+                                    alignItems: 'center',
+                                    flexDirection: 'row',
+                                    justifyContent: 'center',
+                                    gap: 10,
+                                    shadowColor: colors.primary,
+                                    shadowOffset: { width: 0, height: 4 },
+                                    shadowOpacity: 0.3,
+                                    shadowRadius: 8,
+                                    elevation: 6
+                                }}
+                                onPress={() => router.push('/edit-profile' as any)}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 14, letterSpacing: 0.3 }}>Complete Profile</Text>
+                                <ArrowUpRight size={18} color="#FFF" strokeWidth={2.5} />
+                            </TouchableOpacity>
                         </View>
                    </LinearGradient>
                 </View>
