@@ -4,11 +4,13 @@
   "version": "1.0.0",
   "scripts": {
     "start": "cross-env NODE_OPTIONS=--max-old-space-size=4096 expo start",
+    "start:clear": "cross-env NODE_OPTIONS=--max-old-space-size=4096 expo start --clear",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "cross-env NODE_OPTIONS=--max-old-space-size=4096 expo start --android",
     "ios": "cross-env NODE_OPTIONS=--max-old-space-size=4096 expo start --ios",
     "web": "cross-env NODE_OPTIONS=--max-old-space-size=4096 expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "clear": "npx expo start --clear"
   },
   "dependencies": {
     "@expo/react-native-action-sheet": "^4.1.1",
